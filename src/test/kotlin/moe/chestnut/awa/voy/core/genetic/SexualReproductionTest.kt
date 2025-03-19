@@ -2,5 +2,6 @@ package moe.chestnut.awa.voy.core.genetic
 
 import org.junit.jupiter.api.Assertions.*
 
-class ASexualReproductionTest {
+class SexualReproductionTest {
+    // TODO: Add test code here.
 }

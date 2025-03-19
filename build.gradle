@@ -46,6 +46,9 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 	modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
+
+	// Test for Core(Purely Kotlin)
+	testImplementation "org.jetbrains.kotlin:kotlin-test"
 }
 
 processResources {
@@ -100,4 +103,9 @@ publishing {
 		// The repositories here will be used for publishing your artifact, not for
 		// retrieving dependencies.
 	}
+}
+
+// Test
+test {
+	useJUnitPlatform()
 }
