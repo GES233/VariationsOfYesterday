@@ -5,11 +5,11 @@
 	"name": "Variations of Yesterday",
 	"description": "This is an example description! Tell everyone what your mod is about!",
 	"authors": [
-		"Me!"
+		"GES233"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://github.com/GES233/VariationsOfYesterday",
+		"sources": "https://github.com/GES233/VariationsOfYesterday"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/variations-of-yesterday/icon.png",

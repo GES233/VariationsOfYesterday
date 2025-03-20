@@ -9,6 +9,11 @@
 
 ## First Step
 
+### 敏捷开发为主
+
+- [ ] 添加 LuminousGrass
+- [ ] 添加手研钵
+
 ### Elements
 
 - [ ] 基本元素（水、火、风、土）
