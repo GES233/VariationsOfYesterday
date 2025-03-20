@@ -2,7 +2,7 @@
 
 ## 经纬度的变化
 
-20k 格 <-> 10° （sine-wave-like）。
+50k 格 <-> 60° （sine-wave-like）。
 
 ## 更精确的月相
 
