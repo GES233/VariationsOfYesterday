@@ -25,7 +25,7 @@
 
 ## 草药
 
-### 星草（LuminousGrass）
+### 星草（Luminous???）
 
 * 基本信息
     * 学名 *Astrachnium stellamuta*
