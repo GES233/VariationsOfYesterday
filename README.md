@@ -2,6 +2,8 @@
 
 *Variations of Yesterday: Lie No.13 in Serenity*
 
+Used to learn Minecraft mod development.
+
 ## 有关玩法的核心介绍
 
 TODO: 使描述符合游戏的叙事以及标题
@@ -42,6 +44,7 @@ TODO: 使描述符合游戏的叙事以及标题
 
 * 前奏（从祂的眼睛看世界）  *说白了就是营造氛围以及基调*
 * 花（多彩的）
+  * 要有一点点情感方面的成分/元素/角色
 * 月（回忆/清冷）
     * 《爱乐之城》的 *City of Star*
     * Mes larmes secrétes
@@ -51,6 +54,7 @@ TODO: 使描述符合游戏的叙事以及标题
     * 出现随机，频率和进度有关
     * 可供参考的来源：null 的都市传说（inspired of wendigodrip's [TBS](https://modrinth.com/mod/the-broken-script)）
 * 迷失（抉择/混乱的）
+    * Are you lost?
     * 光怪陆离的 [crystal castles - leni](https://www.youtube.com/watch?v=WhpT7Klunl0)
 * Echo（from [【VOCALOID Original】ECHO【Gumi English】](https://www.youtube.com/watch?v=cQKGUgOfD8U)）/Neko（修猫咪好可爱）
     * 直面崩坏的现实或待在幻想世界中
@@ -60,17 +64,23 @@ TODO: 使描述符合游戏的叙事以及标题
     * 第二个就是世界回到了模组不存在的情况
     * 第三个嘛… 「现在是幻想时间」，该存档会一直停留在日式田园的模式
 
+#### 推进
+
+* 展现
+  * 月相
+  * 行星
+
 ### 关于第十三号谎言
 
 谎言的目的：维护这个世界（指代某客体的内心世界）的安宁
 
 => 十三号：这个世界其实很♂乱
 
-=> 1~12 ，类似于动物园怪谈的存在，但是【不是真的】
+=> 1~12 ，类似于动物园怪谈的约束，但是【不是真的】
 
 ### 对玩家行为的观察
 
-目的在于提高互动感，以及增强玩家感受的程度。
+目的在于增强玩家感受的沉浸感。
 
 ## 基本信息
 
