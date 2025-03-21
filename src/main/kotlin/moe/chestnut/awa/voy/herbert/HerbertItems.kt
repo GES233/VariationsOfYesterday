@@ -9,7 +9,6 @@ import net.minecraft.util.Identifier
 
 object HerbertItems {
     // LuminousGrass
-    private val LUMINOUS_GRASS: Item = register("luminous_grass", { settings: Item.Settings? -> Item(settings) }, Item.Settings())
     private val LUMINOUS_GRASS_LEAVES: Item = register("luminous_grass_leaves", { settings: Item.Settings? -> Item(settings) }, Item.Settings())
     private val LUMINOUS_GRASS_STEM: Item = register("luminous_grass_stem", { settings: Item.Settings? -> Item(settings) }, Item.Settings())
 

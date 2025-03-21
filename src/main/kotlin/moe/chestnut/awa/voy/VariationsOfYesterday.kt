@@ -1,5 +1,6 @@
 package moe.chestnut.awa.voy
 
+import moe.chestnut.awa.voy.herbert.HerbertBlocks
 import moe.chestnut.awa.voy.herbert.HerbertItems
 import net.fabricmc.api.ModInitializer
 import org.slf4j.LoggerFactory
@@ -12,6 +13,7 @@ object VariationsOfYesterday : ModInitializer {
 
 	override fun onInitialize() {
 		HerbertItems.initialize()
+		HerbertBlocks.initialize()
 
 		// This code runs as soon as Minecraft is in a mod-load-ready state.
 		// However, some things (like resources) may still be uninitialized.
