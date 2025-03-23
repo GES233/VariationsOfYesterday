@@ -6,8 +6,8 @@ Used to learn Minecraft mod development.
 
 ## 有关玩法的核心介绍
 
-TODO: 借鉴养老田园游戏的介绍
-TODO: 构建反转
+- TODO: 借鉴养老田园游戏的介绍
+- TODO: 构建反转
 
 参见[事前谈](/doc/PreludeOfScene.md)。
 

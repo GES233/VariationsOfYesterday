@@ -8,8 +8,8 @@ A project for learning Minecraft mod development.
 
 ## Core Gameplay Introduction
 
-TODO: Reference to countryside farming game introduction
-TODO: Build inversion
+- TODO: Reference to countryside farming game introduction
+- TODO: Build inversion
 
 See [Prelude of Scene](/doc/PreludeOfScene.md).
 
