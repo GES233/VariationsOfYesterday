@@ -1,16 +1,18 @@
-# 花影下的音符
+# Variations of Yesterday
 
 *Variations of Yesterday: Lie No.13 in Serenity*
 
-Used to learn Minecraft mod development.
+A project for learning Minecraft mod development.
 
-## 有关玩法的核心介绍
+[中文版文档 (Chinese Version)](README-zh.md)
 
-TODO: 借鉴养老田园游戏的介绍
-TODO: 构建反转
+## Core Gameplay Introduction
 
-参见[事前谈](/doc/PreludeOfScene.md)。
+TODO: Reference to countryside farming game introduction
+TODO: Build inversion
 
-## 基本信息
+See [Prelude of Scene](/doc/PreludeOfScene.md).
+
+## Basic Information
 
 TBD
