@@ -1,7 +1,10 @@
+// import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
 	id 'fabric-loom' version '1.10-SNAPSHOT'
 	id 'maven-publish'
-	id "org.jetbrains.kotlin.jvm" version "2.1.10"
+	// id "org.jetbrains.kotlin.jvm" version "2.1.10"
+	id 'scala'
 }
 
 version = project.mod_version
@@ -17,6 +20,16 @@ repositories {
 	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
 	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
 	// for more information about repositories.
+	maven {
+		name = "Main"
+		url = uri("https://maven.kotori316.com")
+		content {
+			includeVersion("com.kotori316", "scalable-cats-force-fabric", project.slp_version)
+			includeVersion("org.typelevel", "cats-core_3", project.cats_version)
+			includeVersion("org.typelevel", "cats-kernel_3", project.cats_version)
+			includeVersion("org.typelevel", "cats-free_3", project.cats_version)
+		}
+	}
 }
 
 loom {
@@ -45,10 +58,18 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-	modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
+	// modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
+	modImplementation "com.kotori316:scalable-cats-force-fabric:${kotori_scala_version}:dev"
 
-	// Test for Core(Purely Kotlin)
-	testImplementation "org.jetbrains.kotlin:kotlin-test"
+	// Scala Support
+	implementation "org.scala-lang:scala3-library_3:${project.scala_version}"
+	// Cat
+	implementation "org.typelevel:cats-core_3:${project.cats_version}"
+	implementation "org.typelevel:cats-kernel_3:${project.cats_version}"
+
+	// Test
+	// testImplementation "org.jetbrains.kotlin:kotlin-test"
+	testImplementation "org.scala-lang:scala3-library_3:${project.scala_version}"
 }
 
 processResources {
@@ -63,9 +84,15 @@ tasks.withType(JavaCompile).configureEach {
 	it.options.release = 21
 }
 
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+/* tasks.withType(KotlinCompile).configureEach {
 	kotlinOptions {
 		jvmTarget = 21
+	}
+} */
+
+tasks.withType(ScalaCompile).configureEach {
+	scalaCompileOptions.with {
+		force = true
 	}
 }
 

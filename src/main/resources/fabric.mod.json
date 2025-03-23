@@ -3,7 +3,7 @@
 	"id": "variations-of-yesterday",
 	"version": "${version}",
 	"name": "Variations of Yesterday",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "Bla bla bla bla",
 	"authors": [
 		"GES233", "GGGUA7"
 	],
@@ -17,20 +17,20 @@
 	"entrypoints": {
 		"main": [
 			{
-				"value": "moe.chestnut.awa.voy.VariationsOfYesterday",
-				"adapter": "kotlin"
+				"adapter": "kotori_scala",
+				"value": "moe.chestnut.awa.voy.VariationsOfYesterday"
 			}
 		],
 		"client": [
 			{
-				"value": "moe.chestnut.awa.voy.VariationsOfYesterdayClient",
-				"adapter": "kotlin"
+				"adapter": "kotori_scala",
+				"value": "moe.chestnut.awa.voy.VariationsOfYesterdayClient"
 			}
 		],
 		"fabric-datagen": [
 			{
 				"value": "moe.chestnut.awa.voy.VariationsOfYesterdayDataGenerator",
-				"adapter": "kotlin"
+				"adapter": "kotori_scala"
 			}
 		]
 	},
@@ -46,7 +46,10 @@
 		"minecraft": "~1.21.2",
 		"java": ">=21",
 		"fabric-api": "*",
-		"fabric-language-kotlin": "*"
+		"kotori_scala": ">=3.0.0"
+	},
+	"requires": {
+		"kotori_scala": ">=3.0.0"
 	},
 	"suggests": {
 		"another-mod": "*"
