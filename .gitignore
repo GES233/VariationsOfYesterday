@@ -23,6 +23,9 @@ classes/
 bin/
 .classpath
 .project
+# vsc's scala extension)
+.metals/
+.bloop/
 
 # macos
 
