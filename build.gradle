@@ -1,9 +1,6 @@
-// import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
 	id 'fabric-loom' version '1.10-SNAPSHOT'
 	id 'maven-publish'
-	// id "org.jetbrains.kotlin.jvm" version "2.1.10"
 	id 'scala'
 }
 
@@ -68,7 +65,6 @@ dependencies {
 	implementation "org.typelevel:cats-kernel_3:${project.cats_version}"
 
 	// Test
-	// testImplementation "org.jetbrains.kotlin:kotlin-test"
 	testImplementation "org.scala-lang:scala3-library_3:${project.scala_version}"
 }
 
@@ -83,12 +79,6 @@ processResources {
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 21
 }
-
-/* tasks.withType(KotlinCompile).configureEach {
-	kotlinOptions {
-		jvmTarget = 21
-	}
-} */
 
 tasks.withType(ScalaCompile).configureEach {
 	scalaCompileOptions.with {
