@@ -1,6 +1,19 @@
 package moe.chestnut.awa.voy.core.mandate
 
-class MandateState:
-  // present model status & param.
-  private var mandate_param: Tuple3[Double, Double, Double] = (0, 0, 0)
-  private var mandate_state: Tuple2[Double, Double] = (0, 0)
+case class MandateParam(alpha: Double, beta: Double, epsilon: Double)
+
+case class MandateCurrent(dissonance: Double, entrench: Double)
+
+/** Bla bla.
+  */
+class MandateState(
+    private var param: MandateParam,
+    private var state: MandateCurrent
+):
+  // TODO: find default params and state.
+
+  def update(timestep: Double): Unit = {}
+  // Calculate ...
+
+  def getState: MandateCurrent = state
+  def getParam: MandateParam = param
