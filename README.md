@@ -11,8 +11,6 @@ A project for learning Minecraft mod development.
 - TODO: Reference to countryside farming game introduction
 - TODO: Build inversion
 
-See [Prelude of Scene](/doc/PreludeOfScene.md).
-
 ## Basic Information
 
 TBD
