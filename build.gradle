@@ -27,6 +27,8 @@ repositories {
 			includeVersion("org.typelevel", "cats-free_3", project.cats_version)
 		}
 	}
+	// Pekko
+	mavenCentral()
 }
 
 loom {
@@ -64,8 +66,15 @@ dependencies {
 	implementation "org.typelevel:cats-core_3:${project.cats_version}"
 	implementation "org.typelevel:cats-kernel_3:${project.cats_version}"
 
+	// Pekko
+	implementation platform("org.apache.pekko:pekko-bom_3:${project.pekko_version}")
+
+    implementation "org.apache.pekko:pekko-actor-typed_3:${project.pekko_version}"
+    implementation "org.apache.pekko:pekko-slf4j_3:${project.pekko_version}"
+
 	// Test
 	testImplementation "org.scala-lang:scala3-library_3:${project.scala_version}"
+	// testImplemtntation "org.apache.pekko:pekko-actor-testkit-typed_3:${project.pekko_version}"
 }
 
 processResources {

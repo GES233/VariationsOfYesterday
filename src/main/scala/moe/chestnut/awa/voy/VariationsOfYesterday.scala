@@ -14,6 +14,7 @@ import org.slf4j.{Logger, LoggerFactory}
 object VariationsOfYesterday extends ModInitializer:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
+  // TODO: Add Actor related.
   override def onInitialize(): Unit =
     logger.info("Initializing Variations of Yesterday...")
     // TODO: ...
