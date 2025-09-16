@@ -1,19 +1,19 @@
 package moe.chestnut.awa.voy.helpers
 
-trait NumericTuple:
+trait NumericTuple[T <: NumericTuple[T]]:
   def toArray: Array[Double]
-  def fromArray(interval_numbers: Array[Double]): NumericTuple
+  def fromArray(interval_numbers: Array[Double]): T
 
 class ODESolver(equation: (Array[Double], Option[Map[String, Any]]) => Array[Double]):
   val useEular: Symbol = Symbol("USE_EULAR")
   val useRK4: Symbol = Symbol("USE_RK4")
 
-  def update(
-      currentState: NumericTuple,
+  def update[T <: NumericTuple[T]](
+      currentState: T,
       dt: Double,
       method: Symbol = this.useRK4,
       extra: Option[Map[String, Any]] = None
-  ): NumericTuple =
+  ): T =
     val res: Array[Double] = method match
       case this.useEular => useEular_(currentState.toArray, dt, extra)
       case this.useRK4 => useRK4_(currentState.toArray, dt, extra)
