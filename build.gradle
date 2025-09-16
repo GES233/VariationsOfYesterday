@@ -74,7 +74,7 @@ dependencies {
 
 	// Test
 	testImplementation "org.scala-lang:scala3-library_3:${project.scala_version}"
-	// testImplemtntation "org.apache.pekko:pekko-actor-testkit-typed_3:${project.pekko_version}"
+	testImplementation "org.apache.pekko:pekko-actor-testkit-typed_3:${project.pekko_version}"
 }
 
 processResources {
