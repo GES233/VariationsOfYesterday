@@ -1,14 +1,9 @@
-# 花影下的音符
+# 旧日变奏曲
 
-*Variations of Yesterday: Lie No.13 in Serenity*
+[English](README.md)
 
-Used to learn Minecraft mod development.
-
-## 有关玩法的核心介绍
-
-- TODO: 借鉴养老田园游戏的介绍
-- TODO: 构建反转
+对一个实验性的游戏机制进行一个发掘，后面编不下去了。
 
 ## 基本信息
 
-TBD
+无
