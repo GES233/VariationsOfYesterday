@@ -1,16 +1,16 @@
 # Variations of Yesterday
 
-*Variations of Yesterday: Lie No.13 in Serenity*
+[中文](README-zh.md)
 
-A project for learning Minecraft mod development.
-
-[中文版文档 (Chinese Version)](README-zh.md)
+A project with expiremental game mechanics for exploring sonething.
 
 ## Core Gameplay Introduction
 
-- TODO: Reference to countryside farming game introduction
-- TODO: Build inversion
+- ~~Reference to countryside farming game introduction~~
+    - Make narrative
+- How inversion implement?
+    - TBD
 
 ## Basic Information
 
-TBD
+`nil`
