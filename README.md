@@ -2,7 +2,7 @@
 
 [中文](README-zh.md)
 
-A project with expiremental game mechanics for exploring sonething.
+A project with experimental game mechanics for exploring something.
 
 ## Core Gameplay Introduction
 

@@ -4,25 +4,28 @@ trait NumericTuple[T <: NumericTuple[T]]:
   def toArray: Array[Double]
   def fromArray(interval_numbers: Array[Double]): T
 
+object ODESolver {
+  private val UseEuler: Symbol = Symbol("USE_EULER")
+  private val UseRK4: Symbol = Symbol("USE_RK4")
+}
+
 class ODESolver(equation: (Array[Double], Option[Map[String, Any]]) => Array[Double]):
-  val useEular: Symbol = Symbol("USE_EULAR")
-  val useRK4: Symbol = Symbol("USE_RK4")
 
   def update[T <: NumericTuple[T]](
       currentState: T,
       dt: Double,
-      method: Symbol = this.useRK4,
+      method: Symbol = ODESolver.UseRK4,
       extra: Option[Map[String, Any]] = None
   ): T =
     val res: Array[Double] = method match
-      case this.useEular => useEular_(currentState.toArray, dt, extra)
-      case this.useRK4 => useRK4_(currentState.toArray, dt, extra)
+      case ODESolver.UseEuler => useEuler_(currentState.toArray, dt, extra)
+      case ODESolver.UseRK4 => useRK4_(currentState.toArray, dt, extra)
       // case _: Any => new `throws`
 
     currentState.fromArray(res)
 
   // ignore absolutely `t`.
-  private def useEular_(
+  private def useEuler_(
       currentState: Array[Double],
       dt: Double,
       extra: Option[Map[String, Any]]

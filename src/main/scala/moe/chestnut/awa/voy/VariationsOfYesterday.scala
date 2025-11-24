@@ -5,8 +5,8 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import org.slf4j.{Logger, LoggerFactory}
 import org.apache.pekko.actor.typed.ActorSystem
 
-/** *Variations of Yesterday: Lie No.13 in Serenity* is a Minecraft mod that
-  * simulates a world born from a lost, incomplete blueprint.
+/** *Variations of Yesterday* is a Minecraft mod that
+  * simulates a world born from a lost, incomplete (and maybe harmful) blueprint.
   *
   * This world is caught in a tragic, cyclical loop of collapse and flawed
   * recovery, governed by a core 'Mandate Engine'. And the player enters not as
