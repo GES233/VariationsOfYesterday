@@ -98,7 +98,8 @@ c₀    ≥ 0  基线安抚（村庄钟仪式等残余维护）
 ### 1.5 实现状态备忘
 
 - `MandateAgent.simulationLoop` 子步进 bug 已修复（原实现累加 `dt` 而非 `deltaTime`，且每个子步都从旧状态出发），回归测试已落入 `MandateStateSpec`。
-- 单点（单格子）动力学已在 Scala 侧实现并测试（§7.2）；空间格子场（多格子 + 扩散/平流）尚未实现，见 §7.4。
+- 单点动力学（§1.1）已在 Scala 侧实现并测试（`MandateStateSpec`，五条）。
+- 空间格子场已实现纯逻辑版：`MandateGrid`（格子 = `MandateState`，边 = `LatticeEdge` 扩散 + 有向平流，算子分裂显式积分，`stressFlux` 通道注入），`MandateGridSpec` 覆盖守恒/平流单向性/下游点火波前/逆流隔离。尚未接入 Minecraft（区块化、D8 流向推导见 §7.4）。
 
 ## 2. 河流：因果的方向
 
@@ -214,4 +215,4 @@ c₀    ≥ 0  基线安抚（村庄钟仪式等残余维护）
 1. ~~慢变量耦合形式~~ 已定稿（§1.1.1，数值验证通过）；后续可调参但结构不变；
 2. ~~修复 `simulationLoop` 子步进 bug；Scala 侧慢变量实现与单元测试~~ 已完成：`MandateState` 扩展为 4 维状态（`stress`/`activity` + `δ(s)` 状态依赖恢复 + `s∈[0,1]` 截断 + `disturbance`/`calming`/`baselineCalming` 输入通道），`MandateStateSpec` 五条测试全绿（点火/自持/滞后熄灭/宽容区/子步进回归）；
 3. 文档圣经骨架（地名/机构/代号体系）；
-4. 路线 A 原型：区块格子场 + D8 流向推导的最小实现。
+4. 路线 A 原型：~~格子场~~（已完成，见 §1.5）→ 剩余：区块化接入（PersistentState、区块加载钩子）+ D8 流向推导的最小实现。

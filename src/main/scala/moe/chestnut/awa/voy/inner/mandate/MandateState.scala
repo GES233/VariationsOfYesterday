@@ -80,6 +80,12 @@ class MandateState(
   /** c0: baseline calming from residual rituals (village bells, ...). */
   var baselineCalming: Double = 0.0
 
+  /** Net stress influx from spatial coupling (diffusion/advection across
+    * the lattice), set by the grid before each step. Raw addition to ds/dt
+    * (already carries the transport coefficient).
+    */
+  var stressFlux: Double = 0.0
+
   private def equ(
       fullState: Array[Double],
       _extra: Option[Map[String, Any]]
@@ -97,7 +103,7 @@ class MandateState(
 
     val recovery = sp.delta0 / (1.0 + Math.pow(stress / sp.sHalf, 2)) * stress
     val delta_stress = sp.gamma * (disturbance - recovery -
-      sp.rho * (baselineCalming + calming) + sp.eta * activity)
+      sp.rho * (baselineCalming + calming) + sp.eta * activity) + stressFlux
     val delta_activity =
       sp.lambda * (Math.max(Math.abs(dis) - sp.vSpike, 0.0) - activity)
 
