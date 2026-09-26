@@ -40,7 +40,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/scala/moe/chestnut/awa/voy/`
   - `VariationsOfYesterday.scala` — 模组主入口（`ModInitializer`），目前仅打印日志
   - `inner/` — 模组核心内部逻辑（不依赖 Minecraft API 的部分尽量放这里）：
-    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 型 ODE 方程组，参数 `alpha/beta/epsilon`，状态 `dissonance/entrench`）、`MandateAgent`（固定步长累积器的模拟循环）
+    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming`）、`MandateAgent`（固定步长累积器的模拟循环）
     - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（`TickArrived` 等），`EventMapper`（占位）
     - `action/` — 动作协议：`MandateActionProtocol` sealed trait 及动作消息
     - `plant/` — 植物 DTO（占位）
@@ -64,8 +64,9 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 
 ## 测试
 
-- 测试框架：JUnit Platform（`useJUnitPlatform()`）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
-- 当前没有实际测试代码；核心模拟逻辑（`inner/`、`helpers/`）设计上不依赖 Minecraft，可以直接用纯单元测试覆盖。
+- 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
+- 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区，以及 `simulationLoop` 子步进回归）。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
+- **本机环境注意**：系统默认 `java` 是 JDK 25，Gradle 8.12.1 在其上会崩溃（`Type T not present`）；运行 Gradle 需指定 JDK 21，例如 `JAVA_HOME='D:\Q\Scoop\apps\zulu21-jdk\current' ./gradlew test`（CI 用 JDK 21，不受影响）。
 - Fabric/Minecraft 集成无法简单单测，验证集成行为请使用 `./gradlew runClient` 手动运行游戏。
 
 ## 注意事项

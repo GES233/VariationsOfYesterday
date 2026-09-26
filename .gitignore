@@ -41,3 +41,6 @@ hs_err_*.log
 replay_*.log
 *.hprof
 *.jfr
+
+# Gradle/Minecraft runtime logs at repo root
+/logs/
