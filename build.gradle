@@ -137,3 +137,10 @@ publishing {
 test {
 	useJUnitPlatform()
 }
+
+// Loom's remapJar consumes the mixin-map output of compileTestScala without
+// declaring it, which fails Gradle's implicit-dependency validation once
+// src/test actually has sources. Declare it explicitly.
+tasks.named("remapJar") {
+	dependsOn tasks.named("compileTestScala")
+}
