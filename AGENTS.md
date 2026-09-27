@@ -45,7 +45,8 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
     - `action/` — 动作协议：`MandateActionProtocol` sealed trait 及动作消息
     - `plant/` — 植物 DTO（占位）
   - `helpers/ODESolver.scala` — 通用 ODE 求解器（Euler / RK4），配合 `NumericTuple` trait 使用
-- `src/client/scala/...` — `VariationsOfYesterdayClient`（`ClientModInitializer`）、`VariationsOfYesterdayDataGenerator`（datagen 入口）
+- `src/client/scala/...` — `VariationsOfYesterdayClient`（`ClientModInitializer`，开发环境下注册 `hud.MandateHud`）、`VariationsOfYesterdayDataGenerator`（datagen 入口）
+  - `hud/` — 开发用 HUD 覆层（`MandateHud`：`/voy hud [on|off]` 开关 + `HudRenderCallback` 渲染 `MandateRuntime` 快照）
 - `src/main/java` / `src/client/java` — Mixin（目前是模板自带的 `ExampleMixin` / `ExampleClientMixin`）
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
