@@ -56,7 +56,7 @@ case class MandateCurrent(
   *
   * Equations (design draft section 1.1):
   * {{{
-  * dv/dt = v - v^3/3 - w
+  * dv/dt = v - v^3/3 - w + p
   * dw/dt = epsilon * (v + a(s) - beta * w),  a(s) = alpha - coupling * s
   * ds/dt = gamma * (u - delta(s) * s - rho * (c0 + c) + eta * q)
   * dq/dt = lambda * (max(|v| - vSpike, 0) - q)
@@ -80,6 +80,32 @@ class MandateState(
   /** c0: baseline calming from residual rituals (village bells, ...). */
   var baselineCalming: Double = 0.0
 
+  /** p: phase-modulation impulse applied directly to the fast variable
+    * (ritual bells, modulator devices). The effect depends on the excitable
+    * phase it lands in: quenching a surge in progress, advancing the next
+    * one in the vulnerable window, or fizzling during the refractory phase.
+    */
+  var impulse: Double = 0.0
+
+  /** Alpha-synapse kernel on the fast variable (synaptic-pulse channel for
+    * discrete game events: one event = one (area, tau) pulse, see design
+    * draft section 1.1.4). Dual-exponential cascade dz/dt = -z/tau,
+    * dp/dt = (z - p)/tau driven by delta firings; integrated in closed
+    * form between steps, so it stays outside the RK4 state vector.
+    * `firePulse` takes the kernel AREA; the peak lands at t = tau with
+    * height area / (e * tau).
+    */
+  var synapseTau: Double = 5.0
+  private var synapseZ: Double = 0.0
+  private var synapseP: Double = 0.0
+
+  /** Fire one alpha-kernel pulse of total area `area` on the fast variable. */
+  def firePulse(area: Double): Unit =
+    synapseZ += area / synapseTau
+
+  /** Current kernel output (what dv/dt receives right now). */
+  def synapseOutput: Double = synapseP
+
   /** Net stress influx from spatial coupling (diffusion/advection across
     * the lattice), set by the grid before each step. Raw addition to ds/dt
     * (already carries the transport coefficient).
@@ -98,7 +124,7 @@ class MandateState(
     val sp = stressParam
     val a = param.alpha - sp.coupling * stress
 
-    val delta_dis = dis - Math.pow(dis, 3) / 3 - en
+    val delta_dis = dis - Math.pow(dis, 3) / 3 - en + impulse + synapseP
     val delta_en = param.epsilon * (dis + a - param.beta * en)
 
     val recovery = sp.delta0 / (1.0 + Math.pow(stress / sp.sHalf, 2)) * stress
@@ -113,6 +139,12 @@ class MandateState(
 
   /** Advance one fixed step; stress is clamped to stay within [0, stressMax]. */
   def step(dt: Double = time_step): Unit =
+    // Closed-form decay of the alpha-kernel cascade over this step:
+    // z(t) = z0 * e^(-t/tau); p(t) = (p0 + z0 * t/tau) * e^(-t/tau).
+    // Updated before the solver so dv/dt sees the fresh kernel output.
+    val decay = Math.exp(-dt / synapseTau)
+    synapseP = (synapseP + synapseZ * dt / synapseTau) * decay
+    synapseZ *= decay
     state = solver.update(state, dt)
     val clamped =
       Math.min(Math.max(state.stress, 0.0), stressParam.stressMax)

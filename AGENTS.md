@@ -40,7 +40,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/scala/moe/chestnut/awa/voy/`
   - `VariationsOfYesterday.scala` — 模组主入口（`ModInitializer`），目前仅打印日志
   - `inner/` — 模组核心内部逻辑（不依赖 Minecraft API 的部分尽量放这里）：
-    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming`）、`MandateAgent`（固定步长累积器的模拟循环）
+    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateAgent`（固定步长累积器的模拟循环）
     - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（`TickArrived` 等），`EventMapper`（占位）
     - `action/` — 动作协议：`MandateActionProtocol` sealed trait 及动作消息
     - `plant/` — 植物 DTO（占位）
@@ -51,7 +51,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
 - `src/test/scala/` — 测试代码目录（当前仅有空目录骨架 `core/calendar`，尚无测试）
-- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（新方向草案：动力学/河流/聚落/ARG），旧概念稿已废弃清空
+- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/河流/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8），旧概念稿已废弃清空
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 
 ## 开发约定
@@ -66,7 +66,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 ## 测试
 
 - 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
-- 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区，以及 `simulationLoop` 子步进回归）。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
+- 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区，以及 `simulationLoop` 子步进回归）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
 - **本机环境注意**：系统默认 `java` 是 JDK 25，Gradle 8.12.1 在其上会崩溃（`Type T not present`）；运行 Gradle 需指定 JDK 21，例如 `JAVA_HOME='D:\Q\Scoop\apps\zulu21-jdk\current' ./gradlew test`（CI 用 JDK 21，不受影响）。
 - Fabric/Minecraft 集成无法简单单测，验证集成行为请使用 `./gradlew runClient` 手动运行游戏。
 
