@@ -67,7 +67,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 
 - 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
 - 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区，以及 `simulationLoop` 子步进回归）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
-- **本机环境注意**：系统默认 `java` 是 JDK 25，Gradle 8.12.1 在其上会崩溃（`Type T not present`）；运行 Gradle 需指定 JDK 21，例如 `JAVA_HOME='D:\Q\Scoop\apps\zulu21-jdk\current' ./gradlew test`（CI 用 JDK 21，不受影响）。
+- **本机环境注意**：JDK 路径等环境信息因设备而异，不入库；见仓库根目录 `ref/` 目录下的本地说明（该目录被 git 忽略，各设备自行维护）。
 - Fabric/Minecraft 集成无法简单单测，验证集成行为请使用 `./gradlew runClient` 手动运行游戏。
 
 ## 注意事项

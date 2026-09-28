@@ -44,3 +44,7 @@ replay_*.log
 
 # Gradle/Minecraft runtime logs at repo root
 /logs/
+
+# local machine notes (per-device, not tracked)
+
+ref/
