@@ -4,7 +4,7 @@
 
 这是一个 **Minecraft Fabric 模组**，处于非常早期的开发阶段。当前创作方向（讨论中，尚未定型）：**中式民俗恐怖 + ARG 碎片化叙事的「活着的世界」生态模拟模组**。世界本身是一个由核心「Mandate Engine」驱动的动力学系统（可激发介质 / 快慢变量 + 滞后效应），会因过度扰动跨越临界点而发生生态级灾变；玩家的核心目标是「调制与维稳」——实事求是地监测并安抚这片土地，而非征服它。叙事层面以虚构的近现代（1980s）滇西南风格山区为背景，通过档案、报表等 ARG 碎片呈现现代工程与本土祭祀逻辑的碰撞（全部地理/民族/仪式/事件均为虚构，不指涉真实存在）。
 
-注意：早期概念稿已废弃删除；旧设定中「残缺蓝图 / 崩坏与修复循环 / 调试者」的表述不再适用，但 Mandate Engine 的技术骨架（FHN 型 ODE）沿用于新方向。设计文档目录为 `docs/`。
+注意：早期概念稿已废弃删除（设计草案 01 记载其内容为「星象/草药等」，旧稿中的表述一律不再适用），但 Mandate Engine 的技术骨架（FHN 型 ODE）沿用于新方向。设计文档目录为 `docs/`。
 
 - 模组 ID：`variations-of-yesterday`
 - 包名：`moe.chestnut.awa.voy`
@@ -17,7 +17,7 @@
 - **语言**：以 **Scala 3**（3.6.3，缩进语法 / 显著缩进风格）为主，Mixin 用 Java 编写。
 - **平台**：Minecraft 1.21.2 + Yarn mappings + Fabric Loader 0.16.10 + Fabric API 0.106.1+1.21.2，Java 21。
 - **Scala 支持**：通过 `com.kotori316:scalable-cats-force-fabric`（Kotori Scala，`kotori_scala`）加载，`fabric.mod.json` 中的入口点使用 `"adapter": "kotori_scala"`。
-- **并发模型**：**Apache Pekko**（typed actor），`pekko-actor-typed` + `pekko-slf4j`，测试用 `pekko-actor-testkit-typed`。目前 ActorSystem 尚未接线（`VariationsOfYesterday.scala` 中有 TODO）。
+- **并发模型**：**Apache Pekko**（typed actor），`pekko-actor-typed` + `pekko-slf4j`，测试用 `pekko-actor-testkit-typed`。目前 ActorSystem 尚未接线（`inner/mandate/MandateAgent.scala` 中留有注释掉的 actor 骨架；当前由 `VariationsOfYesterday.scala` 注册的 server tick 事件直接驱动 `MandateRuntime`，与设计文档 §1.4 的独立 dispatcher 原则尚不一致）。
 - **函数式库**：cats-core / cats-kernel（kotori 定制版本，来自 kotori316 的 Maven 仓库）。
 
 ## 构建与运行
