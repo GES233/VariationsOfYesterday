@@ -43,9 +43,15 @@ object MandateRuntime:
   @volatile private var snapshot: Map[(Int, Int), MandateCurrent] = Map.empty
 
   def tick(server: MinecraftServer): Unit =
-    // Keep this prototype active only while a world has a player. It avoids
-    // simulating an unused lattice on a dedicated server sitting at the menu.
+    // Design decision (design draft §1.4, 2026-09-28): simulation pauses
+    // while no player is online — the 3-5h first-catastrophe target
+    // (§1.1.3) is measured in play time. When the actor wiring lands this
+    // gate moves to the actor side unchanged.
     if !server.getPlayerManager.getPlayerList.isEmpty then
+      // Provisional mapping: 20 ticks/s x dt=0.05 = 1 time unit per real
+      // second, chosen for the HUD prototype only. The final mapping is
+      // pending calibration against the "first catastrophe at 3-5 play
+      // hours" target (design draft §1.1.3, §7 item 5).
       grid.step(0.05)
       snapshot = grid.cells.iterator.map { case (coord, state) =>
         (coord.x + originX, coord.z + originZ) -> state.getState
