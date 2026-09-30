@@ -17,7 +17,7 @@
 - **语言**：以 **Scala 3**（3.6.3，缩进语法 / 显著缩进风格）为主，Mixin 用 Java 编写。
 - **平台**：Minecraft 1.21.2 + Yarn mappings + Fabric Loader 0.16.10 + Fabric API 0.106.1+1.21.2，Java 21。
 - **Scala 支持**：通过 `com.kotori316:scalable-cats-force-fabric`（Kotori Scala，`kotori_scala`）加载，`fabric.mod.json` 中的入口点使用 `"adapter": "kotori_scala"`。
-- **并发模型**：**Apache Pekko**（typed actor），`pekko-actor-typed` + `pekko-slf4j`，测试用 `pekko-actor-testkit-typed`。目前 ActorSystem 尚未接线（`inner/mandate/MandateAgent.scala` 中留有注释掉的 actor 骨架；当前由 `VariationsOfYesterday.scala` 注册的 server tick 事件直接驱动 `MandateRuntime`，与设计文档 §1.4 的独立 dispatcher 原则尚不一致）。
+- **并发模型**：**Apache Pekko**（typed actor），`pekko-actor-typed` + `pekko-slf4j`，测试用 `pekko-actor-testkit-typed`。ActorSystem 已接线：`MandateRuntime`（游戏侧桥）随服务器生命周期启停（`SERVER_STARTING`/`SERVER_STOPPED`），`MandateAgent` actor 持有格子场并作为唯一写者。调度语义为 **tick 事件驱动**（设计草案 §1.4，2026-09-30 修订）：`END_SERVER_TICK` 投递固定步长的 `TickArrived`，事件与 tick 同信箱全序，仿真时间恒等于游戏时间；游戏线程只投递事件、消费 `@volatile` 快照（HUD 读 `MandateRuntime.stateAt`），actor 回包经动作队列在下一 tick drain 回主线程。
 - **函数式库**：cats-core / cats-kernel（kotori 定制版本，来自 kotori316 的 Maven 仓库）。
 
 ## 构建与运行
@@ -38,9 +38,10 @@ CI：GitHub Actions（`.github/workflows/build.yml`），在 push / PR 时于 Ub
 Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），每个 source set 同时包含 `java` 和 `scala` 目录：
 
 - `src/main/scala/moe/chestnut/awa/voy/`
-  - `VariationsOfYesterday.scala` — 模组主入口（`ModInitializer`），目前仅打印日志
+  - `VariationsOfYesterday.scala` — 模组主入口（`ModInitializer`），注册 Mandate Engine 的生命周期与 tick 事件
+  - `MandateRuntime.scala` — Minecraft ↔ Mandate 的游戏侧桥：持有 ActorSystem 生命周期、tick gate（无玩家不投递）、快照发布（`stateAt` 供 HUD 读）、动作回包队列
   - `inner/` — 模组核心内部逻辑（不依赖 Minecraft API 的部分尽量放这里）：
-    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateAgent`（固定步长累积器的模拟循环）
+    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateAgent`（Pekko typed actor：tick 事件驱动积分、发布不可变快照；另含固定步长累积器的 `simulationLoop`）、`MandateGrid`（格子场）
     - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（`TickArrived` 等），`EventMapper`（占位）
     - `action/` — 动作协议：`MandateActionProtocol` sealed trait 及动作消息
     - `plant/` — 植物 DTO（占位）
@@ -66,7 +67,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 ## 测试
 
 - 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
-- 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区，以及 `simulationLoop` 子步进回归）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
+- 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区，以及 `simulationLoop` 子步进回归）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`、`inner/mandate/MandateAgentSpec`（actor 接线契约：tick 事件驱动确定性积分、每 tick 一份快照、无 tick 不积分）。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
 - **本机环境注意**：JDK 路径等环境信息因设备而异，不入库；见仓库根目录 `ref/` 目录下的本地说明（该目录被 git 忽略，各设备自行维护）。
 - Fabric/Minecraft 集成无法简单单测，验证集成行为请使用 `./gradlew runClient` 手动运行游戏。
 

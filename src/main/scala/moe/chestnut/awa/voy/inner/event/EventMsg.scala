@@ -22,15 +22,14 @@ object EventMsg:
   
   // ==== Timer ==== //
 
-  /** Arrive when tick update(`deltaTime` means time elapse in real world). */
-  final case class TickArrived(deltaTime: Double) extends EventDTO
-
-  /** When game's tick speed updated by player or other mod. */
-  // final case class TickSpeedUpdate(newTickSpeed: Double) extends EventDTO
-  
-  // Record game's time are updated.
-  // Is it essential?
-  // final case class TimeUpdate() extends EventDTO
+  /** One game tick delivered to the engine. Carries the FIXED simulation
+    * step plus the server's current nominal tick rate (design draft §1.4,
+    * 2026-09-30: tick-driven, simulation time is identical to game time; no
+    * wall-clock measurement). `tickRate` stamps the scheduling context into
+    * the event stream so the actor stays a pure function of it — it is the
+    * trigger input for step coarsening ("weathering"); the actor ignores it
+    * until that mechanism lands. */
+  final case class TickArrived(deltaTime: Double, tickRate: Float) extends EventDTO
   
   // ==== Command ==== //
 
