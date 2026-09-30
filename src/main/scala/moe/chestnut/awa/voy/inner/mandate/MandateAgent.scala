@@ -29,6 +29,12 @@ object MandateAgent:
       snapshotSink: Map[CellCoord, MandateCurrent] => Unit,
       actionSink: MandateActionProtocol => Unit = (_ => ())
   ): Behavior[EventDTO] =
+    // Channel events apply to a single cell; events addressed outside the
+    // active lattice are dropped deterministically (§1.4 loading
+    // invariance: presence of a cell must not depend on chunk load order).
+    def onCell(cell: CellCoord)(op: MandateState => Unit): Unit =
+      grid.cells.get(cell).foreach(op)
+
     Behaviors.setup { context =>
       context.log.info("Mandate engine actor started.")
       Behaviors.receiveMessage {
@@ -42,8 +48,23 @@ object MandateAgent:
             }.toMap
           )
           Behaviors.same
-        case event: EventMsg.GenericEventDTO =>
-          context.log.debug(s"Ignored event: $event")
+        case EventMsg.StressInject(cell, amount) =>
+          onCell(cell)(_.injectStress(amount))
+          Behaviors.same
+        case EventMsg.SetDisturbance(cell, rate) =>
+          onCell(cell)(_.disturbance = Math.max(0.0, rate))
+          Behaviors.same
+        case EventMsg.SetCalming(cell, level) =>
+          onCell(cell)(_.calming = level)
+          Behaviors.same
+        case EventMsg.SetBaselineCalming(cell, level) =>
+          onCell(cell)(_.baselineCalming = level)
+          Behaviors.same
+        case EventMsg.HoldImpulse(cell, strength) =>
+          onCell(cell)(_.impulse = strength)
+          Behaviors.same
+        case EventMsg.FirePulse(cell, area) =>
+          onCell(cell)(_.firePulse(area))
           Behaviors.same
       }
     }

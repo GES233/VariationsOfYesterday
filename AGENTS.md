@@ -42,7 +42,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
   - `MandateRuntime.scala` — Minecraft ↔ Mandate 的游戏侧桥：持有 ActorSystem 生命周期、tick gate（无玩家不投递）、快照发布（`stateAt` 供 HUD 读）、动作回包队列
   - `inner/` — 模组核心内部逻辑（不依赖 Minecraft API 的部分尽量放这里）：
     - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateAgent`（Pekko typed actor：tick 事件驱动积分、发布不可变快照；另含固定步长累积器的 `simulationLoop`）、`MandateGrid`（格子场）
-    - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（`TickArrived` 等），`EventMapper`（占位）
+    - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（**通道语义**：`TickArrived` + `StressInject`/`SetDisturbance`/`SetCalming`/`SetBaselineCalming`/`HoldImpulse`/`FirePulse`；世界语义 → 通道事件的 1:N 映射在 Minecraft 侧做，见协议头注释），`EventMapper`（占位）
     - `action/` — 动作协议：`MandateActionProtocol` sealed trait 及动作消息
     - `plant/` — 植物 DTO（占位）
   - `helpers/ODESolver.scala` — 通用 ODE 求解器（Euler / RK4），配合 `NumericTuple` trait 使用

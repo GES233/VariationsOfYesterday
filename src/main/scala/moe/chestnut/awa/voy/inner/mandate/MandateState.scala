@@ -150,5 +150,11 @@ class MandateState(
       Math.min(Math.max(state.stress, 0.0), stressParam.stressMax)
     if clamped != state.stress then state = state.copy(stress = clamped)
 
+  /** One-shot stress injection (u channel): raise stress immediately,
+    * clamped to [0, stressMax]. */
+  def injectStress(amount: Double): Unit =
+    val raised = Math.min(Math.max(state.stress + amount, 0.0), stressParam.stressMax)
+    state = state.copy(stress = raised)
+
   def getState: MandateCurrent = state
   def getParam: MandateParam = param

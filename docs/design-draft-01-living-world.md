@@ -144,7 +144,7 @@ c₀    ≥ 0  基线安抚（村庄钟仪式等残余维护）
 - 单点动力学（§1.1）已在 Scala 侧实现并测试（`MandateStateSpec`，五条）。
 - 空间格子场已实现纯逻辑版：`MandateGrid`（格子 = `MandateState`，边 = `LatticeEdge` 扩散 + 有向平流，算子分裂显式积分，`stressFlux` 通道注入），`MandateGridSpec` 覆盖守恒/平流单向性/下游点火波前/逆流隔离。尚未接入 Minecraft（区块化、D8 流向推导见 §7.4）。
 - 当前固定网格与 HUD 主要用于验证 JVM 性能、数值表现和呈现效果，不代表最终的区块加载架构；目标实现以 §1.2、§1.4 的全局有限 Cell 场和加载不变性为准。
-- Minecraft ↔ Mandate 接口已按 tick-as-event 接线（2026-09-30）：`MandateAgent`（Pekko typed actor）为格子场唯一写者，`TickArrived` 事件驱动积分并逐 tick 发布不可变快照；游戏侧桥 `MandateRuntime` 持有 ActorSystem 生命周期（随服务器启停）、无玩家在线的 gate、动作回包队列（回包在下一 tick drain 回主线程，目前尚无生产者）。`MandateAgentSpec` 覆盖 tick 驱动确定性与「无 tick 不积分」。尚未接入：事件的世界侧采集（爆破/敲钟等仅协议就绪）、`PersistentState` 持久化、tick 抽稀降频与步长加粗（风化机制）。
+- Minecraft ↔ Mandate 接口已按 tick-as-event 接线（2026-09-30）：`MandateAgent`（Pekko typed actor）为格子场唯一写者，`TickArrived` 事件驱动积分并逐 tick 发布不可变快照；游戏侧桥 `MandateRuntime` 持有 ActorSystem 生命周期（随服务器启停）、无玩家在线的 gate、动作回包队列（回包在下一 tick drain 回主线程，目前尚无生产者）。入方向协议已定为**通道语义**（`StressInject`/`SetDisturbance`/`SetCalming`/`SetBaselineCalming`/`HoldImpulse`/`FirePulse`）：DTO 只说注入/电平/脉冲，世界语义（爆破/敲钟等）→ 通道事件的 1:N 映射在 Minecraft 侧做；活区外事件由 actor 确定性丢弃。`MandateAgentSpec` 覆盖 tick 驱动确定性、「无 tick 不积分」、信箱顺序与越界丢弃。尚未接入：世界侧事件采集与 1:N 映射、`PersistentState` 持久化、tick 抽稀降频与步长加粗（风化机制）。
 
 ## 2. 河流：因果的方向
 
