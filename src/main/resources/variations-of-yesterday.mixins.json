@@ -3,7 +3,8 @@
 	"package": "moe.chestnut.awa.voy.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-		"ExampleMixin"
+		"ExampleMixin",
+		"TntExplosionMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

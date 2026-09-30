@@ -1,7 +1,6 @@
 package moe.chestnut.awa.voy
 
 import net.fabricmc.api.ModInitializer
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import org.slf4j.{Logger, LoggerFactory}
 
 /** *Variations of Yesterday* is a Minecraft mod about a living world whose
@@ -12,14 +11,13 @@ import org.slf4j.{Logger, LoggerFactory}
 object VariationsOfYesterday extends ModInitializer:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  private def registerActorsEvent(): Unit =
-    ServerTickEvents.END_SERVER_TICK.register { server =>
-      MandateRuntime.tick(server)
-    }
+  private def registerPoc(): Unit =
+    PocGame.register()
+    PocCommands.register()
 
   override def onInitialize(): Unit =
     logger.info("Initializing Variations of Yesterday...")
 
-    this.registerActorsEvent()
+    this.registerPoc()
 
     logger.info("Variations of Yesterday initialized!")
