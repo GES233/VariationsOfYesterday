@@ -143,6 +143,12 @@ publishing {
 // Test
 test {
 	useJUnitPlatform()
+	// Opt-in lattice benchmark (GridBenchmarkSpec) needs headroom for
+	// ~1.2M cells; normal test runs keep the default heap.
+	if (System.getenv("VOY_BENCH")) {
+		maxHeapSize = "3g"
+		testLogging { showStandardStreams = true }
+	}
 }
 
 // Loom's remapJar consumes the mixin-map output of compileTestScala without

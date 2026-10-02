@@ -37,8 +37,8 @@ case class StressParam(
 /** Full state of the mandate system.
   *
   * Fast: `dissonance` (v), `entrench` (w).
-  * Slow: `stress` (s, land stress, clamped >= 0), `activity` (q, low-passed
-  * catastrophe activity tracer feeding back into stress).
+  * Slow: `stress` (s, land stress, clamped to [0, stressMax]), `activity`
+  * (q, low-passed catastrophe activity tracer feeding back into stress).
   */
 case class MandateCurrent(
     dissonance: Double,
@@ -66,11 +66,10 @@ case class MandateCurrent(
 class MandateState(
     var state: MandateCurrent,
     var param: MandateParam,
-    var stressParam: StressParam = StressParam(),
-    var time_step: Double = 0.01,
-    var timeDeltaAccumulator: Double = 0.0,
+    var stressParam: StressParam = StressParam()
 ):
-  // External forcing channels, fed from EventDTO via EventMapper later.
+  // External forcing channels, fed from channel events (EventDTO) by the
+  // game side.
   /** u: disturbance input (blasting, mining, ...). */
   var disturbance: Double = 0.0
 
@@ -137,8 +136,8 @@ class MandateState(
 
   val solver = ODESolver(equation = this.equ)
 
-  /** Advance one fixed step; stress is clamped to stay within [0, stressMax]. */
-  def step(dt: Double = time_step): Unit =
+  /** Advance one step; stress is clamped to stay within [0, stressMax]. */
+  def step(dt: Double): Unit =
     // Closed-form decay of the alpha-kernel cascade over this step:
     // z(t) = z0 * e^(-t/tau); p(t) = (p0 + z0 * t/tau) * e^(-t/tau).
     // Updated before the solver so dv/dt sees the fresh kernel output.

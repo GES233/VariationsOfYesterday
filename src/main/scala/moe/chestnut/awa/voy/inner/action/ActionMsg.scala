@@ -6,6 +6,4 @@ sealed trait MandateActionProtocol
 
 object ActionMsgPool:
   final case class MandateCurrentStatus(current: MandateCurrent) extends MandateActionProtocol
-  
-//  final case class 
 

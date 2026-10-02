@@ -41,8 +41,8 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
   - `VariationsOfYesterday.scala` — 模组主入口（`ModInitializer`），注册 Mandate Engine 的生命周期与 tick 事件
   - `MandateRuntime.scala` — Minecraft ↔ Mandate 的游戏侧桥：持有 ActorSystem 生命周期、tick gate（无玩家不投递）、快照发布（`stateAt` 供 HUD 读）、动作回包队列
   - `inner/` — 模组核心内部逻辑（不依赖 Minecraft API 的部分尽量放这里）：
-    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateAgent`（Pekko typed actor：tick 事件驱动积分、发布不可变快照；另含固定步长累积器的 `simulationLoop`）、`MandateGrid`（格子场）
-    - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（**通道语义**：`TickArrived` + `StressInject`/`SetDisturbance`/`SetCalming`/`SetBaselineCalming`/`HoldImpulse`/`FirePulse`；世界语义 → 通道事件的 1:N 映射在 Minecraft 侧做，见协议头注释），`EventMapper`（占位）
+    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateAgent`（Pekko typed actor：tick 事件驱动积分、发布不可变快照）、`MandateGrid`（格子场）
+    - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（**通道语义**：`TickArrived` + `StressInject`/`SetDisturbance`/`SetCalming`/`SetBaselineCalming`/`HoldImpulse`/`FirePulse`；世界语义 → 通道事件的 1:N 映射在 Minecraft 侧做，见协议头注释）
     - `action/` — 动作协议：`MandateActionProtocol` sealed trait 及动作消息
     - `plant/` — 植物 DTO（占位）
   - `helpers/ODESolver.scala` — 通用 ODE 求解器（Euler / RK4），配合 `NumericTuple` trait 使用
@@ -51,7 +51,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/java` / `src/client/java` — Mixin（目前是模板自带的 `ExampleMixin` / `ExampleClientMixin`）
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
-- `src/test/scala/` — 测试代码目录（当前仅有空目录骨架 `core/calendar`，尚无测试）
+- `src/test/scala/` — 测试代码（现有 `inner/mandate/` 下 5 个 Spec，清单见下文「测试」一节）
 - `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/河流/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8），旧概念稿已废弃清空
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 
@@ -67,7 +67,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 ## 测试
 
 - 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
-- 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区，以及 `simulationLoop` 子步进回归）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`、`inner/mandate/MandateAgentSpec`（actor 接线契约：tick 事件驱动确定性积分、每 tick 一份快照、无 tick 不积分）。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
+- 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`、`inner/mandate/MandateAgentSpec`（actor 接线契约：tick 事件驱动确定性积分、每 tick 一份快照、无 tick 不积分）。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
 - **本机环境注意**：JDK 路径等环境信息因设备而异，不入库；见仓库根目录 `ref/` 目录下的本地说明（该目录被 git 忽略，各设备自行维护）。
 - Fabric/Minecraft 集成无法简单单测，验证集成行为请使用 `./gradlew runClient` 手动运行游戏。
 

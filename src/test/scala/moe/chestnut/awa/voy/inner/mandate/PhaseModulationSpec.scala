@@ -22,8 +22,7 @@ class PhaseModulationSpec:
   private def freshState(): MandateState =
     MandateState(
       state = MandateCurrent(dissonance = -1.2, entrench = -0.6),
-      param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
-      time_step = dt
+      param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
     )
 
   private val crossLevel = 1.2

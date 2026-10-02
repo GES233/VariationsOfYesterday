@@ -24,8 +24,7 @@ class MandateAgentSpec:
   private def mkCell(disturbance: Double): MandateState =
     val cell = MandateState(
       MandateCurrent(0.0, 0.0, 0.0, 0.0),
-      MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
-      time_step = 0.05
+      MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
     )
     cell.disturbance = disturbance
     cell

@@ -8,7 +8,7 @@ import scala.collection.mutable.ArrayBuffer
 /** Reproduces the numerical-experiment conclusions of design draft
   * section 1.1 against the Scala implementation:
   * threshold ignition, self-sustaining catastrophe, hysteresis extinction,
-  * forgiving zone, and the fixed-substep regression.
+  * and the forgiving zone.
   */
 class MandateStateSpec:
   private val dt = 0.02
@@ -16,8 +16,7 @@ class MandateStateSpec:
   private def freshState(): MandateState =
     MandateState(
       state = MandateCurrent(dissonance = -1.2, entrench = -0.6),
-      param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
-      time_step = dt
+      param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
     )
 
   private class Recorder:
@@ -50,25 +49,6 @@ class MandateStateSpec:
       t += dt
       rec.observe(t, state)
     rec
-
-  @Test def `simulation loop advances substeps sequentially`(): Unit =
-    // Use an exactly representable dt so accumulator arithmetic is exact.
-    val dtExact = 0.0625
-    val viaLoop = freshState()
-    val viaSteps = freshState()
-    viaLoop.disturbance = 0.02
-    viaSteps.disturbance = 0.02
-
-    MandateAgent.simulationLoop(viaLoop, deltaTime = 5 * dtExact, dtExact)
-    for _ <- 1 to 5 do viaSteps.step(dtExact)
-
-    assertEquals(viaSteps.getState.dissonance, viaLoop.getState.dissonance, 1e-12)
-    assertEquals(viaSteps.getState.entrench, viaLoop.getState.entrench, 1e-12)
-    assertEquals(viaSteps.getState.stress, viaLoop.getState.stress, 1e-12)
-
-    // The accumulator keeps the unconsumed remainder.
-    MandateAgent.simulationLoop(viaLoop, deltaTime = 0.5 * dtExact, dtExact)
-    assertEquals(0.5 * dtExact, viaLoop.timeDeltaAccumulator, 1e-12)
 
   @Test def `sustained overload ignites catastrophe beyond stress threshold`(): Unit =
     val state = freshState()

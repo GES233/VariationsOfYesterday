@@ -26,8 +26,7 @@ class PrototypeHotspotSpec:
       val cell = MandateState(
         state =
           MandateCurrent(0.0, 0.0, Math.max(0.0, 0.18 - distance * 0.004), 0.0),
-        param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
-        time_step = dt
+        param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
       )
       cell.disturbance = if distance < 2.0 then 0.08 else 0.002
       cell.baselineCalming = if distance < 5.0 then 0.03 else 0.0

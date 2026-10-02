@@ -18,8 +18,7 @@ class MandateGridSpec:
     MandateState(
       state = MandateCurrent(dissonance = -1.2, entrench = -0.6),
       param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
-      stressParam = stressParam,
-      time_step = dt
+      stressParam = stressParam
     )
 
   private def withStress(state: MandateState, s: Double): MandateState =
