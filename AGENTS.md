@@ -9,7 +9,7 @@
 - 模组 ID：`variations-of-yesterday`
 - 包名：`moe.chestnut.awa.voy`
 - 版本与坐标：`gradle.properties`（`mod_version=0.1.0`，`maven_group=moe.chestnut.awa.voy`）
-- 许可证：CC0-1.0
+- 许可证：All Rights Reserved（ARR，保留所有权利）
 - 仓库：https://github.com/GES233/VariationsOfYesterday
 
 ## 技术栈
