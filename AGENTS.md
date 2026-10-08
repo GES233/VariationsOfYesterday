@@ -52,7 +52,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
 - `src/test/scala/` — 测试代码（现有 `inner/mandate/` 下 5 个 Spec，清单见下文「测试」一节）
-- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/河流/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8），旧概念稿已废弃清空
+- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8），旧概念稿已废弃清空
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 
 ## 开发约定
