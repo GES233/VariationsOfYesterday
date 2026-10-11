@@ -263,6 +263,8 @@ c₀    ≥ 0  基线安抚（村庄钟仪式等残余维护）
 - **路线 B（中期目标）**：自定义 world preset / dimension（「山区」世界类型），以主谷与分水岭为骨架设计群系分布，自撒村庄与遗迹。数据驱动（JSON density function / biome / structure set），不写 chunk generator。
 - **路线 C（不做）**：自定义 chunk generator。工程量最大、兼容性最差，除非 B 证明不够用。
 
+> **Demo 注记（2026-10-11）**：招人 demo 使用独立世界类型 `demo_valley`（`world/DemoValleyChunkGenerator`，高度图驱动：灰度 PNG 一像素一柱、32×32 chunk 谷地居中于原点、与格子场同址对齐、区域外回落为平地）作为 staging 手段。这在形式上是微缩版路线 C，但属有界例外——上述路线分级管的是正式世界的 worldgen；demo 生成器不得生长为通用生成器，正式世界仍走 A+→B。格子场初始条件按谷地手捏（上游高应力、坝子基线安抚、支沟工程遗迹常驻扰动），正式版应由数据/世界生成推导。
+
 玩法核心（格子场 + 平流 + 村庄指示器）在路线 A 下全部可验证；worldgen 定制是叙事包装层升级，不是玩法前置依赖。
 
 ### 5.0 领地性原则（跨层级决策）

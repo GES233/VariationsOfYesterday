@@ -19,10 +19,11 @@ import moe.chestnut.awa.voy.inner.mandate.*
   * Outbound actions are queued by the actor and drained back onto the
   * server thread at the next tick.
   *
-  * TODO: the prototype lattice is fixed to world chunks [-16, 15] in both
-  * axes, with its disturbance hotspot around chunk (0, 0). Future iterations
-  * should anchor it to the spawn point, follow the player's local region, or
-  * derive cells from real world topology and persist them per dimension.
+  * Demo staging: the lattice covers the demo valley region (32x32 chunks,
+  * world chunks [-16, 15] on both axes, same extent as the demo heightmap)
+  * with initial conditions hand-shaped to the valley — see buildGrid. The
+  * real thing anchors to Nodes/terrain and persists per dimension (design
+  * draft section 1.2, section 8 items 1-2).
   */
 object MandateRuntime:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
@@ -41,29 +42,41 @@ object MandateRuntime:
   @volatile private var system: Option[ActorSystem[EventDTO]] = None
   @volatile private var snapshot: Map[(Int, Int), MandateCurrent] =
     Map.empty
+  @volatile private var simTime = 0.0
   private var lastTickRate: Float = 20.0f
   private val pendingActions =
     new ConcurrentLinkedQueue[MandateActionProtocol]()
 
-  /** Prototype lattice: disturbance hotspot around its centre, calming ring
-    * further out. Constructed per engine start so restarts get a fresh
-    * world state. */
+  /** Demo lattice anchored to the valley terrain:
+    *   - the valley runs north-south; upstream is -z, where the side gully
+    *     (the engineering site) joins around block (96, -80) -> chunk (6, -5)
+    *   - initial stress is low in the basin (the stockade at the origin) and
+    *     rises toward the upstream end, staying below the theoretical
+    *     ignition threshold s_c ~ 0.233 (design draft section 1.1.1)
+    *   - the gully patch carries a standing disturbance (u = 0.08); the
+    *     basin carries baseline calming (c0 = 0.03, the stockade's bell)
+    *
+    * Constructed per engine start so restarts get a fresh world state.
+    */
   private def buildGrid(): MandateGrid = MandateGrid.rectangular(
     width,
     height,
     diffusion = 0.002,
     coord =>
-      val localX = coord.x - width / 2
-      val localZ = coord.z - height / 2
-      val distance = Math.sqrt(localX * localX + localZ * localZ)
-      val initialStress = Math.max(0.0, 0.18 - distance * 0.004)
+      val chunkX = coord.x - width / 2 // world chunk x
+      val chunkZ = coord.z - height / 2 // world chunk z
+      val basinDistance = math.hypot(chunkX.toDouble, chunkZ.toDouble)
+      // 0 at the equator, 1 at the north (upstream) edge
+      val upstream = math.max(0, -chunkZ) / (height / 2.0)
+      val initialStress = 0.04 + 0.16 * upstream
       val state = MandateCurrent(0.0, 0.0, initialStress, 0.0)
       val cell = MandateState(
         state,
         MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
       )
-      cell.disturbance = if distance < 2.0 then 0.08 else 0.002
-      cell.baselineCalming = if distance < 5.0 then 0.03 else 0.0
+      val gullyDistance = math.hypot((chunkX - 6).toDouble, (chunkZ + 5).toDouble)
+      cell.disturbance = if gullyDistance < 2.5 then 0.08 else 0.002
+      cell.baselineCalming = if basinDistance < 5.0 then 0.03 else 0.0
       cell
   )
 
@@ -84,6 +97,7 @@ object MandateRuntime:
     system.foreach(_.terminate())
     system = None
     snapshot = Map.empty
+    simTime = 0.0
   }
 
   /** One server tick: drain pending actions back onto the game thread, then
@@ -103,6 +117,12 @@ object MandateRuntime:
       lastTickRate = tickRate
     if !server.getPlayerManager.getPlayerList.isEmpty then
       system.foreach(_ ! EventMsg.TickArrived(TickDt, tickRate))
+      simTime += TickDt
+
+  /** Accumulated simulation time (time units), for HUD sampling aligned to
+    * simulation time rather than wall clock.
+    */
+  def getSimTime: Double = simTime
 
   /** HUD / external read: world chunk -> state; zero state outside the
     * lattice or while the engine is stopped.

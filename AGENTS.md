@@ -45,14 +45,17 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
     - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（**通道语义**：`TickArrived` + `StressInject`/`SetDisturbance`/`SetCalming`/`SetBaselineCalming`/`HoldImpulse`/`FirePulse`；世界语义 → 通道事件的 1:N 映射在 Minecraft 侧做，见协议头注释）
     - `action/` — 动作协议：`MandateActionProtocol` sealed trait 及动作消息
     - `plant/` — 植物 DTO（占位）
+  - `world/` — demo 专用世界类型：`DemoValleyChunkGenerator`（高度图驱动的 chunk generator，灰度 PNG 一像素一柱，32×32 chunk 区域居中于原点、与格子场同址对齐，区域外回落为平地）。**这是招人 demo 的 staging 手段，不是正式 worldgen 路线**（正式路线仍为设计草案 §5 的 A+→B）；高度图资源在 `data/variations-of-yesterday/valley/heightmap.png`，用 `java scripts/ValleyHeightmap.java` 重新生成（必须用 Java/ImageIO 生成——读取侧是 ImageIO，且 `getRGB` 对灰度图会做灰度→sRGB 转换，加载侧必须用 `getRaster().getSample`）
   - `helpers/ODESolver.scala` — 通用 ODE 求解器（Euler / RK4），配合 `NumericTuple` trait 使用
 - `src/client/scala/...` — `VariationsOfYesterdayClient`（`ClientModInitializer`，开发环境下注册 `hud.MandateHud`）、`VariationsOfYesterdayDataGenerator`（datagen 入口）
   - `hud/` — 开发用 HUD 覆层（`MandateHud`：`/voy hud [on|off]` 开关 + `HudRenderCallback` 渲染 `MandateRuntime` 快照）
 - `src/main/java` / `src/client/java` — Mixin（目前是模板自带的 `ExampleMixin` / `ExampleClientMixin`）
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
+- `src/main/resources/data/variations-of-yesterday/worldgen/` — demo 世界类型数据：world preset `demo_valley`（主世界用 `DemoValleyChunkGenerator` + 自定义 `valley` biome，下界/末地沿用 vanilla；经 `data/minecraft/tags/worldgen/world_preset/normal.json` 挂进「World Type」列表）
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
 - `src/test/scala/` — 测试代码（现有 `inner/mandate/` 下 5 个 Spec，清单见下文「测试」一节）
 - `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8），旧概念稿已废弃清空
+- `scripts/` — 开发用一次性工具（不进 jar）：`ValleyHeightmap.java`（demo 高度图再生成）
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 
 ## 开发约定

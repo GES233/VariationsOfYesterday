@@ -1,7 +1,11 @@
 package moe.chestnut.awa.voy
 
+import com.mojang.serialization.MapCodec
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.event.lifecycle.v1.{ServerLifecycleEvents, ServerTickEvents}
+import net.minecraft.registry.Registry
+import net.minecraft.world.gen.chunk.ChunkGenerator
+import moe.chestnut.awa.voy.world.DemoValleyChunkGenerator
 import org.slf4j.{Logger, LoggerFactory}
 
 /** *Variations of Yesterday* is a Minecraft mod about a living world whose
@@ -19,6 +23,12 @@ object VariationsOfYesterday extends ModInitializer:
 
   override def onInitialize(): Unit =
     logger.info("Initializing Variations of Yesterday...")
+
+    Registry.register[MapCodec[? <: ChunkGenerator], MapCodec[DemoValleyChunkGenerator]](
+      net.minecraft.registry.Registries.CHUNK_GENERATOR,
+      DemoValleyChunkGenerator.GeneratorId,
+      DemoValleyChunkGenerator.CODEC
+    )
 
     this.registerMandateEngine()
 
