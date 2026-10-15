@@ -1,4 +1,6 @@
 defmodule Logic.Core do
+  # From
+  # https://ges233.github.io/2026/1/Paper-view-HemannMuKanren2013/#%E9%A2%9D%E5%A4%96%E8%A1%A5%E5%85%85
   @moduledoc "附带 occurs-check、disequality (neq) 以及 fair-search 的 microKanren 实现。"
 
   defmodule Var do
@@ -149,8 +151,6 @@ defmodule Logic.Core do
     occurs?(x, h, s) or occurs?(x, t, s)
   end
 
-  defp occurs_list?(_x, _non_list_tail, _s), do: false
-
   # --- 搜索流 ---
 
   @type stream :: [] | {:mature, State.t(), stream()} | {:immature, (-> stream())}
@@ -277,11 +277,33 @@ defmodule Logic.Core do
     end)
   end
 
+  @doc "受界属性查找：沿现有列表骨架查找 {k, v}，避免对未绑定尾部无限生成开列表"
+  def lookupo(k, v, entity) do
+    fn %State{subst: s} = state ->
+      case walk(entity, s) do
+        [] ->
+          mzero()
+
+        [h | t] ->
+          disj(eq(h, {k, v}), lookupo(k, v, t)).(state)
+
+        %Var{} = u ->
+          # 若实体本身尚未绑定骨架，仅合一单元素骨架而非无限递归生成
+          fresh(1, fn tail ->
+            eq(u, [{k, v} | tail])
+          end).(state)
+
+        _ ->
+          mzero()
+      end
+    end
+  end
+
   @doc "开放属性匹配：只要 entity (Keyword list) 包含所需的所有 {k, v} 对即合一"
   def propso(_entity, []), do: fn state -> unit(state) end
 
   def propso(entity, [{k, v} | rest]) do
-    conj(membero({k, v}, entity), propso(entity, rest))
+    conj(lookupo(k, v, entity), propso(entity, rest))
   end
 
   # --- Reify & Run ---
@@ -321,9 +343,25 @@ defmodule Logic.Core do
   defp reify_s_list([], s), do: s
   defp reify_s_list([h | t], s), do: reify_s(t, reify_s(h, s))
 
-  def reify(var, %State{subst: s}) do
+  def reify(var, %State{subst: s, neq: neq}) do
     walked = walk_star(var, s)
-    walk_star(walked, reify_s(walked, %{}))
+    reify_map = reify_s(walked, %{})
+    reified_term = walk_star(walked, reify_map)
+
+    # 将仍挂起的不等约束一并具象化（仅保留与当前查询结果中未绑定变量相关的约束）
+    active_neq =
+      neq
+      |> Enum.map(fn {a, b} ->
+        {walk_star(walk_star(a, s), reify_map), walk_star(walk_star(b, s), reify_map)}
+      end)
+      |> Enum.reject(fn {a, b} -> Var.var?(a) or Var.var?(b) end)
+      |> Enum.uniq()
+
+    if active_neq == [] do
+      reified_term
+    else
+      [result: reified_term, where_neq: active_neq]
+    end
   end
 
   def run(n, f) do
@@ -413,11 +451,27 @@ defmodule Voy.LiurenSandbox do
 
   # ----------------------------------------------------------------------------
   # 3. 【四课 Four Lessons】：散落在山谷里的器物、动作与物候（待发用之机）
+  #    严格绑定聚落组织形态 (org_type) 与基线状态 (c0_status)，防止跨聚落穿帮
   # ----------------------------------------------------------------------------
-  def artifact_actiono(actor_group, place_role, item_props) do
+  def artifact_actiono(org_type, c0_status, actor_group, place_role, item_props) do
     any([
-      # 302地质勘探队：在源头沟谷使用2号岩石硝铵炸药
+      # 林场采石班：在老寨上游使用常规黑火药（提供 :heavy_kick，验证天盘规则 1 宽容区吸收）
       all([
+        eq(org_type, :ancestral_zhai),
+        eq(c0_status, :c0_intact),
+        eq(actor_group, :forestry_quarry_crew),
+        eq(place_role, :upstream_source),
+        eq(item_props, [
+          name: "常规林区修路黑火药",
+          pulse: :heavy_kick,
+          trace_left: :charcoal_powder_residue
+        ])
+      ]),
+
+      # 302地质勘探队：在改制农场上游沟谷使用2号岩石硝铵炸药（触发易损窗提前起峰）
+      all([
+        eq(org_type, :farm_brigade_04),
+        eq(c0_status, :c0_collapsed),
         eq(actor_group, :survey_team_302),
         eq(place_role, :upstream_source),
         eq(item_props, [
@@ -427,8 +481,10 @@ defmodule Voy.LiurenSandbox do
         ])
       ]),
 
-      # 原生老寨祭司：在汇流垭口或寨门敲击镇山铜钲
+      # 原生老寨祭司：仅在保留了铜钲的老寨（c0_intact）汇流垭口敲击镇山铜钲
       all([
+        eq(org_type, :ancestral_zhai),
+        eq(c0_status, :c0_intact),
         eq(actor_group, :old_zhai_priest),
         eq(place_role, :midstream_pass),
         eq(item_props, [
@@ -438,14 +494,29 @@ defmodule Voy.LiurenSandbox do
         ])
       ]),
 
-      # 退化新寨（四队留守职工）：用大锤砸报废东方红拖拉机气缸 + 念交接班条例
+      # 退化新寨（四队留守职工）：在铜钲被收缴（c0_collapsed）的绝境下，用东方红气缸替代司钟
       all([
+        eq(org_type, :farm_brigade_04),
+        eq(c0_status, :c0_collapsed),
         eq(actor_group, :assimilated_brigade_04),
         eq(place_role, :midstream_pass),
         eq(item_props, [
           name: "红绸包裹的东方红-54气缸体敲击礼",
           pulse: :alpha_metal_resonance,
           trace_left: :red_cloth_and_grease
+        ])
+      ]),
+
+      # 总指挥部直属注浆处：在源头强行打入超高压反向水泥注浆（触发天盘规则 4 Burnout 湮灭）
+      all([
+        eq(org_type, :farm_brigade_04),
+        eq(c0_status, :c0_collapsed),
+        eq(actor_group, :hq_grouting_command),
+        eq(place_role, :upstream_source),
+        eq(item_props, [
+          name: "超高压反向水泥封井注浆",
+          pulse: :OverwhelmingNegativeSuppression,
+          trace_left: :calcified_grout_seal
         ])
       ])
     ])
@@ -477,14 +548,22 @@ defmodule Voy.LiurenSandbox do
     ])
   end
 
+  # 根据 action_place_role 将动作发生地锚定到具体的地盘节点（上游源头 vs 中游垭口）
+  def action_siteo(up, mid, role, action_site) do
+    any([
+      all([eq(role, :upstream_source), eq(action_site, up)]),
+      all([eq(role, :midstream_pass), eq(action_site, mid)])
+    ])
+  end
+
   # ----------------------------------------------------------------------------
   # 4. 【三传 Three Transmissions】：因 Goal（所求之事）而发用！
   #    初传（起手触发） -> 中传（平流与滞后移易） -> 末传（下游显化归宿）
   # ----------------------------------------------------------------------------
   def sanchuano(chuchuan, zhongchuan, mochuan) do
-    fresh(15, fn [
+    fresh(16, fn [
       up, mid, down, org, c0,
-      regime, phase, actor, role, item,
+      regime, phase, actor, role, action_site, item,
       pulse, next_state, lag, nat_sign, inst_sign
     ] ->
       all([
@@ -493,8 +572,9 @@ defmodule Voy.LiurenSandbox do
         settlement_stateo(down, org, c0),
         phase_phenomenono(phase, nat_sign, inst_sign),
 
-        # 四课取用
-        artifact_actiono(actor, role, item),
+        # 四课取用（与聚落组织、c0 状态及具体地理节点严格绑定）
+        artifact_actiono(org, c0, actor, role, item),
+        action_siteo(up, mid, role, action_site),
         propso(item, [pulse: pulse]),
 
         # 发用推演
@@ -504,6 +584,8 @@ defmodule Voy.LiurenSandbox do
         eq(chuchuan, [
           upstream: up,
           pass: mid,
+          action_site: action_site,
+          action_role: role,
           phase: phase,
           natural_sign: nat_sign,
           instrument_sign: inst_sign,
@@ -532,79 +614,90 @@ defmodule Voy.LiurenSandbox do
   end
 
   # ----------------------------------------------------------------------------
-  # 5. 【多世界观认知透镜 Lenses】：对同一组「三传」的不同叙事投影（由 neq 保证绝不串戏）
+  # 5. 【多世界观认知透镜 Lenses】：
+  #    构建共享的「归因解释池」，再用 neq（意识形态禁忌）迫使不同透镜筛出各自的说法
   # ----------------------------------------------------------------------------
-  def lens_projectiono(lens, chuchuan, zhongchuan, mochuan, narrative_record) do
-    fresh(4, fn [phase, outcome, c0, item_name] ->
+  def attribution_candidateo(regime, cause_tag, explanation_text) do
+    any([
+      # 解释候选 1：官方替罪羊（秋汛自然岩移）
       all([
-        propso(chuchuan, [phase: phase]),
-        propso(zhongchuan, [c0_baseline: c0]),
-        propso(mochuan, [outcome: outcome]),
+        eq(regime, :Strained),
+        eq(cause_tag, :autumn_rain_natural_erosion),
+        eq(explanation_text, "十月连日秋雨导致野猪箐常规岩层疲劳滑坡（系自然损耗，与排险爆破无关）")
+      ]),
+      # 解释候选 2：技术真相 A（拆钟 c0 归零 + 承压区易损窗点炮初犯击穿）
+      all([
+        eq(regime, :Strained),
+        eq(cause_tag, :c0_collapsed_and_vulnerable_blasting),
+        eq(explanation_text, "此前白水坝恢复变慢（临界慢化 Strained），79年收走铜钲后阻尼归零（c0=0）；302队点炮正撞在簧片蜂鸣段（易损窗），5刻后推过失稳点")
+      ]),
+      # 解释候选 3：老寨民俗解释（拆钟断香火 + 换气口动火药惊动山神）
+      all([
+        eq(regime, :Strained),
+        eq(cause_tag, :mountain_god_breath_disturbed),
+        eq(explanation_text, "涧水起鱼鳞碎纹、雀鸟惊飞乃山脉倒换气！四队拆了寨门铜钲断香火，勘探队又在换气口动火药致山神翻身")
+      ]),
+      # 解释候选 4：技术真相 B（已在自持振荡期二次误点火）
+      all([
+        eq(regime, :Oscillating),
+        eq(cause_tag, :secondary_ignition_in_oscillation),
+        eq(explanation_text, "谷地明明已陷入周期性自激振荡（Oscillating），302队在回潮易损窗追加爆破，把原本40刻后的尖峰直接提前引爆")
+      ])
+    ])
+  end
 
-        any([
-          # 透镜 A：向上汇报的官样文章 (OfficialHQ)
-          # 禁忌：绝不承认与 RelativeRefractory（时机失误）或 c0_collapsed（拆钟改制）有关！
-          all([
-            eq(lens, :OfficialHQ),
-            propso(zhongchuan, [regime: :Strained]),
-            eq(outcome, :premature_excitation_spike),
-            neq(item_name, "岁祭镇山铜钲三叩"),
-            eq(narrative_record, [
-              lens: :OfficialHQ,
-              stage_context: :first_breach_from_strained,
-              title: "《关于白水坝十月中旬秋汛滑坡及自然损耗的结案通报》",
-              claimed_cause: "十月连日秋雨导致野猪箐常规岩层疲劳滑坡（与排险爆破无关）",
-              claimed_solution: "已责令302队加大炸药当量继续排险，隐患彻底消除"
-            ])
-          ]),
+  # 各透镜的认知禁忌（真正用 neq 裁剪候选池！）
+  def lens_tabooo(lens, cause_tag) do
+    any([
+      all([
+        eq(lens, :OfficialHQ),
+        # 官样通报严禁承认：拆钟改制/时机失误、二次振荡误点火、或山神发怒
+        neq(cause_tag, :c0_collapsed_and_vulnerable_blasting),
+        neq(cause_tag, :secondary_ignition_in_oscillation),
+        neq(cause_tag, :mountain_god_breath_disturbed)
+      ]),
+      all([
+        eq(lens, :TechInner),
+        # 技术员内参鄙视官方秋汛借口，也不采信山神鬼怪之说
+        neq(cause_tag, :autumn_rain_natural_erosion),
+        neq(cause_tag, :mountain_god_breath_disturbed)
+      ]),
+      all([
+        eq(lens, :OldZhai),
+        # 老寨幸存者不认官方秋汛借口，也不用现代动力学方程术语
+        neq(cause_tag, :autumn_rain_natural_erosion),
+        neq(cause_tag, :c0_collapsed_and_vulnerable_blasting),
+        neq(cause_tag, :secondary_ignition_in_oscillation)
+      ])
+    ])
+  end
 
-          # 透镜 B1：技术员手写内参 - 针对「从承压区(Strained)初犯击穿」的批注
-          all([
-            eq(lens, :TechInner),
-            propso(zhongchuan, [regime: :Strained]),
-            eq(phase, :RelativeRefractory),
-            eq(c0, :c0_collapsed),
-            eq(outcome, :premature_excitation_spike),
-            eq(narrative_record, [
-              lens: :TechInner,
-              stage_context: :first_breach_from_strained,
-              title: "《水文站工作手簿·夹页铅笔批注（一）》",
-              contradiction: "通报纯属扯淡！气象台账显示当周滴雨未下。",
-              real_mechanism: "此前白水坝只是恢复变慢（临界慢化 Strained），79年收走老寨铜钲后坝子没了阻尼裕度（c0=0）；302队这一炮正撞在簧片蜂鸣段（易损窗），5刻（τ=5）后直接把系统推过了失稳点！"
-            ])
-          ]),
+  def lens_projectiono(lens, chuchuan, zhongchuan, mochuan, narrative_record) do
+    fresh(7, fn [phase, outcome, c0, regime, item, item_name, cause_tag] ->
+      fresh(1, fn [explanation] ->
+        all([
+          propso(chuchuan, [phase: phase, action_item: item]),
+          propso(item, [name: item_name]),
+          propso(zhongchuan, [c0_baseline: c0, regime: regime]),
+          propso(mochuan, [outcome: outcome]),
+          eq(outcome, :premature_excitation_spike),
+          eq(phase, :RelativeRefractory),
+          eq(c0, :c0_collapsed),
 
-          # 透镜 B2：技术员手写内参 - 针对「已在自持振荡期(Oscillating)二次误点火」的批注
-          all([
-            eq(lens, :TechInner),
-            propso(zhongchuan, [regime: :Oscillating]),
-            eq(phase, :RelativeRefractory),
-            eq(c0, :c0_collapsed),
-            eq(outcome, :premature_excitation_spike),
-            eq(narrative_record, [
-              lens: :TechInner,
-              stage_context: :secondary_ignition_during_oscillation,
-              title: "《水文站工作手簿·夹页铅笔批注（二）》",
-              contradiction: "所谓的『追加排险爆破』是在火上浇油！",
-              real_mechanism: "谷地明明已经陷入周期性自激振荡（Oscillating），302队不肯停工，在回潮易损窗追加爆破，把原本40刻后的下一波尖峰直接提前到了当场！"
-            ])
-          ]),
+          # 先挂载当前透镜的 neq 禁忌，再投入共享候选池合一！
+          membero(lens, [:OfficialHQ, :TechInner, :OldZhai]),
+          lens_tabooo(lens, cause_tag),
+          attribution_candidateo(regime, cause_tag, explanation),
 
-          # 透镜 C：老寨残存老人的口述 (OldZhai)
-          all([
-            eq(lens, :OldZhai),
-            propso(zhongchuan, [regime: :Strained]),
-            eq(phase, :RelativeRefractory),
-            eq(outcome, :premature_excitation_spike),
-            eq(narrative_record, [
-              lens: :OldZhai,
-              stage_context: :first_breach_from_strained,
-              title: "《白水老寨幸存者口述》",
-              folklore: "涧水起鱼鳞碎纹、雀鸟惊飞，那是山脉在倒换气！四队拆了寨门铜钲断了香火，勘探队又在换气口动火药，山神翻身吞了坝子。"
-            ])
+          eq(narrative_record, [
+            lens: lens,
+            regime_context: regime,
+            trigger_artifact: item_name,
+            adopted_cause_tag: cause_tag,
+            record_text: explanation
           ])
         ])
-      ])
+      end)
     end)
   end
 end
@@ -656,19 +749,20 @@ results_2 =
 IO.inspect(results_2, pretty: true, width: 100)
 
 IO.puts("\n==================================================================")
-IO.puts("【推演三：绝境求生（退化新寨的邪典仪式合成）】")
-IO.puts("所求之事（Goal）：白水坝已陷入自持振荡（:Oscillating），且祖传铜钲早已遗失。")
-IO.puts("若要末传得「推迟尖峰（:spike_delayed_by_8_6）」，留守的四队职工（:assimilated_brigade_04）")
-IO.puts("必须在什么物候与土法仪器读数下、用什么东西完成司钟？")
+IO.puts("【推演三：绝境求生（退化新寨的邪典仪式合成 — 不预设行动者！）】")
+IO.puts("所求之事（Goal）：仅指定白水坝（:baishui_flat）要得末传「推迟尖峰（:spike_delayed_by_8_6）」。")
+IO.puts("不预设是谁干的（?actor 留空），由 Kanren 根据白水坝 c0 已坍塌的事实，自动排除老寨铜钲，")
+IO.puts("唯一推演出：只能由四队留守职工在断碑垭口、卡死死寂回吸窗、敲击东方红气缸体！")
 IO.puts("==================================================================")
 
 results_3 =
   Logic.Core.run_all(fn q ->
-    Logic.Core.fresh(7, fn [chu, zhong, mo, phase, nat_sign, inst_sign, item] ->
+    Logic.Core.fresh(9, fn [chu, zhong, mo, actor, site, phase, nat_sign, inst_sign, item] ->
       Logic.Core.all([
         Voy.LiurenSandbox.sanchuano(chu, zhong, mo),
         Logic.Core.propso(chu, [
-          actor: :assimilated_brigade_04,
+          actor: actor,
+          action_site: site,
           phase: phase,
           natural_sign: nat_sign,
           instrument_sign: inst_sign,
@@ -679,6 +773,8 @@ results_3 =
           outcome: :spike_delayed_by_8_6
         ]),
         Logic.Core.eq(q, [
+          推导出的唯一执行者: actor,
+          仪式地点: site,
           必须卡准的相位: phase,
           眼见物候口诀: nat_sign,
           土法仪器读数: inst_sign,
@@ -689,3 +785,499 @@ results_3 =
   end)
 
 IO.inspect(results_3, pretty: true, width: 100)
+
+# ==============================================================================
+# 第二部分：四纪发展史与玩家入场切面编译器 (Voy.ChronicleCompiler)
+# ------------------------------------------------------------------------------
+# 解决痛点：不用手写海量分支剧本！
+# 输入：从任意种子（含外部地形模组）D8 高度图提取出的「山谷拓扑特征」
+# 推演：第一纪（建寨） -> 第二纪（改制与工程进山） -> 第三纪（激化与三分结局）
+# 输出：第四纪（玩家入场时的 Mandate 初始场、结构 NBT 落位、多视角自洽档案包）
+# ==============================================================================
+defmodule Voy.ChronicleCompiler do
+  import Logic.Core
+
+  # ----------------------------------------------------------------------------
+  # 【第一纪：老寨肇建 (Era I - Ancestral Settlement)】
+  # 规则：依地势建寨，坝子/台地聚居，必在咽喉隘口立镇山之器以维系基线安抚 c0
+  # ----------------------------------------------------------------------------
+  def era1_ancestralo(topo, era1) do
+    fresh(5, fn [branch_id, up_type, pass_type, down_type, guardian_relic] ->
+      all([
+        propso(topo, [
+          branch_id: branch_id,
+          up_terrain: up_type,
+          pass_terrain: pass_type,
+          down_terrain: down_type
+        ]),
+        # 下游聚落选址必须是开阔冲积坝或半山台地
+        any([eq(down_type, :alluvial_flat), eq(down_type, :mid_terrace)]),
+        # 咽喉隘口根据地貌立不同的镇山器物（均提供 c0_intact）
+        any([
+          all([
+            eq(pass_type, :canyon_pass),
+            eq(guardian_relic, :ancestral_bronze_zheng)
+          ]),
+          all([
+            eq(pass_type, :karst_gorge),
+            eq(guardian_relic, :carved_diversion_stele)
+          ])
+        ]),
+        eq(era1, [
+          branch_id: branch_id,
+          settlement_form: :ancestral_zhai,
+          guardian_relic: guardian_relic,
+          initial_c0: :c0_intact,
+          initial_regime: :Calm
+        ])
+      ])
+    end)
+  end
+
+  # ----------------------------------------------------------------------------
+  # 【第二纪：改制与工程进山 (Era II - Reorganization & Survey, 1960s-1970s)】
+  # 规则：
+  # 1. 下游地貌决定交通可达性，进而决定「寨改村/农场」是否发生（拆毁镇山器 -> c0 坍塌）；
+  # 2. 源头地貌与地质构造共同决定进驻哪种工程分队，埋下不同性质的扰动源。
+  # ----------------------------------------------------------------------------
+  def era2_reorgo(topo, era1, era2) do
+    fresh(10, fn [
+      down_type,
+      access,
+      geology,
+      up_type,
+      relic,
+      org_after,
+      c0_after,
+      relic_fate,
+      eng_team,
+      disturbance_mode
+    ] ->
+      all([
+        propso(topo, [
+          down_terrain: down_type,
+          accessibility: access,
+          up_geology: geology,
+          up_terrain: up_type
+        ]),
+        propso(era1, [guardian_relic: relic]),
+
+        # 聚落改制分支：开阔冲积坝修通机耕道被改制为农场分队；半山台地绝壁隔绝得以幸存
+        any([
+          all([
+            eq(down_type, :alluvial_flat),
+            eq(access, :tractor_road_accessible),
+            eq(org_after, :state_farm_brigade),
+            eq(relic_fate, {:requisitioned_or_dismantled, relic}),
+            eq(c0_after, :c0_collapsed)
+          ]),
+          all([
+            eq(down_type, :mid_terrace),
+            eq(access, :cliff_isolated),
+            eq(org_after, :unreformed_old_zhai),
+            eq(relic_fate, {:preserved_in_situ, relic}),
+            eq(c0_after, :c0_intact)
+          ])
+        ]),
+
+        # 源头工程进驻分支：按源头地貌与断裂带性质派驻不同工程单位
+        any([
+          # 陡峭裂隙矿脉 -> 302 勘探队进行浅层密集点炮（周期性冲击易损窗）
+          all([
+            eq(up_type, :steep_fissure_headwater),
+            eq(geology, :active_fault_vein),
+            eq(eng_team, :survey_blasting_team_302),
+            eq(disturbance_mode, :periodic_shallow_blasting)
+          ]),
+          # 喀斯特落水洞/暗河 -> 总指挥部直属高压注浆处（企图用巨量反向压力闷死地脉）
+          all([
+            eq(up_type, :karst_sinkhole_headwater),
+            eq(geology, :deep_stress_cavity),
+            eq(eng_team, :hq_high_pressure_grouting_corps),
+            eq(disturbance_mode, :overwhelming_reverse_suppression)
+          ]),
+          # 陡峭次生裂隙林区 -> 仅设常规水文气象哨（轻微扰动）
+          all([
+            eq(up_type, :steep_fissure_headwater),
+            eq(geology, :minor_fracture),
+            eq(eng_team, :forestry_hydro_post),
+            eq(disturbance_mode, :low_level_logging_shock)
+          ])
+        ]),
+
+        eq(era2, [
+          org_after_reorg: org_after,
+          relic_fate: relic_fate,
+          c0_status: c0_after,
+          stationed_team: eng_team,
+          disturbance_mode: disturbance_mode
+        ])
+      ])
+    end)
+  end
+
+  # ----------------------------------------------------------------------------
+  # 【第三纪：激化与三分结局 (Era III - Catastrophe & Fates, early 1980s)】
+  # 规则：严格对齐设计草案 §1.1 动力学方程与 §4.5 主体下落（同化 / 湮灭 / 飞升 / 幸存对照）
+  # ----------------------------------------------------------------------------
+  def era3_catastropheo(_topo, _era1, era2, era3) do
+    fresh(7, fn [
+      org,
+      c0,
+      dist_mode,
+      fate_category,
+      resulting_regime,
+      target_phase_rule,
+      emergent_practice
+    ] ->
+      all([
+        propso(era2, [
+          org_after_reorg: org,
+          c0_status: c0,
+          disturbance_mode: dist_mode
+        ]),
+
+        any([
+          # 结局分支 1：【同化 -> 退化新寨】
+          # 条件：c0 坍塌 + 勘探队密集爆破击穿宽容区 -> 陷入自持振荡 (Oscillating)
+          # 撤场断粮后，留守农场职工用拖拉机气缸与交接班制度在 AbsoluteRefractory 合成替代仪式
+          all([
+            eq(org, :state_farm_brigade),
+            eq(c0, :c0_collapsed),
+            eq(dist_mode, :periodic_shallow_blasting),
+            eq(fate_category, :Fate_Assimilated_NewZhai),
+            eq(resulting_regime, :Oscillating),
+            eq(target_phase_rule, :must_strike_at_AbsoluteRefractory),
+            eq(emergent_practice, [
+              costume: "褪色劳保服与红袖章",
+              instrument: "红绸包裹的东方红-54铸铁气缸体",
+              liturgy: "虫鸣骤停死寂时，按《交接班制度》列队唱名三声并重锤击缸"
+            ])
+          ]),
+
+          # 结局分支 2：【湮灭 -> 烧毁态死寂区】
+          # 条件：c0 坍塌 + 总指挥部直属高压反向注浆镇压 -> 应力冲穿截断阈值进入 Burnout 吸引子
+          all([
+            eq(c0, :c0_collapsed),
+            eq(dist_mode, :overwhelming_reverse_suppression),
+            eq(fate_category, :Fate_Annihilated_BurnoutZone),
+            eq(resulting_regime, :Burnout),
+            eq(target_phase_rule, :phase_frozen_in_white_silence),
+            eq(emergent_practice, [
+              phenomenon: "灰白钙化地表、无声无息、钟摆焊死在最大偏角",
+              remnant: "被水泥彻底封死的注浆井口与全员失踪名册"
+            ])
+          ]),
+
+          # 结局分支 3：【飞升 -> 空间畸变放逐点】
+          # 条件：虽有古寨 c0 但源头为深层应力腔且遭遇高压强行谐振 -> 核心人员在尖峰时刻自我放逐
+          all([
+            eq(c0, :c0_intact),
+            eq(dist_mode, :overwhelming_reverse_suppression),
+            eq(fate_category, :Fate_Ascended_SpatialRift),
+            eq(resulting_regime, :Strained),
+            eq(target_phase_rule, :triggered_at_Excitation_zenith),
+            eq(emergent_practice, [
+              phenomenon: "游荡的搬运方块黑影（末影畸变）、指南针乱转的残破观测掩体",
+              remnant: "写满高频相位坐标与『去往对岸』字样的磁带"
+            ])
+          ]),
+
+          # 结局分支 4：【幸存对照 -> 宽容区吸收的老寨】
+          # 条件：c0 完好 + 常规林区轻微扰动 -> 方程宽容区吸收脉冲（单次预兆后迅速回落 Calm）
+          all([
+            eq(org, :unreformed_old_zhai),
+            eq(c0, :c0_intact),
+            eq(dist_mode, :low_level_logging_shock),
+            eq(fate_category, :Fate_Ancestral_ControlGroup),
+            eq(resulting_regime, :Calm),
+            eq(target_phase_rule, :absorbed_in_Resting_basin),
+            eq(emergent_practice, [
+              phenomenon: "涧水偶有微澜但很快平息，老寨岁祭如常",
+              remnant: "完好运转的镇山古器与世代相传的听山口诀"
+            ])
+          ])
+        ]),
+
+        eq(era3, [
+          fate: fate_category,
+          final_regime: resulting_regime,
+          phase_rule: target_phase_rule,
+          manifestation: emergent_practice
+        ])
+      ])
+    end)
+  end
+
+  # ----------------------------------------------------------------------------
+  # 【第四纪：玩家入场切面与「两套账本」编译器 (Era IV - Present-Day Slice)】
+  # 将前三纪推演出的历史，直接编译为：
+  # 1. 地形节点上的结构落位 (Structures)
+  # 2. Mandate 引擎各格初始状态 (Mandate Initial State)
+  # 3. 散落在箱子里的多透镜档案（带 neq 防串戏约束）
+  # ----------------------------------------------------------------------------
+  def compile_branch_sliceo(topo, slice) do
+    fresh(6, fn [branch_id, era1, era2, era3, structures, archives] ->
+      all([
+        propso(topo, [branch_id: branch_id]),
+        era1_ancestralo(topo, era1),
+        era2_reorgo(topo, era1, era2),
+        era3_catastropheo(topo, era1, era2, era3),
+        compile_structureso(topo, era1, era2, era3, structures),
+        compile_archiveso(topo, era1, era2, era3, archives),
+        eq(slice, [
+          支沟代号: branch_id,
+          地理骨相: topo,
+          第一纪_古寨肇建: era1,
+          第二纪_改制与进山: era2,
+          第三纪_激化与结局: era3,
+          第四纪_落地结构与遗迹: structures,
+          第四纪_生成档案包: archives
+        ])
+      ])
+    end)
+  end
+
+  defp compile_structureso(topo, era1, era2, era3, structures) do
+    fresh(6, fn [up_name, pass_name, down_name, relic, fate, team] ->
+      all([
+        propso(topo, [up_name: up_name, pass_name: pass_name, down_name: down_name]),
+        propso(era1, [guardian_relic: relic]),
+        propso(era2, [stationed_team: team]),
+        propso(era3, [fate: fate]),
+        any([
+          all([
+            eq(fate, :Fate_Assimilated_NewZhai),
+            eq(structures, [
+              upstream_site: {up_name, "302队废弃爆破钻探台 (常驻脉冲源)"},
+              pass_site: {pass_name, "断碑垭口·悬挂东方红气缸体的简易木架 + 验山垂架"},
+              downstream_site: {down_name, "农场四队砖混宿舍区 (variations-of-yesterday:farm_dorm_unit_*)"}
+            ])
+          ]),
+          all([
+            eq(fate, :Fate_Annihilated_BurnoutZone),
+            eq(structures, [
+              upstream_site: {up_name, "水泥封死的超高压注浆井群 (灰白死寂核心)"},
+              pass_site: {pass_name, "坍塌的石雕分水堰与焊死的验山垂架"},
+              downstream_site: {down_name, "空无一人的钙化农场废墟 (Burnout 绝对静默区)"}
+            ])
+          ]),
+          all([
+            eq(fate, :Fate_Ascended_SpatialRift),
+            eq(relic, :ancestral_bronze_zheng),
+            eq(structures, [
+              upstream_site: {up_name, "深渊谐振掩体与黑曜石畸变裂隙 (末影人游荡点)"},
+              pass_site: {pass_name, "尚存岁祭镇山铜钲的险峻峡口"},
+              downstream_site: {down_name, "半山绝壁孤寨 (偶受空间裂隙微扰)"}
+            ])
+          ]),
+          all([
+            eq(fate, :Fate_Ascended_SpatialRift),
+            eq(relic, :carved_diversion_stele),
+            eq(structures, [
+              upstream_site: {up_name, "深渊谐振掩体与黑曜石畸变裂隙 (末影人游荡点)"},
+              pass_site: {pass_name, "尚存石雕分水古碑的溶洞峡口"},
+              downstream_site: {down_name, "半山绝壁孤寨 (偶受空间裂隙微扰)"}
+            ])
+          ]),
+          all([
+            eq(fate, :Fate_Ancestral_ControlGroup),
+            eq(structures, [
+              upstream_site: {up_name, "废弃林场水文观测哨"},
+              pass_site: {pass_name, "古寨镇山铜钲亭 (c0 维持源完好)"},
+              downstream_site: {down_name, "原生老寨聚落 (安居乐业，提供听山口诀对照)"}
+            ])
+          ])
+        ])
+      ])
+    end)
+  end
+
+  # 同一结局下的多源解释池（含内部真相与官方替罪羊），供 neq 禁忌主动筛选
+  defp branch_cause_candidateo(fate, cause_tag, summary_text) do
+    any([
+      # 同化线候选：真相 vs 官方替罪羊
+      all([
+        eq(fate, :Fate_Assimilated_NewZhai),
+        eq(cause_tag, :c0_removed_and_vulnerable_window_blasting),
+        eq(summary_text, "79年收缴铜钲后 c0 归零，302队点炮正撞上簧片蜂鸣段（易损窗）致自持振荡")
+      ]),
+      all([
+        eq(fate, :Fate_Assimilated_NewZhai),
+        eq(cause_tag, :seasonal_rain_mudslide),
+        eq(summary_text, "归咎于连日秋雨导致常规岩移滑坡，隐瞒拆钟与点炮")
+      ]),
+      # 湮灭线候选：真相 vs 官方替罪羊
+      all([
+        eq(fate, :Fate_Annihilated_BurnoutZone),
+        eq(cause_tag, :overwhelming_suppression_attractor_burnout),
+        eq(summary_text, "总指挥部强行打入反向巨量阻尼，应力冲穿 s_max 截断阈值，整条沟进入死寂吸引子")
+      ]),
+      all([
+        eq(fate, :Fate_Annihilated_BurnoutZone),
+        eq(cause_tag, :planned_relocation_and_mine_closure),
+        eq(summary_text, "宣称矿区资源枯竭、全员已整建制平稳搬迁")
+      ]),
+      # 飞升线候选：真相 vs 官方替罪羊
+      all([
+        eq(fate, :Fate_Ascended_SpatialRift),
+        eq(cause_tag, :excitation_zenith_spatial_exile),
+        eq(summary_text, "他们在起峰极值（Excitation）打开了谐振腔，核心组全变成了搬石头的黑影")
+      ]),
+      all([
+        eq(fate, :Fate_Ascended_SpatialRift),
+        eq(cause_tag, :equipment_retrieval_completed),
+        eq(summary_text, "深孔观测站设备回收完毕，人员调离备案")
+      ]),
+      # 幸存古寨候选：真相 vs 官方口径
+      all([
+        eq(fate, :Fate_Ancestral_ControlGroup),
+        eq(cause_tag, :intact_c0_basin_absorption),
+        eq(summary_text, "铜钲镇垭口，山涧小震不过三息自平；莫在鱼鳞水纹时动土，要在万籁俱寂时叩钟")
+      ]),
+      all([
+        eq(fate, :Fate_Ancestral_ControlGroup),
+        eq(cause_tag, :backward_folk_custom_pending_reform),
+        eq(summary_text, "山高路远暂缓改制，旧式鸣钟习俗待后续引导")
+      ])
+    ])
+  end
+
+  # 官方汇报严禁采信任何涉及工程失误、c0 坍塌、Burnout 或空间畸变的真实原因
+  defp official_tabooo(cause_tag) do
+    all([
+      neq(cause_tag, :c0_removed_and_vulnerable_window_blasting),
+      neq(cause_tag, :overwhelming_suppression_attractor_burnout),
+      neq(cause_tag, :excitation_zenith_spatial_exile),
+      neq(cause_tag, :intact_c0_basin_absorption)
+    ])
+  end
+
+  defp compile_archiveso(topo, _era1, _era2, era3, archives) do
+    fresh(7, fn [up_name, down_name, fate, official_claim, official_text, inner_truth, inner_text] ->
+      all([
+        propso(topo, [up_name: up_name, down_name: down_name]),
+        propso(era3, [fate: fate]),
+
+        # 1. 官方通报从候选池中取用，但受 official_tabooo 的 neq 约束裁剪，只能落入替罪羊解释
+        official_tabooo(official_claim),
+        branch_cause_candidateo(fate, official_claim, official_text),
+
+        # 2. 内参/民间深层记录同样从候选池取用，但强制 neq(inner_truth, official_claim)
+        neq(inner_truth, official_claim),
+        branch_cause_candidateo(fate, inner_truth, inner_text),
+
+        eq(archives, [
+          表层_官样通报: [
+            target_settlement: down_name,
+            upstream_site: up_name,
+            claimed_cause: official_claim,
+            summary: official_text
+          ],
+          深层_内参或口述真相: [
+            true_source: up_name,
+            settlement: down_name,
+            true_cause: inner_truth,
+            note: inner_text
+          ]
+        ])
+      ])
+    end)
+  end
+end
+
+IO.puts("\n==================================================================")
+IO.puts("【推演四：从地形骨相自动生成「四纪发展史」与玩家入场世界切面】")
+IO.puts("场景：D8 算法从当前世界种子（或外部地形模组）的高度图中抠出了 3 条支沟。")
+IO.puts("设计师只需声明地形特征，Kanren 自动推演出每一条沟的四纪历史、建筑落位与三层档案！")
+IO.puts("==================================================================")
+
+# 模拟从高度图 D8 提取出的三条支沟拓扑特征
+extracted_terrain_branches = [
+  # 支沟 1：陡峭裂隙源头 + 峡谷隘口 + 通了机耕道的开阔坝子
+  [
+    branch_id: :branch_01_baishui,
+    up_name: "野猪箐裂隙",
+    pass_name: "断碑垭口",
+    down_name: "白水坝",
+    up_terrain: :steep_fissure_headwater,
+    pass_terrain: :canyon_pass,
+    down_terrain: :alluvial_flat,
+    up_geology: :active_fault_vein,
+    accessibility: :tractor_road_accessible
+  ],
+  # 支沟 2：喀斯特落水洞源头 + 溶洞峡口 + 通了公路的矿区平坝
+  [
+    branch_id: :branch_02_heishui,
+    up_name: "鬼哭漏斗",
+    pass_name: "锁龙峡",
+    down_name: "黑水坪",
+    up_terrain: :karst_sinkhole_headwater,
+    pass_terrain: :karst_gorge,
+    down_terrain: :alluvial_flat,
+    up_geology: :deep_stress_cavity,
+    accessibility: :tractor_road_accessible
+  ],
+  # 支沟 3：普通次生裂隙源头 + 峡谷隘口 + 绝壁隔绝的半山台地
+  [
+    branch_id: :branch_03_nuoliang,
+    up_name: "老君林场",
+    pass_name: "响水涧口",
+    down_name: "糯良古寨",
+    up_terrain: :steep_fissure_headwater,
+    pass_terrain: :canyon_pass,
+    down_terrain: :mid_terrace,
+    up_geology: :minor_fracture,
+    accessibility: :cliff_isolated
+  ]
+]
+
+compiled_valley_history =
+  Enum.flat_map(extracted_terrain_branches, fn branch_topo ->
+    Logic.Core.run_all(fn q ->
+      Voy.ChronicleCompiler.compile_branch_sliceo(branch_topo, q)
+    end)
+  end)
+
+IO.inspect(compiled_valley_history, pretty: true, width: 100)
+
+IO.puts("\n==================================================================")
+IO.puts("【推演五：从结局倒推地形与历史（Goal-Driven Worldgen 选址）】")
+IO.puts("场景：设计师希望在玩家探索的下一个区域生成一个「飞升（空间畸变放逐）」遗迹。")
+IO.puts("直接向 Kanren 提问：什么样的地形骨相（?topo）与前三纪历史，才能演生出 :Fate_Ascended_SpatialRift？")
+IO.puts("==================================================================")
+
+reverse_worldgen_query =
+  Logic.Core.run_all(fn q ->
+    Logic.Core.fresh(7, fn [required_topo, slice, up_t, pass_t, down_t, geo, acc] ->
+      Logic.Core.all([
+        # 只绑定地名占位，5项地形特征全部留作未知逻辑变量让 Kanren 反推！
+        Logic.Core.eq(required_topo, [
+          branch_id: :mystery_branch,
+          up_name: "未知源头",
+          pass_name: "未知隘口",
+          down_name: "未知聚落",
+          up_terrain: up_t,
+          pass_terrain: pass_t,
+          down_terrain: down_t,
+          up_geology: geo,
+          accessibility: acc
+        ]),
+        Voy.ChronicleCompiler.compile_branch_sliceo(required_topo, slice),
+        Logic.Core.propso(slice, [
+          第三纪_激化与结局: [
+            fate: :Fate_Ascended_SpatialRift,
+            final_regime: :Strained,
+            phase_rule: :triggered_at_Excitation_zenith,
+            manifestation: [
+              phenomenon: "游荡的搬运方块黑影（末影畸变）、指南针乱转的残破观测掩体",
+              remnant: "写满高频相位坐标与『去往对岸』字样的磁带"
+            ]
+          ]
+        ]),
+        Logic.Core.eq(q, slice)
+      ])
+    end)
+  end)
+
+IO.inspect(reverse_worldgen_query, pretty: true, width: 100)
