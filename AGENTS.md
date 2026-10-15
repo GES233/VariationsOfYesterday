@@ -39,7 +39,8 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 
 - `src/main/scala/moe/chestnut/awa/voy/`
   - `VariationsOfYesterday.scala` — 模组主入口（`ModInitializer`），注册 Mandate Engine 的生命周期与 tick 事件
-  - `MandateRuntime.scala` — Minecraft ↔ Mandate 的游戏侧桥：持有 ActorSystem 生命周期、tick gate（无玩家不投递）、demo 谷地 D8 汇流建图、快照发布与 HUD 订阅流式同步（`stateAt` / `MandateHudPackets`）、动作回包队列
+  - `MandateRuntime.scala` — Minecraft ↔ Mandate 的游戏侧桥：持有 ActorSystem 生命周期、tick gate（无玩家不投递）、demo 谷地 D8 汇流建图、事件投递（`postEvent`/`firePulseAt`/`injectStressAt`）、快照发布与 HUD 订阅流式同步（`stateAt` / `MandateHudPackets`）、动作回包队列
+  - `block/` — 模组方块注册与交互：`VoyBlocks`、`TelluricPlumbBlock`（地脉验山垂架 `variations-of-yesterday:telluric_plumb`：绑定 `MandateReadout` 四相切换 3D 模型姿态与粒子、右键验山读数、潜行右键/红石触发校准铜钲 `FirePulse`、手持火药/TNT 注入测试应力、比较器四相信号输出）
   - `network/` — 网络同步包：`MandateHudPackets`（`HudSubscribePayload` C2S 订阅开关 + `HudSnapshotPayload` S2C 区块状态与仿真时钟流式同步）
   - `inner/` — 模组核心内部逻辑（不依赖 Minecraft API 的部分尽量放这里）：
     - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateReadout`（相平面语义投影层：将连续状态映射为慢变量分级 `StressRegime` 与快变量动作电位四相 `ExcitablePhase`，阈值集中于 `ReadoutParam`）、`MandateAgent`（Pekko typed actor：tick 事件驱动积分、发布不可变快照）、`MandateGrid`（格子场，含对称扩散与基于高度场的 D8 最陡下降有向平流推导）
@@ -57,7 +58,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
 - `src/test/scala/` — 测试代码（现有 `inner/mandate/` 下 5 个 Spec，清单见下文「测试」一节）
 - `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8），旧概念稿已废弃清空
-- `scripts/` — 开发用一次性工具（不进 jar）：`ValleyHeightmap.java`（demo 高度图再生成）
+- `scripts/` — 开发用一次性工具（不进 jar）：`ValleyHeightmap.java`（demo 高度图再生成）、`TelluricPlumbTextures.java`（地脉验山垂架 16×16 像素贴图生成）
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 
 ## 开发约定

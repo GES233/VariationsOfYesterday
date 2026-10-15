@@ -1,0 +1,23 @@
+{
+  "variants": {
+    "facing=north,phase=resting":    { "model": "variations-of-yesterday:block/telluric_plumb_resting" },
+    "facing=east,phase=resting":     { "model": "variations-of-yesterday:block/telluric_plumb_resting", "y": 90 },
+    "facing=south,phase=resting":    { "model": "variations-of-yesterday:block/telluric_plumb_resting", "y": 180 },
+    "facing=west,phase=resting":     { "model": "variations-of-yesterday:block/telluric_plumb_resting", "y": 270 },
+
+    "facing=north,phase=refractory": { "model": "variations-of-yesterday:block/telluric_plumb_refractory" },
+    "facing=east,phase=refractory":  { "model": "variations-of-yesterday:block/telluric_plumb_refractory", "y": 90 },
+    "facing=south,phase=refractory": { "model": "variations-of-yesterday:block/telluric_plumb_refractory", "y": 180 },
+    "facing=west,phase=refractory":  { "model": "variations-of-yesterday:block/telluric_plumb_refractory", "y": 270 },
+
+    "facing=north,phase=vulnerable": { "model": "variations-of-yesterday:block/telluric_plumb_vulnerable" },
+    "facing=east,phase=vulnerable":  { "model": "variations-of-yesterday:block/telluric_plumb_vulnerable", "y": 90 },
+    "facing=south,phase=vulnerable": { "model": "variations-of-yesterday:block/telluric_plumb_vulnerable", "y": 180 },
+    "facing=west,phase=vulnerable":  { "model": "variations-of-yesterday:block/telluric_plumb_vulnerable", "y": 270 },
+
+    "facing=north,phase=excitation": { "model": "variations-of-yesterday:block/telluric_plumb_excitation" },
+    "facing=east,phase=excitation":  { "model": "variations-of-yesterday:block/telluric_plumb_excitation", "y": 90 },
+    "facing=south,phase=excitation": { "model": "variations-of-yesterday:block/telluric_plumb_excitation", "y": 180 },
+    "facing=west,phase=excitation":  { "model": "variations-of-yesterday:block/telluric_plumb_excitation", "y": 270 }
+  }
+}

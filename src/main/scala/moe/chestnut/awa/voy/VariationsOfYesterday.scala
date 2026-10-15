@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.{ServerLifecycleEvents, Server
 import net.fabricmc.fabric.api.networking.v1.{ServerPlayConnectionEvents, ServerPlayNetworking}
 import net.minecraft.registry.Registry
 import net.minecraft.world.gen.chunk.ChunkGenerator
+import moe.chestnut.awa.voy.block.VoyBlocks
 import moe.chestnut.awa.voy.network.MandateHudPackets
 import moe.chestnut.awa.voy.world.DemoValleyChunkGenerator
 import org.slf4j.{Logger, LoggerFactory}
@@ -41,6 +42,7 @@ object VariationsOfYesterday extends ModInitializer:
       DemoValleyChunkGenerator.CODEC
     )
 
+    VoyBlocks.register()
     this.registerMandateEngine()
 
     logger.info("Variations of Yesterday initialized!")

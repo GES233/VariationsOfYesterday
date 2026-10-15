@@ -1,0 +1,13 @@
+{
+  "block.variations-of-yesterday.telluric_plumb": "Telluric Plumb Frame",
+  "item.variations-of-yesterday.telluric_plumb": "Telluric Plumb Frame",
+  "message.variations-of-yesterday.telluric_plumb.read_resting": "[Survey Log] Plumb centered, reed still | stress s=%s act q=%s [%s / Resting]",
+  "message.variations-of-yesterday.telluric_plumb.read_refractory": "[Survey Log] Wire pulled taut, mist drawing inward | stress s=%s act q=%s [%s / Refractory Delay Window — Strike Now]",
+  "message.variations-of-yesterday.telluric_plumb.read_vulnerable": "[Survey Log] Reed buzzing in standing wave! | stress s=%s act q=%s [%s / Vulnerable Window — Do Not Strike]",
+  "message.variations-of-yesterday.telluric_plumb.read_excitation": "[Survey Log] Plumb bob slamming the frame — SURGE! | stress s=%s act q=%s [%s / Excitation Spike]",
+  "message.variations-of-yesterday.telluric_plumb.gong_refractory": "[Calibration Gong] Struck inside the refractory window — next surge delayed!",
+  "message.variations-of-yesterday.telluric_plumb.gong_vulnerable": "[Calibration Gong] Struck inside the vulnerable window — premature surge ignited!",
+  "message.variations-of-yesterday.telluric_plumb.gong_excitation": "[Calibration Gong] Drowned out by the active surge.",
+  "message.variations-of-yesterday.telluric_plumb.gong_resting": "[Calibration Gong] A lone chime echoes across the resting valley.",
+  "message.variations-of-yesterday.telluric_plumb.blast_injected": "[Test Charge] Injected disturbance into chunk (+0.28 stress, now s=%s)"
+}

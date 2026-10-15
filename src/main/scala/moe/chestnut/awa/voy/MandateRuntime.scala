@@ -207,6 +207,26 @@ object MandateRuntime:
   def stateAt(chunkX: Int, chunkZ: Int): MandateCurrent =
     snapshot.getOrElse((chunkX, chunkZ), MandateCurrent(0.0, 0.0, 0.0, 0.0))
 
+  /** Convert world chunk coordinates to grid-local cell coordinates. */
+  def worldChunkToCell(chunkX: Int, chunkZ: Int): CellCoord =
+    CellCoord(chunkX - originX, chunkZ - originZ)
+
+  /** Deliver a channel event from the game thread into the mandate actor
+    * mailbox (total order with TickArrived, §1.4).
+    */
+  def postEvent(event: EventDTO): Unit =
+    system.foreach(_ ! event)
+
+  /** Fire one alpha-kernel pulse on the fast variable of the given world
+    * chunk (bell strike / modulator pulse).
+    */
+  def firePulseAt(chunkX: Int, chunkZ: Int, area: Double): Unit =
+    postEvent(EventMsg.FirePulse(worldChunkToCell(chunkX, chunkZ), area))
+
+  /** Inject a one-shot stress disturbance into the given world chunk. */
+  def injectStressAt(chunkX: Int, chunkZ: Int, amount: Double): Unit =
+    postEvent(EventMsg.StressInject(worldChunkToCell(chunkX, chunkZ), amount))
+
   /** Actor-thread callback: republish the grid-local snapshot with world
     * chunk coordinates. The map is immutable, so the volatile handoff is
     * safe for render-thread readers.

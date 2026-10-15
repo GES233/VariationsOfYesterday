@@ -1,0 +1,13 @@
+{
+  "block.variations-of-yesterday.telluric_plumb": "地脉验山垂架",
+  "item.variations-of-yesterday.telluric_plumb": "地脉验山垂架",
+  "message.variations-of-yesterday.telluric_plumb.read_resting": "【验山手簿】垂线归中，铜簧静默 | 应力 s=%s 活动 q=%s [%s·静息期]",
+  "message.variations-of-yesterday.telluric_plumb.read_refractory": "【验山手簿】垂线斜绷如弓，谷气倒吸 | 应力 s=%s 活动 q=%s [%s·回潮死寂窗（宜鸣钲推迟）]",
+  "message.variations-of-yesterday.telluric_plumb.read_vulnerable": "【验山手簿】铜簧高频驻波，铁匣蜂鸣！ | 应力 s=%s 活动 q=%s [%s·蓄势易损窗（切忌妄动）]",
+  "message.variations-of-yesterday.telluric_plumb.read_excitation": "【验山手簿】重锤狂摆撞框，地脉起峰！！ | 应力 s=%s 活动 q=%s [%s·灾变尖峰期]",
+  "message.variations-of-yesterday.telluric_plumb.gong_refractory": "【校准铜钲】清音入谷，正中回潮死寂窗——下次起峰已推迟！",
+  "message.variations-of-yesterday.telluric_plumb.gong_vulnerable": "【校准铜钲】铮鸣撞上蓄势易损窗——地脉受激提前起峰！",
+  "message.variations-of-yesterday.telluric_plumb.gong_excitation": "【校准铜钲】震峰未退，钲声淹没于地鸣之中。",
+  "message.variations-of-yesterday.telluric_plumb.gong_resting": "【校准铜钲】余音回荡山谷，静息地脉微微泛起涟漪。",
+  "message.variations-of-yesterday.telluric_plumb.blast_injected": "【勘探点炮】已向当前区块注入扰动（Δs=+0.28，当前应力 s=%s）"
+}
