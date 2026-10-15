@@ -39,16 +39,17 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 
 - `src/main/scala/moe/chestnut/awa/voy/`
   - `VariationsOfYesterday.scala` — 模组主入口（`ModInitializer`），注册 Mandate Engine 的生命周期与 tick 事件
-  - `MandateRuntime.scala` — Minecraft ↔ Mandate 的游戏侧桥：持有 ActorSystem 生命周期、tick gate（无玩家不投递）、快照发布（`stateAt` 供 HUD 读）、动作回包队列
+  - `MandateRuntime.scala` — Minecraft ↔ Mandate 的游戏侧桥：持有 ActorSystem 生命周期、tick gate（无玩家不投递）、demo 谷地 D8 汇流建图、快照发布与 HUD 订阅流式同步（`stateAt` / `MandateHudPackets`）、动作回包队列
+  - `network/` — 网络同步包：`MandateHudPackets`（`HudSubscribePayload` C2S 订阅开关 + `HudSnapshotPayload` S2C 区块状态与仿真时钟流式同步）
   - `inner/` — 模组核心内部逻辑（不依赖 Minecraft API 的部分尽量放这里）：
-    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateAgent`（Pekko typed actor：tick 事件驱动积分、发布不可变快照）、`MandateGrid`（格子场）
+    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateReadout`（相平面语义投影层：将连续状态映射为慢变量分级 `StressRegime` 与快变量动作电位四相 `ExcitablePhase`，阈值集中于 `ReadoutParam`）、`MandateAgent`（Pekko typed actor：tick 事件驱动积分、发布不可变快照）、`MandateGrid`（格子场，含对称扩散与基于高度场的 D8 最陡下降有向平流推导）
     - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（**通道语义**：`TickArrived` + `StressInject`/`SetDisturbance`/`SetCalming`/`SetBaselineCalming`/`HoldImpulse`/`FirePulse`；世界语义 → 通道事件的 1:N 映射在 Minecraft 侧做，见协议头注释）
     - `action/` — 动作协议：`MandateActionProtocol` sealed trait 及动作消息
     - `plant/` — 植物 DTO（占位）
   - `world/` — demo 专用世界类型：`DemoValleyChunkGenerator`（高度图驱动的 chunk generator，灰度 PNG 一像素一柱，32×32 chunk 区域居中于原点、与格子场同址对齐，区域外回落为平地）。**这是招人 demo 的 staging 手段，不是正式 worldgen 路线**（正式路线仍为设计草案 §5 的 A+→B）；高度图资源在 `data/variations-of-yesterday/valley/heightmap.png`，用 `java scripts/ValleyHeightmap.java` 重新生成（必须用 Java/ImageIO 生成——读取侧是 ImageIO，且 `getRGB` 对灰度图会做灰度→sRGB 转换，加载侧必须用 `getRaster().getSample`）
   - `helpers/ODESolver.scala` — 通用 ODE 求解器（Euler / RK4），配合 `NumericTuple` trait 使用
 - `src/client/scala/...` — `VariationsOfYesterdayClient`（`ClientModInitializer`，开发环境下注册 `hud.MandateHud`）、`VariationsOfYesterdayDataGenerator`（datagen 入口）
-  - `hud/` — 开发用 HUD 覆层（`MandateHud`：`/voy hud [on|off]` 开关 + `HudRenderCallback` 渲染 `MandateRuntime` 快照）
+  - `hud/` — 开发用 HUD 覆层（`MandateHud`：`/voy hud [on|off]` 开关 + C2S/S2C 网络同步 + `HudRenderCallback` 渲染快照与 `MandateReadout` 四相读数）
 - `src/main/java` / `src/client/java` — Mixin（目前是模板自带的 `ExampleMixin` / `ExampleClientMixin`）
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
 - `src/main/resources/data/variations-of-yesterday/worldgen/` — demo 世界类型数据：world preset `demo_valley`（主世界用 `DemoValleyChunkGenerator` + 自定义 `valley` biome，下界/末地沿用 vanilla；经 `data/minecraft/tags/worldgen/world_preset/normal.json` 挂进「World Type」列表）

@@ -228,3 +228,85 @@ class PhaseModulationSpec:
       r.vMaxInWindow > 1.5,
       "the delayed surge must still be a full surge (delay, not cancellation)"
     )
+
+  @Test def `semantic readout traverses all four action-potential phases aligned with timing windows`(): Unit =
+    val (snapshot, period) = phaseZero(u = 0.05, n = 6)
+    val st = freshState()
+    st.state = snapshot
+    st.disturbance = 0.05
+
+    // Step through one full oscillation cycle and record which phases appear and when.
+    var t = 0.0
+    val seenPhases = scala.collection.mutable.Set.empty[ExcitablePhase]
+    var phaseAt22Pct: Option[ExcitablePhase] = None
+    var phaseAt50Pct: Option[ExcitablePhase] = None
+
+    while t < period do
+      val readout = MandateReadout.classify(st.getState)
+      assertEquals(StressRegime.Oscillating, readout.regime, "self-sustained cell should read as Oscillating")
+      seenPhases += readout.phase
+      if phaseAt22Pct.isEmpty && t >= 0.22 * period then phaseAt22Pct = Some(readout.phase)
+      if phaseAt50Pct.isEmpty && t >= 0.50 * period then phaseAt50Pct = Some(readout.phase)
+      st.step(dt)
+      t += dt
+
+    assertEquals(
+      Some(ExcitablePhase.AbsoluteRefractory),
+      phaseAt22Pct,
+      "22% period (delay window) must classify as AbsoluteRefractory"
+    )
+    assertEquals(
+      Some(ExcitablePhase.RelativeRefractory),
+      phaseAt50Pct,
+      "50% period (vulnerable window) must classify as RelativeRefractory"
+    )
+    assertTrue(
+      seenPhases.contains(ExcitablePhase.Excitation) && seenPhases.contains(ExcitablePhase.Resting),
+      s"cycle should traverse Excitation and Resting as well, saw $seenPhases"
+    )
+
+  @Test def `consecutive refractory-phase pulses cumulatively stretch cycle periods and reduce surge count`(): Unit =
+    val (snapshot, period) = phaseZero(u = 0.05, n = 6)
+
+    // Compare 4 cycles of unmodulated self-sustained oscillation against 4 cycles
+    // where the player strikes the bell once in each AbsoluteRefractory window
+    // (~20% period after each surge upcrossing).
+    def runCycles(strikeBellInRefractory: Boolean): (Int, Double) =
+      val st = freshState()
+      st.synapseTau = 5.0
+      st.state = snapshot
+      st.disturbance = 0.0
+      var t = 0.0
+      val tEnd = 4.2 * period
+      var lastCross = 0.0 // snapshot is at an upcrossing
+      var prevBelow = false
+      var armedForThisCycle = true
+      val crossings = scala.collection.mutable.ArrayBuffer[Double](0.0)
+
+      while t < tEnd do
+        if strikeBellInRefractory && armedForThisCycle && (t - lastCross) >= 0.20 * period then
+          st.firePulse(Math.E * 5.0)
+          armedForThisCycle = false
+        st.step(dt)
+        t += dt
+        val above = st.getState.dissonance > crossLevel
+        if above && prevBelow && t - lastCross > refractory then
+          crossings += t
+          lastCross = t
+          armedForThisCycle = true
+        prevBelow = !above
+      val intervals = crossings.sliding(2).map(p => p(1) - p(0)).toList
+      (crossings.size - 1, intervals.sum / intervals.size)
+
+    val (unmodulatedSpikes, unmodulatedMeanPeriod) = runCycles(strikeBellInRefractory = false)
+    val (modulatedSpikes, modulatedMeanPeriod) = runCycles(strikeBellInRefractory = true)
+
+    assertTrue(
+      modulatedSpikes < unmodulatedSpikes,
+      s"consecutive refractory pulses should reduce surge count in fixed window ($modulatedSpikes vs $unmodulatedSpikes)"
+    )
+    assertTrue(
+      modulatedMeanPeriod > unmodulatedMeanPeriod + 0.10 * period,
+      s"consecutive refractory pulses must cumulatively stretch mean period ($modulatedMeanPeriod vs $unmodulatedMeanPeriod)"
+    )
+

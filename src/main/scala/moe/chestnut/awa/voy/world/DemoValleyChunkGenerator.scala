@@ -153,14 +153,14 @@ object DemoValleyChunkGenerator:
   final val BaseHeight = 48
   final val TopHeight = 144
 
-  private final val Bedrock = Blocks.BEDROCK.getDefaultState
-  private final val Stone = Blocks.STONE.getDefaultState
-  private final val Dirt = Blocks.DIRT.getDefaultState
-  private final val GrassBlock = Blocks.GRASS_BLOCK.getDefaultState
-  private final val Water = Blocks.WATER.getDefaultState
-  private final val Air = Blocks.AIR.getDefaultState
+  private lazy val Bedrock = Blocks.BEDROCK.getDefaultState
+  private lazy val Stone = Blocks.STONE.getDefaultState
+  private lazy val Dirt = Blocks.DIRT.getDefaultState
+  private lazy val GrassBlock = Blocks.GRASS_BLOCK.getDefaultState
+  private lazy val Water = Blocks.WATER.getDefaultState
+  private lazy val Air = Blocks.AIR.getDefaultState
 
-  val CODEC: MapCodec[DemoValleyChunkGenerator] = RecordCodecBuilder.mapCodec { instance =>
+  lazy val CODEC: MapCodec[DemoValleyChunkGenerator] = RecordCodecBuilder.mapCodec { instance =>
     instance
       .group(
         Biome.REGISTRY_CODEC.fieldOf("biome").forGetter((g: DemoValleyChunkGenerator) => g.biomeEntry),
@@ -192,3 +192,23 @@ object DemoValleyChunkGenerator:
         val gray = raster.getSample(px, pz, 0)
         heights(pz * Size + px) = BaseHeight + (gray * (TopHeight - BaseHeight) + 127) / 255
     heights
+
+  /** Load the default demo valley heightmap array (512x512 block columns). */
+  def loadDefaultHeights(): Array[Int] = loadHeights(DefaultHeightmapId)
+
+  /** Mean surface height (in block units) of a world chunk `(chunkX, chunkZ)`
+    * inside the 32x32 demo region `[-16, 15] x [-16, 15]`.
+    */
+  def chunkMeanHeight(heights: Array[Int], chunkX: Int, chunkZ: Int): Double =
+    val basePx = chunkX * 16 + HalfSize
+    val basePz = chunkZ * 16 + HalfSize
+    if basePx < 0 || basePx + 16 > Size || basePz < 0 || basePz + 16 > Size then
+      PlainHeight.toDouble
+    else
+      var sum = 0
+      for dz <- 0 until 16 do
+        val row = (basePz + dz) * Size
+        for dx <- 0 until 16 do
+          sum += heights(row + basePx + dx)
+      sum.toDouble / 256.0
+

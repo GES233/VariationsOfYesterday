@@ -137,3 +137,64 @@ class MandateGridSpec:
       cells(CellCoord(0, 0)).getState.stress < 0.01,
       s"upstream stress should stay near zero, got ${cells(CellCoord(0, 0)).getState.stress}"
     )
+
+  @Test def `D8 flow picks steepest descent with sqrt2 diagonal weighting and conserves stress`(): Unit =
+    // (0,0) at 10.0; cardinal (1,0) at 7.0 (slope 3.0); diagonal (1,1) at 6.0 (slope 4.0 / sqrt(2) ~ 2.83)
+    // Cardinal (1,0) must win because 3.0 > 4.0 / sqrt(2).
+    val elevations = Map(
+      CellCoord(0, 0) -> 10.0,
+      CellCoord(1, 0) -> 7.0,
+      CellCoord(0, 1) -> 9.0,
+      CellCoord(1, 1) -> 6.0
+    )
+    val flow = MandateGrid.d8Flow(elevations)
+    assertEquals(CellCoord(1, 0), flow(CellCoord(0, 0))._1, "steepest slope after sqrt(2) weighting should be (1,0)")
+    assertEquals(CellCoord(1, 1), flow(CellCoord(1, 0))._1, "(1,0) should drain to lowest sink (1,1)")
+    assertTrue(!flow.contains(CellCoord(1, 1)), "local minimum (1,1) must not emit an outgoing D8 edge")
+
+    val grid = MandateGrid.fromElevation(
+      width = 2,
+      height = 2,
+      diffusion = 0.01,
+      advection = 0.05,
+      elevation = elevations(_),
+      mkState = c =>
+        if c == CellCoord(0, 0) then withStress(cellState(transportOnly), 0.6)
+        else cellState(transportOnly)
+    )
+    for _ <- 1 to 5000 do grid.step(dt)
+    assertEquals(0.6, grid.totalStress, 1e-9, "D8 + diffusion grid must conserve total stress")
+    assertTrue(
+      grid.cells(CellCoord(1, 1)).getState.stress > grid.cells(CellCoord(0, 0)).getState.stress,
+      "sink cell (1,1) should accumulate more stress than peak (0,0)"
+    )
+
+  @Test def `demo valley D8 drainage connects side gully to central stockade basin`(): Unit =
+    val grid = moe.chestnut.awa.voy.MandateRuntime.buildGrid()
+    val advTarget = grid.edges
+      .filter(_.advection > 0.0)
+      .map(e => e.from -> e.to)
+      .toMap
+
+    // Side gully engineering site is at world chunk (6, -5) -> grid cell (22, 11).
+    // Central stockade basin is around world chunk (0, 0) -> grid cell (16, 16).
+    val start = CellCoord(6 - moe.chestnut.awa.voy.MandateRuntime.originX, -5 - moe.chestnut.awa.voy.MandateRuntime.originZ)
+    val basin = CellCoord(0 - moe.chestnut.awa.voy.MandateRuntime.originX, 0 - moe.chestnut.awa.voy.MandateRuntime.originZ)
+
+    val visited = mutable.ArrayBuffer[CellCoord](start)
+    var curr = start
+    var steps = 0
+    while advTarget.contains(curr) && steps < 64 do
+      curr = advTarget(curr)
+      visited += curr
+      steps += 1
+
+    assertTrue(
+      visited.exists(c => Math.hypot((c.x - basin.x).toDouble, (c.z - basin.z).toDouble) <= 1.5),
+      s"D8 path from side gully $start must pass through central basin $basin, path was: ${visited.mkString(" -> ")}"
+    )
+    assertTrue(
+      visited.last.z > basin.z,
+      s"D8 path must continue southward past the basin toward the valley outlet, ended at ${visited.last}"
+    )
+

@@ -3,8 +3,10 @@ package moe.chestnut.awa.voy
 import com.mojang.serialization.MapCodec
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.event.lifecycle.v1.{ServerLifecycleEvents, ServerTickEvents}
+import net.fabricmc.fabric.api.networking.v1.{ServerPlayConnectionEvents, ServerPlayNetworking}
 import net.minecraft.registry.Registry
 import net.minecraft.world.gen.chunk.ChunkGenerator
+import moe.chestnut.awa.voy.network.MandateHudPackets
 import moe.chestnut.awa.voy.world.DemoValleyChunkGenerator
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -17,6 +19,15 @@ object VariationsOfYesterday extends ModInitializer:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   private def registerMandateEngine(): Unit =
+    MandateHudPackets.registerCommon()
+    ServerPlayNetworking.registerGlobalReceiver(
+      MandateHudPackets.HudSubscribePayload.Id,
+      (payload, context) =>
+        MandateRuntime.setHudSubscribed(context.player().getUuid, payload.enabled)
+    )
+    ServerPlayConnectionEvents.DISCONNECT.register((handler, _) =>
+      MandateRuntime.setHudSubscribed(handler.getPlayer.getUuid, false)
+    )
     ServerLifecycleEvents.SERVER_STARTING.register(_ => MandateRuntime.start())
     ServerLifecycleEvents.SERVER_STOPPED.register(_ => MandateRuntime.stop())
     ServerTickEvents.END_SERVER_TICK.register(MandateRuntime.onTick(_))
@@ -33,3 +44,4 @@ object VariationsOfYesterday extends ModInitializer:
     this.registerMandateEngine()
 
     logger.info("Variations of Yesterday initialized!")
+
