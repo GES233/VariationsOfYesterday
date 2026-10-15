@@ -787,22 +787,23 @@ results_3 =
 IO.inspect(results_3, pretty: true, width: 100)
 
 # ==============================================================================
-# 第二部分：四纪发展史与玩家入场切面编译器 (Voy.ChronicleCompiler)
+# 第二部分：五阶制度演进与玩家入场切面编译器 (Voy.ChronicleCompiler)
 # ------------------------------------------------------------------------------
-# 解决痛点：不用手写海量分支剧本！
-# 输入：从任意种子（含外部地形模组）D8 高度图提取出的「山谷拓扑特征」
-# 推演：第一纪（建寨） -> 第二纪（改制与工程进山） -> 第三纪（激化与三分结局）
-# 输出：第四纪（玩家入场时的 Mandate 初始场、结构 NBT 落位、多视角自洽档案包）
+# 严格对齐设计草案 §3.5 政治发展历程骨架与 §4.5 三分下落：
+# 1. 第一纪（山官—祭司共议制）：依地势建寨立器，维系 c0_intact
+# 2. 第二纪上（流官设保编甲的触及与挫败）：清丈拆钟致滑坡反噬 -> 外甲内寨妥协（留旧州府方志先例）
+# 3. 第二纪下（垦殖总场改组与工程进山）：机耕道通达处拆钟改队（c0 坍塌），头人贬为保管员，工程队进驻源头
+# 4. 第三纪（撤场、场部—议事会回流与三分结局）：同化（场部-议事会混合邪典仪式）/ 湮灭（Burnout）/ 飞升 / 幸存对照
+# 5. 第四纪（玩家入场切面与四代同堂档案包）：编译结构落位、Mandate 初值与跨时代互证档案
 # ==============================================================================
 defmodule Voy.ChronicleCompiler do
   import Logic.Core
 
   # ----------------------------------------------------------------------------
-  # 【第一纪：老寨肇建 (Era I - Ancestral Settlement)】
-  # 规则：依地势建寨，坝子/台地聚居，必在咽喉隘口立镇山之器以维系基线安抚 c0
+  # 【第一纪：山官—祭司共议制 (Era I - Headman & Ritual Compact)】
   # ----------------------------------------------------------------------------
-  def era1_ancestralo(topo, era1) do
-    fresh(5, fn [branch_id, up_type, pass_type, down_type, guardian_relic] ->
+  def era1_headmano(topo, era1) do
+    fresh(6, fn [branch_id, up_type, pass_type, down_type, guardian_relic, damping_mode] ->
       all([
         propso(topo, [
           branch_id: branch_id,
@@ -810,23 +811,25 @@ defmodule Voy.ChronicleCompiler do
           pass_terrain: pass_type,
           down_terrain: down_type
         ]),
-        # 下游聚落选址必须是开阔冲积坝或半山台地
         any([eq(down_type, :alluvial_flat), eq(down_type, :mid_terrace)]),
-        # 咽喉隘口根据地貌立不同的镇山器物（均提供 c0_intact）
+        # 咽喉隘口根据地貌立不同的镇山器物与阻尼机制（均提供 c0_intact）
         any([
           all([
             eq(pass_type, :canyon_pass),
-            eq(guardian_relic, :ancestral_bronze_zheng)
+            eq(guardian_relic, :ancestral_bronze_zheng),
+            eq(damping_mode, :acoustic_bronze_damping)
           ]),
           all([
             eq(pass_type, :karst_gorge),
-            eq(guardian_relic, :carved_diversion_stele)
+            eq(guardian_relic, :carved_diversion_stele),
+            eq(damping_mode, :karst_siphon_relief)
           ])
         ]),
         eq(era1, [
           branch_id: branch_id,
-          settlement_form: :ancestral_zhai,
+          polity: :headman_priest_compact,
           guardian_relic: guardian_relic,
+          damping_mode: damping_mode,
           initial_c0: :c0_intact,
           initial_regime: :Calm
         ])
@@ -835,171 +838,242 @@ defmodule Voy.ChronicleCompiler do
   end
 
   # ----------------------------------------------------------------------------
-  # 【第二纪：改制与工程进山 (Era II - Reorganization & Survey, 1960s-1970s)】
-  # 规则：
-  # 1. 下游地貌决定交通可达性，进而决定「寨改村/农场」是否发生（拆毁镇山器 -> c0 坍塌）；
-  # 2. 源头地貌与地质构造共同决定进驻哪种工程分队，埋下不同性质的扰动源。
+  # 【第二纪（上）：流官设保编甲的触及与挫败 (Era II-A - Magistrate & Tithing Attempt)】
+  # 为什么近代早期的流官改制失败了？
+  # - 在平坝强行收钟/堵堰 -> 引发小规模反噬灾害 -> 流官惊惧妥协，退回「外甲内寨」，留下旧州府方志先例！
+  # - 在绝壁孤寨 -> 山高路险，胥吏只敢在山口立界碑虚报归化。
   # ----------------------------------------------------------------------------
-  def era2_reorgo(topo, era1, era2) do
-    fresh(10, fn [
-      down_type,
-      access,
-      geology,
-      up_type,
-      relic,
-      org_after,
-      c0_after,
-      relic_fate,
-      eng_team,
-      disturbance_mode
-    ] ->
+  def era2a_magistrateo(topo, era1, era2a) do
+    fresh(6, fn [down_type, relic, attempt_action, backlash_omen, compromise_polity, gazetteer_case] ->
       all([
-        propso(topo, [
-          down_terrain: down_type,
-          accessibility: access,
-          up_geology: geology,
-          up_terrain: up_type
-        ]),
+        propso(topo, [down_terrain: down_type]),
         propso(era1, [guardian_relic: relic]),
-
-        # 聚落改制分支：开阔冲积坝修通机耕道被改制为农场分队；半山台地绝壁隔绝得以幸存
         any([
+          # 分支 1：平坝 + 铜钲 -> 清丈局强收铜钲铸钱 -> 秋分地鸣滑坡毁署 -> 惧而归还铜钲，行「外甲内寨」
           all([
             eq(down_type, :alluvial_flat),
-            eq(access, :tractor_road_accessible),
-            eq(org_after, :state_farm_brigade),
-            eq(relic_fate, {:requisitioned_or_dismantled, relic}),
-            eq(c0_after, :c0_collapsed)
+            eq(relic, :ancestral_bronze_zheng),
+            eq(attempt_action, :confiscate_zheng_for_tax_bronze),
+            eq(backlash_omen, :magistrate_yamen_buried_by_rockslide),
+            eq(compromise_polity, :nominal_tithing_inner_headman),
+            eq(gazetteer_case, :case_1894_zheng_return_calmed_slide)
           ]),
+          # 分支 2：平坝 + 分水石碑 -> 清丈局毁堰改田 -> 落水洞倒灌淹没官仓 -> 复立石碑，行「外甲内寨」
+          all([
+            eq(down_type, :alluvial_flat),
+            eq(relic, :carved_diversion_stele),
+            eq(attempt_action, :dismantle_stele_for_paddy_tax),
+            eq(backlash_omen, :granary_swallowed_by_karst_backflow),
+            eq(compromise_polity, :nominal_tithing_inner_headman),
+            eq(gazetteer_case, :case_1902_stele_restored_stopped_flood)
+          ]),
+          # 分支 3：半山绝壁台地 -> 栈道险绝胥吏畏缩 -> 仅在山口立「归化碑」敷衍上峰，古寨毫发无损
           all([
             eq(down_type, :mid_terrace),
-            eq(access, :cliff_isolated),
-            eq(org_after, :unreformed_old_zhai),
-            eq(relic_fate, {:preserved_in_situ, relic}),
-            eq(c0_after, :c0_intact)
+            eq(attempt_action, :clerk_halted_at_cliff_foot),
+            eq(backlash_omen, :no_disturbance_triggered),
+            eq(compromise_polity, :unreached_autonomous_zhai),
+            eq(gazetteer_case, :case_mountain_too_steep_for_tithing)
           ])
         ]),
-
-        # 源头工程进驻分支：按源头地貌与断裂带性质派驻不同工程单位
-        any([
-          # 陡峭裂隙矿脉 -> 302 勘探队进行浅层密集点炮（周期性冲击易损窗）
-          all([
-            eq(up_type, :steep_fissure_headwater),
-            eq(geology, :active_fault_vein),
-            eq(eng_team, :survey_blasting_team_302),
-            eq(disturbance_mode, :periodic_shallow_blasting)
-          ]),
-          # 喀斯特落水洞/暗河 -> 总指挥部直属高压注浆处（企图用巨量反向压力闷死地脉）
-          all([
-            eq(up_type, :karst_sinkhole_headwater),
-            eq(geology, :deep_stress_cavity),
-            eq(eng_team, :hq_high_pressure_grouting_corps),
-            eq(disturbance_mode, :overwhelming_reverse_suppression)
-          ]),
-          # 陡峭次生裂隙林区 -> 仅设常规水文气象哨（轻微扰动）
-          all([
-            eq(up_type, :steep_fissure_headwater),
-            eq(geology, :minor_fracture),
-            eq(eng_team, :forestry_hydro_post),
-            eq(disturbance_mode, :low_level_logging_shock)
-          ])
-        ]),
-
-        eq(era2, [
-          org_after_reorg: org_after,
-          relic_fate: relic_fate,
-          c0_status: c0_after,
-          stationed_team: eng_team,
-          disturbance_mode: disturbance_mode
+        eq(era2a, [
+          attempt: attempt_action,
+          historical_backlash: backlash_omen,
+          resulting_polity: compromise_polity,
+          c0_after_era2a: :c0_intact,
+          gazetteer_precedent: gazetteer_case
         ])
       ])
     end)
   end
 
   # ----------------------------------------------------------------------------
-  # 【第三纪：激化与三分结局 (Era III - Catastrophe & Fates, early 1980s)】
-  # 规则：严格对齐设计草案 §1.1 动力学方程与 §4.5 主体下落（同化 / 湮灭 / 飞升 / 幸存对照）
+  # 【第二纪（下）：国营垦殖总场改组与工程进山 (Era II-B - Reclamation & Survey, 1960s-1970s)】
+  # 现代工程力量不再像旧流官那样退缩：
+  # 1. 机耕道可达的「外甲内寨」被彻底改组为「垦殖场生产分队」，镇山器拆毁（c0 坍塌），老头人贬为粮仓保管员；
+  # 2. 源头按断裂带性质进驻 302 爆破勘探队、直属高压注浆处或林场水文哨。
   # ----------------------------------------------------------------------------
-  def era3_catastropheo(_topo, _era1, era2, era3) do
-    fresh(7, fn [
+  def era2b_reclamationo(topo, era1, era2a, era2b) do
+    fresh(11, fn [
+      down_type,
+      access,
+      geology,
+      up_type,
+      relic,
+      era2a_polity,
+      org_after,
+      headman_status,
+      c0_after,
+      relic_fate,
+      eng_team
+    ] ->
+      fresh(1, fn [disturbance_mode] ->
+        all([
+          propso(topo, [
+            down_terrain: down_type,
+            accessibility: access,
+            up_geology: geology,
+            up_terrain: up_type
+          ]),
+          propso(era1, [guardian_relic: relic]),
+          propso(era2a, [resulting_polity: era2a_polity]),
+
+          # 聚落行政化改组分支
+          any([
+            all([
+              eq(down_type, :alluvial_flat),
+              eq(access, :tractor_road_accessible),
+              eq(era2a_polity, :nominal_tithing_inner_headman),
+              eq(org_after, :state_reclamation_brigade),
+              eq(headman_status, :demoted_to_warehouse_keeper),
+              eq(relic_fate, {:requisitioned_as_scrap, relic}),
+              eq(c0_after, :c0_collapsed)
+            ]),
+            all([
+              eq(down_type, :mid_terrace),
+              eq(access, :cliff_isolated),
+              eq(era2a_polity, :unreached_autonomous_zhai),
+              eq(org_after, :nominal_forestry_joint_zhai),
+              eq(headman_status, :retained_ritual_authority),
+              eq(relic_fate, {:preserved_in_situ, relic}),
+              eq(c0_after, :c0_intact)
+            ])
+          ]),
+
+          # 源头工程分队进驻分支
+          any([
+            all([
+              eq(up_type, :steep_fissure_headwater),
+              eq(geology, :active_fault_vein),
+              eq(eng_team, :survey_blasting_team_302),
+              eq(disturbance_mode, :periodic_shallow_blasting)
+            ]),
+            all([
+              eq(up_type, :karst_sinkhole_headwater),
+              eq(geology, :deep_stress_cavity),
+              eq(eng_team, :hq_high_pressure_grouting_corps),
+              eq(disturbance_mode, :overwhelming_reverse_suppression)
+            ]),
+            all([
+              eq(up_type, :steep_fissure_headwater),
+              eq(geology, :minor_fracture),
+              eq(eng_team, :forestry_hydro_post),
+              eq(disturbance_mode, :low_level_logging_shock)
+            ])
+          ]),
+
+          eq(era2b, [
+            org_after_reorg: org_after,
+            headman_lineage_role: headman_status,
+            relic_fate: relic_fate,
+            c0_status: c0_after,
+            stationed_team: eng_team,
+            disturbance_mode: disturbance_mode
+          ])
+        ])
+      end)
+    end)
+  end
+
+  # ----------------------------------------------------------------------------
+  # 【第三纪：撤场、场部—议事会回流与三分结局 (Era III - Withdrawal, Council Hybrid & Fates)】
+  # 工程主体撤离后，旧生产关系回流，演化出「场部—议事会」混合体制与三分下落
+  # ----------------------------------------------------------------------------
+  def era3_catastropheo(_topo, _era1, _era2a, era2b, era3) do
+    fresh(9, fn [
       org,
+      headman_role,
       c0,
       dist_mode,
+      post_withdrawal_polity,
       fate_category,
       resulting_regime,
       target_phase_rule,
       emergent_practice
     ] ->
       all([
-        propso(era2, [
+        propso(era2b, [
           org_after_reorg: org,
+          headman_lineage_role: headman_role,
           c0_status: c0,
           disturbance_mode: dist_mode
         ]),
 
         any([
-          # 结局分支 1：【同化 -> 退化新寨】
-          # 条件：c0 坍塌 + 勘探队密集爆破击穿宽容区 -> 陷入自持振荡 (Oscillating)
-          # 撤场断粮后，留守农场职工用拖拉机气缸与交接班制度在 AbsoluteRefractory 合成替代仪式
+          # 结局分支 1：【同化 -> 场部—议事会时代（旧关系回流的退化新寨）】
+          # 机制：c0 坍塌 + 302队爆破致 Oscillating。工程队撤离后，被贬为仓库保管员的老头人后裔
+          #       重获「听山断相」权威，与留守场部干部组成「场部—议事会」，以工分制+拖拉机气缸复刻岁祭！
           all([
-            eq(org, :state_farm_brigade),
+            eq(org, :state_reclamation_brigade),
+            eq(headman_role, :demoted_to_warehouse_keeper),
             eq(c0, :c0_collapsed),
             eq(dist_mode, :periodic_shallow_blasting),
+            eq(post_withdrawal_polity, :brigade_elder_joint_council),
             eq(fate_category, :Fate_Assimilated_NewZhai),
             eq(resulting_regime, :Oscillating),
             eq(target_phase_rule, :must_strike_at_AbsoluteRefractory),
             eq(emergent_practice, [
-              costume: "褪色劳保服与红袖章",
-              instrument: "红绸包裹的东方红-54铸铁气缸体",
-              liturgy: "虫鸣骤停死寂时，按《交接班制度》列队唱名三声并重锤击缸"
+              social_structure: "场部干事记工分、老保管员（旧头人后裔）掌听山令旗的『场部—议事会』双轨制",
+              costume: "印有垦殖场字样的褪色劳保服，外披老寨火塘盟誓麻布肩带的倒错装束",
+              instrument: "断碑垭口木架悬挂、缠满红绸的东方红-54铸铁气缸体",
+              liturgy: "待林中虫鸣骤停（20%-30%死寂回吸窗），按《交接班安全生产条例》列队唱名三声、重锤击缸"
             ])
           ]),
 
-          # 结局分支 2：【湮灭 -> 烧毁态死寂区】
-          # 条件：c0 坍塌 + 总指挥部直属高压反向注浆镇压 -> 应力冲穿截断阈值进入 Burnout 吸引子
+          # 结局分支 2：【湮灭 -> 烧毁态灰白死寂封锁区】
+          # 机制：c0 坍塌 + 直属注浆处超高压反向闷井 -> 应力冲穿截断阈值进入 Burnout 吸引子
           all([
             eq(c0, :c0_collapsed),
             eq(dist_mode, :overwhelming_reverse_suppression),
+            eq(post_withdrawal_polity, :depopulated_concrete_sealed_zone),
             eq(fate_category, :Fate_Annihilated_BurnoutZone),
             eq(resulting_regime, :Burnout),
             eq(target_phase_rule, :phase_frozen_in_white_silence),
             eq(emergent_practice, [
-              phenomenon: "灰白钙化地表、无声无息、钟摆焊死在最大偏角",
-              remnant: "被水泥彻底封死的注浆井口与全员失踪名册"
+              social_structure: "建制彻底抹除，仅剩场部封山水泥墙与虚假的『整建制搬迁』档案",
+              phenomenon: "灰白钙化地表、绝对死寂无声、验山垂架铅锤被焊死在最大偏角",
+              remnant: "被水泥彻底封死的超高压注浆井口与未寄出的家属抚恤底册"
             ])
           ]),
 
-          # 结局分支 3：【飞升 -> 空间畸变放逐点】
-          # 条件：虽有古寨 c0 但源头为深层应力腔且遭遇高压强行谐振 -> 核心人员在尖峰时刻自我放逐
+          # 结局分支 3：【飞升 -> 空间畸变放逐禁区 + 守誓孤寨】
+          # 机制：古寨 c0 完好 + 源头深层应力腔遭强行谐振 -> 核心组在 Excitation 极值化为末影黑影放逐
           all([
             eq(c0, :c0_intact),
+            eq(headman_role, :retained_ritual_authority),
             eq(dist_mode, :overwhelming_reverse_suppression),
+            eq(post_withdrawal_polity, :rift_guarding_cliff_compact),
             eq(fate_category, :Fate_Ascended_SpatialRift),
             eq(resulting_regime, :Strained),
             eq(target_phase_rule, :triggered_at_Excitation_zenith),
             eq(emergent_practice, [
-              phenomenon: "游荡的搬运方块黑影（末影畸变）、指南针乱转的残破观测掩体",
-              remnant: "写满高频相位坐标与『去往对岸』字样的磁带"
+              social_structure: "彻底断绝外部挂靠、恢复山官火塘严酷戒律以封锁源头裂隙的守山孤寨",
+              phenomenon: "源头游荡着永恒搬运方块的黑影（末影畸变），指南针在掩体旁疯狂打转",
+              remnant: "写满高频相位坐标与『去往对岸』字样的盘式磁带"
             ])
           ]),
 
-          # 结局分支 4：【幸存对照 -> 宽容区吸收的老寨】
-          # 条件：c0 完好 + 常规林区轻微扰动 -> 方程宽容区吸收脉冲（单次预兆后迅速回落 Calm）
+          # 结局分支 4：【幸存对照 -> 旧生产关系完整回流的岁祭老寨】
+          # 机制：c0 完好 + 轻微林区扰动 -> 方程宽容区吸收脉冲，林场撤走后彻底回归山官岁祭共同体
           all([
-            eq(org, :unreformed_old_zhai),
+            eq(org, :nominal_forestry_joint_zhai),
+            eq(headman_role, :retained_ritual_authority),
             eq(c0, :c0_intact),
             eq(dist_mode, :low_level_logging_shock),
+            eq(post_withdrawal_polity, :restored_ancestral_compact),
             eq(fate_category, :Fate_Ancestral_ControlGroup),
             eq(resulting_regime, :Calm),
             eq(target_phase_rule, :absorbed_in_Resting_basin),
             eq(emergent_practice, [
-              phenomenon: "涧水偶有微澜但很快平息，老寨岁祭如常",
-              remnant: "完好运转的镇山古器与世代相传的听山口诀"
+              social_structure: "挂靠林场撤牌后全面回流的山官—祭司共同体（实行礼物经济，保管旧州府与林场文书）",
+              phenomenon: "涧水偶有微澜但不过三息自平，维持源（c0）覆盖下万物生机盎然",
+              remnant: "完好运转的镇山铜钲与世代相传的听山口诀"
             ])
           ])
         ]),
 
         eq(era3, [
+          post_withdrawal_polity: post_withdrawal_polity,
           fate: fate_category,
           final_regime: resulting_regime,
           phase_rule: target_phase_rule,
@@ -1010,87 +1084,155 @@ defmodule Voy.ChronicleCompiler do
   end
 
   # ----------------------------------------------------------------------------
-  # 【第四纪：玩家入场切面与「两套账本」编译器 (Era IV - Present-Day Slice)】
-  # 将前三纪推演出的历史，直接编译为：
-  # 1. 地形节点上的结构落位 (Structures)
-  # 2. Mandate 引擎各格初始状态 (Mandate Initial State)
-  # 3. 散落在箱子里的多透镜档案（带 neq 防串戏约束）
+  # 【第四纪：玩家入场切面与「四代同堂档案链」编译器 (Era IV - Present-Day Slice)】
   # ----------------------------------------------------------------------------
   def compile_branch_sliceo(topo, slice) do
-    fresh(6, fn [branch_id, era1, era2, era3, structures, archives] ->
+    fresh(7, fn [branch_id, era1, era2a, era2b, era3, structures, archives] ->
       all([
         propso(topo, [branch_id: branch_id]),
-        era1_ancestralo(topo, era1),
-        era2_reorgo(topo, era1, era2),
-        era3_catastropheo(topo, era1, era2, era3),
-        compile_structureso(topo, era1, era2, era3, structures),
-        compile_archiveso(topo, era1, era2, era3, archives),
+        era1_headmano(topo, era1),
+        era2a_magistrateo(topo, era1, era2a),
+        era2b_reclamationo(topo, era1, era2a, era2b),
+        era3_catastropheo(topo, era1, era2a, era2b, era3),
+        compile_structureso(topo, era1, era2b, era3, structures),
+        compile_archiveso(topo, era1, era2a, era2b, era3, archives),
         eq(slice, [
           支沟代号: branch_id,
           地理骨相: topo,
-          第一纪_古寨肇建: era1,
-          第二纪_改制与进山: era2,
-          第三纪_激化与结局: era3,
-          第四纪_落地结构与遗迹: structures,
-          第四纪_生成档案包: archives
+          "第一纪_山官火塘共议": era1,
+          "第二纪上_流官清丈触及与挫败": era2a,
+          "第二纪下_垦殖场改组与工程进山": era2b,
+          "第三纪_撤场议事会回流与三分结局": era3,
+          "第四纪_落地结构与遗迹": structures,
+          "第四纪_跨纪元四层档案包": archives
         ])
       ])
     end)
   end
 
-  defp compile_structureso(topo, era1, era2, era3, structures) do
-    fresh(6, fn [up_name, pass_name, down_name, relic, fate, team] ->
+  # 隘口遗迹描述严格耦合第一纪镇山器物 (relic) 与第三纪结局 (fate)，杜绝铜钲/石碑混用
+  defp pass_relic_structureo(fate, relic, pass_desc) do
+    any([
+      all([
+        eq(fate, :Fate_Assimilated_NewZhai),
+        eq(relic, :ancestral_bronze_zheng),
+        eq(pass_desc, "断碑垭口·原铜钲基座改挂红绸东方红气缸体的木架 + 验山垂架")
+      ]),
+      all([
+        eq(fate, :Fate_Assimilated_NewZhai),
+        eq(relic, :carved_diversion_stele),
+        eq(pass_desc, "溶洞峡口·原分水碑残座改挂红绸东方红气缸体的铁架 + 验山垂架")
+      ]),
+      all([
+        eq(fate, :Fate_Annihilated_BurnoutZone),
+        eq(relic, :ancestral_bronze_zheng),
+        eq(pass_desc, "被水泥封堵的古铜钲亭废墟与焊死在极值的验山垂架")
+      ]),
+      all([
+        eq(fate, :Fate_Annihilated_BurnoutZone),
+        eq(relic, :carved_diversion_stele),
+        eq(pass_desc, "坍塌钙化的石雕分水堰与焊死在极值的验山垂架")
+      ]),
+      all([
+        eq(fate, :Fate_Ascended_SpatialRift),
+        eq(relic, :ancestral_bronze_zheng),
+        eq(pass_desc, "尚存岁祭镇山铜钲与流官归化断碑的险峻峡口")
+      ]),
+      all([
+        eq(fate, :Fate_Ascended_SpatialRift),
+        eq(relic, :carved_diversion_stele),
+        eq(pass_desc, "尚存石雕分水古碑与流官归化断碑的溶洞峡口")
+      ]),
+      all([
+        eq(fate, :Fate_Ancestral_ControlGroup),
+        eq(relic, :ancestral_bronze_zheng),
+        eq(pass_desc, "完好如初的古寨镇山铜钲亭 (c0 维持源完好)")
+      ]),
+      all([
+        eq(fate, :Fate_Ancestral_ControlGroup),
+        eq(relic, :carved_diversion_stele),
+        eq(pass_desc, "完好如初的古寨石雕分水堰 (c0 维持源完好)")
+      ])
+    ])
+  end
+
+  defp compile_structureso(topo, era1, era2b, era3, structures) do
+    fresh(7, fn [up_name, pass_name, down_name, relic, fate, team, pass_desc] ->
       all([
         propso(topo, [up_name: up_name, pass_name: pass_name, down_name: down_name]),
         propso(era1, [guardian_relic: relic]),
-        propso(era2, [stationed_team: team]),
+        propso(era2b, [stationed_team: team]),
         propso(era3, [fate: fate]),
+        pass_relic_structureo(fate, relic, pass_desc),
         any([
           all([
             eq(fate, :Fate_Assimilated_NewZhai),
             eq(structures, [
               upstream_site: {up_name, "302队废弃爆破钻探台 (常驻脉冲源)"},
-              pass_site: {pass_name, "断碑垭口·悬挂东方红气缸体的简易木架 + 验山垂架"},
-              downstream_site: {down_name, "农场四队砖混宿舍区 (variations-of-yesterday:farm_dorm_unit_*)"}
+              pass_site: {pass_name, pass_desc},
+              downstream_site: {down_name, "场部—议事会驻地：贴有火塘符纸的农场砖混宿舍 (variations-of-yesterday:farm_dorm_unit_*)"}
             ])
           ]),
           all([
             eq(fate, :Fate_Annihilated_BurnoutZone),
             eq(structures, [
               upstream_site: {up_name, "水泥封死的超高压注浆井群 (灰白死寂核心)"},
-              pass_site: {pass_name, "坍塌的石雕分水堰与焊死的验山垂架"},
-              downstream_site: {down_name, "空无一人的钙化农场废墟 (Burnout 绝对静默区)"}
+              pass_site: {pass_name, pass_desc},
+              downstream_site: {down_name, "空无一人的钙化垦殖分场废墟 (Burnout 绝对静默区)"}
             ])
           ]),
           all([
             eq(fate, :Fate_Ascended_SpatialRift),
-            eq(relic, :ancestral_bronze_zheng),
             eq(structures, [
               upstream_site: {up_name, "深渊谐振掩体与黑曜石畸变裂隙 (末影人游荡点)"},
-              pass_site: {pass_name, "尚存岁祭镇山铜钲的险峻峡口"},
-              downstream_site: {down_name, "半山绝壁孤寨 (偶受空间裂隙微扰)"}
-            ])
-          ]),
-          all([
-            eq(fate, :Fate_Ascended_SpatialRift),
-            eq(relic, :carved_diversion_stele),
-            eq(structures, [
-              upstream_site: {up_name, "深渊谐振掩体与黑曜石畸变裂隙 (末影人游荡点)"},
-              pass_site: {pass_name, "尚存石雕分水古碑的溶洞峡口"},
-              downstream_site: {down_name, "半山绝壁孤寨 (偶受空间裂隙微扰)"}
+              pass_site: {pass_name, pass_desc},
+              downstream_site: {down_name, "严守封山戒律的半山绝壁孤寨 (偶受空间裂隙微扰)"}
             ])
           ]),
           all([
             eq(fate, :Fate_Ancestral_ControlGroup),
             eq(structures, [
-              upstream_site: {up_name, "废弃林场水文观测哨"},
-              pass_site: {pass_name, "古寨镇山铜钲亭 (c0 维持源完好)"},
-              downstream_site: {down_name, "原生老寨聚落 (安居乐业，提供听山口诀对照)"}
+              upstream_site: {up_name, "撤牌废弃的林场水文观测哨"},
+              pass_site: {pass_name, pass_desc},
+              downstream_site: {down_name, "恢复山官岁祭的原生老寨 (以物易物交换旧档案)"}
             ])
           ])
         ])
       ])
     end)
+  end
+
+  # 第二纪（上）旧州府方志残卷映射：把百年前流官拆钟/毁堰引发的反噬转化为玩家可读的历史先例
+  defp era2a_gazetteer_recordo(gazetteer_case, down_name, record) do
+    any([
+      all([
+        eq(gazetteer_case, :case_1894_zheng_return_calmed_slide),
+        eq(record, [
+          title: "《旧州府抚夷清丈残卷·铜钲案》",
+          recorded_settlement: down_name,
+          precedent: :case_1894_zheng_return_calmed_slide,
+          excerpt: "光绪二十年清丈局强收寨门铜钲入库铸钱，是秋山鸣石崩掩没局署；流官惊惧，发还铜钲任山官依古法岁祭叩击，山患遂平（外甲内寨）"
+        ])
+      ]),
+      all([
+        eq(gazetteer_case, :case_1902_stele_restored_stopped_flood),
+        eq(record, [
+          title: "《旧州府抚夷清丈残卷·石堰案》",
+          recorded_settlement: down_name,
+          precedent: :case_1902_stele_restored_stopped_flood,
+          excerpt: "光绪二十八年委员毁峡口分水石碑改辟官田，越旬落水洞暗河倒灌吞没官仓；遂准山官复立石堰、按候泄洪乃安（外甲内寨）"
+        ])
+      ]),
+      all([
+        eq(gazetteer_case, :case_mountain_too_steep_for_tithing),
+        eq(record, [
+          title: "《旧州府抚夷清丈残卷·立碑案》",
+          recorded_settlement: down_name,
+          precedent: :case_mountain_too_steep_for_tithing,
+          excerpt: "其寨悬居绝壁、栈道断绝，丈量胥吏望崖生畏，遂于山口立『归化界碑』虚报具结，实未入寨门半步，听任山官自治"
+        ])
+      ])
+    ])
   end
 
   # 同一结局下的多源解释池（含内部真相与官方替罪羊），供 neq 禁忌主动筛选
@@ -1100,45 +1242,45 @@ defmodule Voy.ChronicleCompiler do
       all([
         eq(fate, :Fate_Assimilated_NewZhai),
         eq(cause_tag, :c0_removed_and_vulnerable_window_blasting),
-        eq(summary_text, "79年收缴铜钲后 c0 归零，302队点炮正撞上簧片蜂鸣段（易损窗）致自持振荡")
+        eq(summary_text, "对照清丈残卷方知，79年收缴铜钲恰如光绪二十年拆钟绝了阻尼（c0=0）！302队点炮又撞上簧片蜂鸣段（易损窗），致全谷陷入自持振荡")
       ]),
       all([
         eq(fate, :Fate_Assimilated_NewZhai),
         eq(cause_tag, :seasonal_rain_mudslide),
-        eq(summary_text, "归咎于连日秋雨导致常规岩移滑坡，隐瞒拆钟与点炮")
+        eq(summary_text, "归咎于连日秋雨导致常规岩移滑坡，绝口不提收缴铜钲与302队违规点炮")
       ]),
       # 湮灭线候选：真相 vs 官方替罪羊
       all([
         eq(fate, :Fate_Annihilated_BurnoutZone),
         eq(cause_tag, :overwhelming_suppression_attractor_burnout),
-        eq(summary_text, "总指挥部强行打入反向巨量阻尼，应力冲穿 s_max 截断阈值，整条沟进入死寂吸引子")
+        eq(summary_text, "清丈残卷早戒『不可强堵暗河』，总指挥部偏用超高压反向水泥封井，应力冲穿 s_max 截断阈值，整条沟被活活闷死在 Burnout 吸引子")
       ]),
       all([
         eq(fate, :Fate_Annihilated_BurnoutZone),
         eq(cause_tag, :planned_relocation_and_mine_closure),
-        eq(summary_text, "宣称矿区资源枯竭、全员已整建制平稳搬迁")
+        eq(summary_text, "宣称矿区资源正常枯竭、垦殖分场全员已按计划整建制平稳搬迁")
       ]),
       # 飞升线候选：真相 vs 官方替罪羊
       all([
         eq(fate, :Fate_Ascended_SpatialRift),
         eq(cause_tag, :excitation_zenith_spatial_exile),
-        eq(summary_text, "他们在起峰极值（Excitation）打开了谐振腔，核心组全变成了搬石头的黑影")
+        eq(summary_text, "依靠半山老寨完好的 c0 缓冲，源头未直接烧毁，但核心组在起峰极值（Excitation）强开谐振腔，全员化为搬石头的末影黑影")
       ]),
       all([
         eq(fate, :Fate_Ascended_SpatialRift),
         eq(cause_tag, :equipment_retrieval_completed),
-        eq(summary_text, "深孔观测站设备回收完毕，人员调离备案")
+        eq(summary_text, "深孔观测站科研任务圆满结束，设备回收完毕，人员调离备案")
       ]),
       # 幸存古寨候选：真相 vs 官方口径
       all([
         eq(fate, :Fate_Ancestral_ControlGroup),
         eq(cause_tag, :intact_c0_basin_absorption),
-        eq(summary_text, "铜钲镇垭口，山涧小震不过三息自平；莫在鱼鳞水纹时动土，要在万籁俱寂时叩钟")
+        eq(summary_text, "自清丈局立碑止步以来铜钲从未离位（c0 完好），林场小震皆被宽容区吸收；莫在鱼鳞水纹时动土，要在万籁俱寂时叩钟")
       ]),
       all([
         eq(fate, :Fate_Ancestral_ControlGroup),
         eq(cause_tag, :backward_folk_custom_pending_reform),
-        eq(summary_text, "山高路远暂缓改制，旧式鸣钟习俗待后续引导")
+        eq(summary_text, "山高路远暂设挂靠林场，旧式山官鸣钟习俗待后续条件成熟再行改组")
       ])
     ])
   end
@@ -1153,35 +1295,99 @@ defmodule Voy.ChronicleCompiler do
     ])
   end
 
-  defp compile_archiveso(topo, _era1, _era2, era3, archives) do
-    fresh(7, fn [up_name, down_name, fate, official_claim, official_text, inner_truth, inner_text] ->
+  # 第三纪撤场后的「场部—议事会 / 守山孤寨」现行规约文书
+  defp era3_council_recordo(fate, down_name, council_doc) do
+    any([
       all([
-        propso(topo, [up_name: up_name, down_name: down_name]),
-        propso(era3, [fate: fate]),
-
-        # 1. 官方通报从候选池中取用，但受 official_tabooo 的 neq 约束裁剪，只能落入替罪羊解释
-        official_tabooo(official_claim),
-        branch_cause_candidateo(fate, official_claim, official_text),
-
-        # 2. 内参/民间深层记录同样从候选池取用，但强制 neq(inner_truth, official_claim)
-        neq(inner_truth, official_claim),
-        branch_cause_candidateo(fate, inner_truth, inner_text),
-
-        eq(archives, [
-          表层_官样通报: [
-            target_settlement: down_name,
-            upstream_site: up_name,
-            claimed_cause: official_claim,
-            summary: official_text
-          ],
-          深层_内参或口述真相: [
-            true_source: up_name,
-            settlement: down_name,
-            true_cause: inner_truth,
-            note: inner_text
-          ]
+        eq(fate, :Fate_Assimilated_NewZhai),
+        eq(council_doc, [
+          title: "《场部—议事会联席保命规约》",
+          settlement: down_name,
+          governance: :brigade_elder_joint_council,
+          decree: "老保管员（旧山官后裔）看水纹听虫鸣掌令旗，场部司务长按《交接班制度》点名记工分；凡死寂回吸窗至，立敲红绸气缸三声！"
+        ])
+      ]),
+      all([
+        eq(fate, :Fate_Annihilated_BurnoutZone),
+        eq(council_doc, [
+          title: "《封山隔离水泥墙警示铁牌》",
+          settlement: down_name,
+          governance: :depopulated_concrete_sealed_zone,
+          decree: "灰白死寂区内无声无息，原垦殖分场与议事会筹备组全员失踪，严禁任何人员越过水泥封锁线半步"
+        ])
+      ]),
+      all([
+        eq(fate, :Fate_Ascended_SpatialRift),
+        eq(council_doc, [
+          title: "《山官火塘封山铁誓》",
+          settlement: down_name,
+          governance: :rift_guarding_cliff_compact,
+          decree: "源头掩体已化鬼影裂隙，凡我族人严守峡口镇山古器，见黑影搬石切勿直视其目！"
+        ])
+      ]),
+      all([
+        eq(fate, :Fate_Ancestral_ControlGroup),
+        eq(council_doc, [
+          title: "《岁祭账房木刻借阅约》",
+          settlement: down_name,
+          governance: :restored_ancestral_compact,
+          decree: "挂靠林场已撤，岁祭如仪；外客若以干粮铁器相赠（礼物经济），可借阅账房所藏旧州府清丈卷与水文台账"
         ])
       ])
+    ])
+  end
+
+  defp compile_archiveso(topo, _era1, era2a, _era2b, era3, archives) do
+    fresh(9, fn [
+      up_name,
+      down_name,
+      gazetteer_case,
+      gazetteer_record,
+      fate,
+      official_claim,
+      official_text,
+      inner_truth,
+      inner_text
+    ] ->
+      fresh(1, fn [council_doc] ->
+        all([
+          propso(topo, [up_name: up_name, down_name: down_name]),
+          propso(era2a, [gazetteer_precedent: gazetteer_case]),
+          propso(era3, [fate: fate]),
+
+          # 1. 第二纪（上）旧州府清丈残卷（提供百年前「拆钟致灾、复钟乃平」的历史先例）
+          era2a_gazetteer_recordo(gazetteer_case, down_name, gazetteer_record),
+
+          # 2. 第二纪（下）表层：垦殖总场/指挥部官样通报（受 official_tabooo 的 neq 约束裁剪，只能落入替罪羊解释）
+          official_tabooo(official_claim),
+          branch_cause_candidateo(fate, official_claim, official_text),
+
+          # 3. 第二纪（下）中层：技术员手簿夹页（考据旧州府方志 + 实测数据，强制 neq 官样借口）
+          neq(inner_truth, official_claim),
+          branch_cause_candidateo(fate, inner_truth, inner_text),
+
+          # 4. 第三纪深层：撤场后「场部—议事会 / 守山共同体」的现行制度文书
+          era3_council_recordo(fate, down_name, council_doc),
+
+          eq(archives, [
+            "①旧州府清丈残卷(第二纪上)": gazetteer_record,
+            "②垦殖总场官样通报(第二纪下·表层)": [
+              target_settlement: down_name,
+              upstream_site: up_name,
+              claimed_cause: official_claim,
+              summary: official_text
+            ],
+            "③技术员手簿考据批注(第二纪下·中层)": [
+              true_source: up_name,
+              settlement: down_name,
+              corroborated_gazetteer: gazetteer_case,
+              true_cause: inner_truth,
+              note: inner_text
+            ],
+            "④撤场后场部—议事会文书(第三纪·深层)": council_doc
+          ])
+        ])
+      end)
     end)
   end
 end
@@ -1239,7 +1445,7 @@ compiled_valley_history =
     end)
   end)
 
-IO.inspect(compiled_valley_history, pretty: true, width: 100)
+IO.inspect(compiled_valley_history, pretty: true, width: 100, limit: :infinity)
 
 IO.puts("\n==================================================================")
 IO.puts("【推演五：从结局倒推地形与历史（Goal-Driven Worldgen 选址）】")
@@ -1249,7 +1455,7 @@ IO.puts("==================================================================")
 
 reverse_worldgen_query =
   Logic.Core.run_all(fn q ->
-    Logic.Core.fresh(7, fn [required_topo, slice, up_t, pass_t, down_t, geo, acc] ->
+    Logic.Core.fresh(8, fn [required_topo, slice, era3, up_t, pass_t, down_t, geo, acc] ->
       Logic.Core.all([
         # 只绑定地名占位，5项地形特征全部留作未知逻辑变量让 Kanren 反推！
         Logic.Core.eq(required_topo, [
@@ -1264,20 +1470,52 @@ reverse_worldgen_query =
           accessibility: acc
         ]),
         Voy.ChronicleCompiler.compile_branch_sliceo(required_topo, slice),
-        Logic.Core.propso(slice, [
-          第三纪_激化与结局: [
-            fate: :Fate_Ascended_SpatialRift,
-            final_regime: :Strained,
-            phase_rule: :triggered_at_Excitation_zenith,
-            manifestation: [
-              phenomenon: "游荡的搬运方块黑影（末影畸变）、指南针乱转的残破观测掩体",
-              remnant: "写满高频相位坐标与『去往对岸』字样的磁带"
-            ]
-          ]
-        ]),
+        Logic.Core.propso(slice, ["第三纪_撤场议事会回流与三分结局": era3]),
+        Logic.Core.propso(era3, [fate: :Fate_Ascended_SpatialRift]),
         Logic.Core.eq(q, slice)
       ])
     end)
   end)
 
-IO.inspect(reverse_worldgen_query, pretty: true, width: 100)
+IO.inspect(reverse_worldgen_query, pretty: true, width: 100, limit: :infinity)
+
+IO.puts("\n==================================================================")
+IO.puts("【推演六：跨时代考据破案（玩家用『旧州府清丈残卷』戳穿『垦殖总场秋汛通报』）】")
+IO.puts("场景：玩家在糯良老寨通过礼物经济借阅到了百年前的《旧州府抚夷清丈残卷·铜钲案》，")
+IO.puts("又在白水坝捡到了宣称『秋雨滑坡、已平稳停产』的《垦殖总场官样通报》。")
+IO.puts("玩家将这两份跨越百年的文书放入对账手簿，直接向 Kanren 反向求证：")
+IO.puts("白水坝在第二纪下到底遭遇了什么真相似曾相识的祸根？现在的场部—议事会靠什么苟活？")
+IO.puts("==================================================================")
+
+cross_era_deduction =
+  Logic.Core.run_all(fn q ->
+    Logic.Core.fresh(6, fn [topo, slice, archives, tech_note, council_doc, era3] ->
+      Logic.Core.all([
+        Logic.Core.membero(topo, extracted_terrain_branches),
+        Voy.ChronicleCompiler.compile_branch_sliceo(topo, slice),
+        Logic.Core.propso(slice, [
+          "第三纪_撤场议事会回流与三分结局": era3,
+          "第四纪_跨纪元四层档案包": archives
+        ]),
+        # 玩家已知线索 1：旧州府残卷记载此地光绪二十年曾因收缴铜钲引发滑坡反噬
+        Logic.Core.propso(archives, [
+          "①旧州府清丈残卷(第二纪上)": [
+            title: "《旧州府抚夷清丈残卷·铜钲案》",
+            recorded_settlement: "白水坝",
+            precedent: :case_1894_zheng_return_calmed_slide,
+            excerpt: "光绪二十年清丈局强收寨门铜钲入库铸钱，是秋山鸣石崩掩没局署；流官惊惧，发还铜钲任山官依古法岁祭叩击，山患遂平（外甲内寨）"
+          ],
+          "③技术员手簿考据批注(第二纪下·中层)": tech_note,
+          "④撤场后场部—议事会文书(第三纪·深层)": council_doc
+        ]),
+        Logic.Core.eq(q, [
+          考据出的第二纪下真相: tech_note,
+          推导出的第三纪现行规约: council_doc,
+          当前支沟动力学状态: era3
+        ])
+      ])
+    end)
+  end)
+
+IO.inspect(cross_era_deduction, pretty: true, width: 100, limit: :infinity)
+
