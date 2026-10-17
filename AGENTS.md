@@ -53,7 +53,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
 - `src/test/scala/` — 测试代码（现有 `inner/mandate/` 下 5 个 Spec，清单见下文「测试」一节）
 - `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8）与 `docs/design-note-02-kanren-worldview-engine.md`（动力学四相 × Kanren 关系引擎：多世界观透镜、式盘因果推导与五阶制度发展史编译器），旧概念稿已废弃清空
-- `scripts/` — 开发与设定验证用独立脚本（不进 jar）：`kanren_sandbox.exs`（Elixir 单文件 microKanren 沙盘与五阶制度历史编译器原型）
+- `tools/voy_world/` — 开发与设定验证用独立 Elixir Mix 包（不进 jar）：`Voy.Kanren` 关系内核、`Voy.World` 世界模型与六个沙盘推演；含 48 种地形组合分类测试和 JVM 迁移用 JSON golden cases
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 
 ## 开发约定
@@ -69,6 +69,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 
 - 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
 - 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`、`inner/mandate/MandateAgentSpec`（actor 接线契约：tick 事件驱动确定性积分、每 tick 一份快照、无 tick 不积分）。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
+- Elixir 世界模型原型：在 `tools/voy_world/` 运行 `mix test`（ExUnit），`mix run examples/sandbox.exs` 执行六个沙盘推演；`test/fixtures/world_cases.json` 是后续 JVM 移植复用的语义 golden cases。
 - **本机环境注意**：JDK 路径等环境信息因设备而异，不入库；见仓库根目录 `ref/` 目录下的本地说明（该目录被 git 忽略，各设备自行维护）。
 - Fabric/Minecraft 集成无法简单单测，验证集成行为请使用 `./gradlew runClient` 手动运行游戏。
 

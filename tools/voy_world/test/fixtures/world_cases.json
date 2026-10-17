@@ -1,0 +1,88 @@
+{
+  "forward": [
+    {
+      "topography": {
+        "branch_id": "branch_01_baishui",
+        "up_name": "野猪箐裂隙",
+        "pass_name": "断碑垭口",
+        "down_name": "白水坝",
+        "up_terrain": "steep_fissure_headwater",
+        "pass_terrain": "canyon_pass",
+        "down_terrain": "alluvial_flat",
+        "up_geology": "active_fault_vein",
+        "accessibility": "tractor_road_accessible"
+      },
+      "expected": {
+        "fate": "Fate_Assimilated_NewZhai",
+        "regime": "Oscillating",
+        "relic": "ancestral_bronze_zheng",
+        "disturbance": "periodic_shallow_blasting",
+        "official_cause": "seasonal_rain_mudslide",
+        "true_cause": "c0_removed_and_vulnerable_window_blasting"
+      }
+    },
+    {
+      "topography": {
+        "branch_id": "branch_02_heishui",
+        "up_name": "鬼哭漏斗",
+        "pass_name": "锁龙峡",
+        "down_name": "黑水坪",
+        "up_terrain": "karst_sinkhole_headwater",
+        "pass_terrain": "karst_gorge",
+        "down_terrain": "alluvial_flat",
+        "up_geology": "deep_stress_cavity",
+        "accessibility": "tractor_road_accessible"
+      },
+      "expected": {
+        "fate": "Fate_Annihilated_BurnoutZone",
+        "regime": "Burnout",
+        "relic": "carved_diversion_stele",
+        "disturbance": "overwhelming_reverse_suppression",
+        "official_cause": "planned_relocation_and_mine_closure",
+        "true_cause": "overwhelming_suppression_attractor_burnout"
+      }
+    },
+    {
+      "topography": {
+        "branch_id": "branch_03_nuoliang",
+        "up_name": "老君林场",
+        "pass_name": "响水涧口",
+        "down_name": "糯良古寨",
+        "up_terrain": "steep_fissure_headwater",
+        "pass_terrain": "canyon_pass",
+        "down_terrain": "mid_terrace",
+        "up_geology": "minor_fracture",
+        "accessibility": "cliff_isolated"
+      },
+      "expected": {
+        "fate": "Fate_Ancestral_ControlGroup",
+        "regime": "Calm",
+        "relic": "ancestral_bronze_zheng",
+        "disturbance": "low_level_logging_shock",
+        "official_cause": "backward_folk_custom_pending_reform",
+        "true_cause": "intact_c0_basin_absorption"
+      }
+    }
+  ],
+  "reverse": [
+    {
+      "fate": "Fate_Ascended_SpatialRift",
+      "expected_topographies": [
+        {
+          "up_terrain": "karst_sinkhole_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "mid_terrace",
+          "up_geology": "deep_stress_cavity",
+          "accessibility": "cliff_isolated"
+        },
+        {
+          "up_terrain": "karst_sinkhole_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "mid_terrace",
+          "up_geology": "deep_stress_cavity",
+          "accessibility": "cliff_isolated"
+        }
+      ]
+    }
+  ]
+}

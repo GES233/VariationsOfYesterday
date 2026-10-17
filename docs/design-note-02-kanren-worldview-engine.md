@@ -1,6 +1,6 @@
 # 设计札记 02 — 动力学四相 × Kanren 关系引擎：多世界观透镜与「式盘」因果推导
 
-> 状态：**概念发散与原型验证札记**（2026-10，配套沙盘脚本见 `scripts/kanren_sandbox.exs`）。
+> 状态：**概念发散与原型验证札记**（2026-10，配套 Elixir Mix 包见 `tools/voy_world/`）。
 > 定位：在不触碰 `design-draft-01-living-world.md` §1 动力学冻结结构的前提下，探索如何以极简关系型编程（microKanren / cKanren）作为**符号桥接层**，将 `MandateReadout` 的离散相位枚举、地势有向拓扑、多套互异的世界观口径（老寨/官样文章/技术内参/退化新寨）以及玩法 Goals 统合进同一套不冲突的逻辑文法。
 
 ---
@@ -35,10 +35,10 @@
 
 | 关系引擎结构（内部骨架） | 80s 工程队/水文站口径（理工行话） | 老寨残篇口径（虚构山民古谚） | 动力学与 Kanren 机制语义 |
 | :--- | :--- | :--- | :--- |
-| **静盘**（Static Plate） | **底图 / 汇流基底**<br>（等高线图、支沟断面号） | **山骨 / 落水架**<br>（哪条沟喝哪条涧的水） | `dipan_edgeo(up, mid, down)` + 聚落基线 $c_0$ 状态：决定因果单向顺沟下淌 |
-| **动盘**（Dynamic Plate） | **相区 / 周期游标**<br>（对应 `MandateReadout` 四相） | **山息 / 潮候**<br>（起峰、退潮息、倒换气、平眠） | `tianpan_transitiono`：加临在底图各格上，决定此刻对脉冲是吸收、推迟还是引爆 |
+| **静盘**（Static Plate） | **底图 / 汇流基底**<br>（等高线图、支沟断面号） | **山骨 / 落水架**<br>（哪条沟喝哪条涧的水） | `drainage_edgeo(up, mid, down)` + 聚落基线 $c_0$ 状态：决定因果单向顺沟下淌 |
+| **动盘**（Dynamic Plate） | **相区 / 周期游标**<br>（对应 `MandateReadout` 四相） | **山息 / 潮候**<br>（起峰、退潮息、倒换气、平眠） | `phase_transitiono`：加临在底图各格上，决定此刻对脉冲是吸收、推迟还是引爆 |
 | **四课**（Four Facets） | **工况切面 / 台账对照表**<br>（水文表 + 监听匣 + 作业单） | **四验 / 听山四对**<br>（看水纹、听虫鸣、验垂架、查香火） | `artifact_actiono` + `phase_phenomenono`：散落于山谷的主客器物与物候表征 |
-| **三传**（Three Stages） | **起爆点 $\rightarrow$ 滞后传导 $\rightarrow$ 坝区响应** | **起手 $\rightarrow$ 过涧 $\rightarrow$ 落报** | `sanchuano(chu, zhong, mo)`：由具体 Goal 触发的「初传发端 $\rightarrow$ 中传平流 $\rightarrow$ 末传归宿」 |
+| **三传**（Three Stages） | **起爆点 $\rightarrow$ 滞后传导 $\rightarrow$ 坝区响应** | **起手 $\rightarrow$ 过涧 $\rightarrow$ 落报** | `causal_stageso(initial, propagation, outcome)`：由具体 Goal 触发的「初传发端 $\rightarrow$ 中传平流 $\rightarrow$ 末传归宿」 |
 | **式盘工具**（实物化） | **双层铝制水文计算转盘 / 穿孔排程卡** | **合木验山盘** | 下层刻本谷地高程节点，上层旋转透明盘刻四相窗口与滞后 $\tau$，玩家拨盘即在人脑中跑 Unification |
 
 ---
@@ -49,7 +49,7 @@
 
 ### 2.1 唯一本体层 + 认知透镜（`Lens`）四元组
 
-所有客观事件只在本体层（`sanchuano`）结算一次；所有叙事文本与归因逻辑必须通过 `lens_projectiono(Lens, Chuchuan, Zhongchuan, Mochuan, Record)` 投影生成：
+所有客观事件只在本体层（`causal_stageso`）结算一次；所有叙事文本与归因逻辑必须通过 `lens_projectiono(Lens, Initial, Propagation, Outcome, Record)` 投影生成：
 
 ```text
            [ 唯一本体三传 (Ground Truth Three Stages) ]
@@ -84,7 +84,7 @@
 
 ### 3.1 退化新寨的「邪典工业仪式」自动合成（反向求解 Goal）
 - **场景**：老寨改制为农场四队后，祖传铜钲被收缴（`c0_collapsed`）。工程队撤离后，留守职工在自持振荡期（`Oscillating`）面临生存 Goal：`outcome === :spike_delayed_by_8_6`（推迟灾变尖峰）。
-- **涌现**：Kanren 在宿舍区残存的工业废料词条中反向搜索满足 `tianpan_transitiono` 的组合，自动将 **「林中虫鸣骤停/监听匣静默（20%–30% 绝对不应期）」+「按交接班条例列队唱名」+「大锤敲击红绸包裹的东方红拖拉机铸铁气缸」** 合一为合法的救命仪式。荒诞的形式与严肃的 FHN 方程在逻辑层严丝合缝。
+- **涌现**：Kanren 在宿舍区残存的工业废料词条中反向搜索满足 `phase_transitiono` 的组合，自动将 **「林中虫鸣骤停/监听匣静默（20%–30% 绝对不应期）」+「按交接班条例列队唱名」+「大锤敲击红绸包裹的东方红拖拉机铸铁气缸」** 合一为合法的救命仪式。荒诞的形式与严肃的 FHN 方程在逻辑层严丝合缝。
 
 ### 3.2 「两套账本」与本地化 ARG 档案的约束编译
 - **场景**：对抗 Wiki 剧透（设计草案 §4.1），每个世界种子的安全窗口、滞后常数 $\tau$、出事支沟代号不同。
@@ -92,7 +92,7 @@
 
 ### 3.3 设计期「设定集静态检查器（Lore Linter）」
 - 在编写「文档圣经」与手写报告时，Kanren 可直接作为测试套件运行：
-  - **漏判检测**：正如 `scripts/kanren_sandbox.exs` 初次运行所揭示的——当同一个叙事规则对 `regime: :Strained`（初犯击穿）和 `regime: :Oscillating`（持续振荡中二次点火）吐出完全相同的文本时，说明叙事颗粒度漏掉了关键的慢变量阶段区分。
+  - **漏判检测**：正如 `tools/voy_world/` 原型初次运行所揭示的——当同一个叙事规则对 `regime: :Strained`（初犯击穿）和 `regime: :Oscillating`（持续振荡中二次点火）吐出完全相同的文本时，说明叙事颗粒度漏掉了关键的慢变量阶段区分。
   - **可解性验证**：验证给定的 $N$ 份档案碎片是否足以将未知逻辑变量 `?safe_phase` 收敛为唯一解（若解集长度 $>1$ 说明线索不足，若为 `[]` 说明线索自相矛盾）。
 
 ### 3.4 物候症候群与「老把式断山 / 勘测手簿」（双向因果网）
@@ -109,25 +109,24 @@
 
 ## 4. 原型验证与后续 Scala 3 迁移路线
 
-### 4.1 现有 Elixir 独立沙盘（无需 Java/Scala 环境即可迭代设定）
-已在仓库 `scripts/kanren_sandbox.exs` 落地完整的单文件可执行原型：
-- **内核（`Logic.Core`）**：包含带 `occurs?` 检查的 `unify`、交错搜索流（`mplus`/`bind` 公平搜索）、不等约束 `neq`（`=/=`）、多变量引入 `fresh/2` 以及开放属性表匹配 `propso/2`。
-- **沙盘（`Voy.LiurenSandbox`）**：实现了「底图（地盘）— 相区（天盘）— 工况物候（四课）— 三阶传导（三传）— 多世界观透镜（Lenses）」完整闭环，并验证了三个核心推演：
-  1. **推演一（溯因断案）**：由白水坝提前起峰（末传）反推 302 勘探队在野猪箐易损窗点炮（初传）及平流路径（中传），自动区分「从承压区 `Strained` 初犯击穿」与「在振荡期 `Oscillating` 二次点火」两种情形；
-  2. **推演二（一案三表）**：对同一场事故自动衍生出 `:OfficialHQ`（秋汛通报）、`:TechInner`（手簿夹页批注一/二）、`:OldZhai`（山脉换气口述）四份视角各异且内部严丝合缝的档案记录（由 `neq` 禁忌对共享候选池主动裁剪）；
-  3. **推演三（邪典仪式合成，不预设行动者）**：在仅指定白水坝需得 `:spike_delayed_by_8_6`、不预设 `?actor` 的条件下，由白水坝 `c0_collapsed` 的事实自动排除老寨铜钲，唯一推演出「四队留守职工 + 断碑垭口 + 死寂回吸窗（`AbsoluteRefractory`）+ 红绸东方红-54气缸体」；
-  4. **推演四（五阶制度演进正向编译，`Voy.ChronicleCompiler`）**：输入从高度图提取的 3 条支沟地形特征，自动推演 **第一纪（山官—祭司火塘共议）$\rightarrow$ 第二纪上（流官设保编甲的触及与挫败）$\rightarrow$ 第二纪下（国营垦殖总场改组与工程进山）$\rightarrow$ 第三纪（撤场、场部—议事会旧关系回流与三分结局）$\rightarrow$ 第四纪（落地结构 NBT 与四代同堂档案包）**；
-  5. **推演五（从结局倒推地形选址，Goal-Driven Worldgen）**：给定期望出现的第三纪结局（如 `:Fate_Ascended_SpatialRift` 飞升空间畸变点），将 5 项地形属性全部留空为逻辑变量，反向求解该支沟必须具备的源头地貌、地质构造与前两纪聚落历史；
-  6. **推演六（跨时代考据破案）**：模拟玩家在幸存老寨通过礼物经济借阅到百年前的《旧州府抚夷清丈残卷·铜钲案》，结合白水坝官样通报放入对账手簿，反向求证出第二纪下「收缴铜钲致 $c_0=0$」的同构祸根与第三纪「场部—议事会」现行保命规约。
+### 4.1 现有 Elixir 独立 Mix 包（无需 Java/Scala 环境即可迭代设定）
+已在仓库 `tools/voy_world/` 落地零外部依赖的关系引擎与世界模型原型：
+- **内核（`Voy.Kanren.Core`）**：包含带 `occurs?` 检查的 `unify`、交错搜索流（`mplus`/`bind` 公平搜索）、不等约束 `neq`（`=/=`）、多变量引入 `fresh` 以及开放属性表匹配 `propso/2`；`Voy.Kanren.DSL` 提供薄语法，统一 reify 结果与剩余约束的返回形状。
+- **世界模型（`Voy.World`）**：`Causality` 承载因果三阶传导与多世界观透镜，`Chronicle` 承载唯一一份可正反向求值的编年史关系，`Projection` 派生结构与档案，`Schema` 与顶层 `Voy.World` 提供稳定字段和 JSON-safe 查询入口。
+- **可执行规格**：六个推演均有 ExUnit 语义断言；另有 48 种地形组合分类、正反向 round-trip、档案文本一致性与 JSON golden cases。当前 36 种组合属于不支持地形，4 种可推进至第二纪下但第三纪历史未定（显式返回 `unresolved_history`），8 种可完整编译，不再以静默空列表掩盖区别。
+
+六个沙盘场景仍覆盖：溯因断案、一案三表、邪典仪式合成、五阶制度演进正向编译、从结局倒推地形选址，以及由旧方志和官样通报双线索驱动的跨时代考据。演示入口为 `examples/sandbox.exs`。
 
 运行方式（在具备 Elixir 环境的终端下）：
 ```powershell
-elixir scripts/kanren_sandbox.exs
+cd tools/voy_world
+mix test
+mix run examples/sandbox.exs
 ```
 
 ---
 
-## 5. 五阶制度发展史编译器（`Voy.ChronicleCompiler`）：对齐设计草案 §3.5 与 §4.5
+## 5. 五阶制度发展史编译器（`Voy.World.Chronicle`）：对齐设计草案 §3.5 与 §4.5
 
 针对路线 A/A+ 及第三方地形模组（Tectonic / Terralith 等）下**「地形由种子动态决定，但古寨—流官挫败—垦殖改组—撤场议事会回流—玩家入场的历史链又必须高度严密」**的需求，将设计草案 §3.5 的政治发展历程骨架直接编码为 Kanren 的五阶关系管线：
 
@@ -148,11 +147,11 @@ elixir scripts/kanren_sandbox.exs
 ---
 
 ### 4.2 后续向 Scala 3（`inner/`）迁移的工程要点
-当切换至主开发环境并决定在具体分支施工时，将 `Logic.Core` 迁入 `src/main/scala/moe/chestnut/awa/voy/inner/` 极其轻量（预计约 150–200 行纯 Scala 3 代码，零外部依赖）：
-1. **代数数据类型直接对接**：`Term` 可直接包裹现有的 `StressRegime` 与 `ExcitablePhase` 枚举（`MandateReadout.scala`），无需字符串转换；
-2. **Stream 与 Goal 表达**：Elixir 的 `{:mature, h, t}` / `{:immature, f}` 直接映射为 Scala 3 的 `enum KStream[+A]`；`fresh` 配合 Scala 3 尾随闭包语法（`fresh: a => fresh: b => ...`），无需编写宏即可获得极佳的可读性；
+当规则与查询语义稳定后，将 `Voy.Kanren` 与 `Voy.World` 分别迁入 `src/main/scala/moe/chestnut/awa/voy/inner/kanren/` 与 `inner/world/`；两侧均保持零外部运行时依赖，并以 `tools/voy_world/test/fixtures/world_cases.json` 及双向 round-trip 用例作为移植基准：
+1. **代数数据类型直接对接**：设计草案 §1.3 已定义 `StressRegime` 与 `ExcitablePhase`，但 Scala 侧尚无 `MandateReadout.scala`；迁移时先实现该读数契约，再让 `Term` 与其中枚举对接，无需经过字符串转换；
+2. **Stream 与 Goal 表达**：Elixir 的 `{:mature, h, t}` / `{:immature, f}` 直接映射为 Scala 3 的 `enum KStream[+A]`；`fresh` 配合 Scala 3 尾随闭包语法（`fresh: a => fresh: b => ...`），无需移植 Elixir 表面宏；
 3. **触发时机与性能隔离**：Kanren 求解器**绝不在每 tick 积分循环内调用**，仅在以下低频离散时刻触发：
    - 世界/Node 首次激活生成本地化档案与聚落初始历史时；
    - 区块 `MandateReadout` 发生跨相区/跨分级跃迁（Phase/Regime Transition）驱动聚落 AI 切换 Goal 时；
    - 玩家操作土法推演盘、勘测手簿或搭建调制工程触发拓扑验证时。
-   全程纯内存不可变结构求值，单次查询耗时在微秒至亚毫秒级，完全符合 `design-draft-01-living-world.md` §1.4 的性能预算与加载不变性原则。
+   全程使用纯内存不可变结构求值；具体查询预算须以独立基准验证，不在每 tick 路径或区块生成回调中进行无界 `run_all`。
