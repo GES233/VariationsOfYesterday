@@ -4,7 +4,7 @@
 
 这是一个 **Minecraft Fabric 模组**，处于非常早期的开发阶段。当前创作方向（讨论中，尚未定型）：**中式民俗恐怖 + ARG 碎片化叙事的「活着的世界」生态模拟模组**。世界本身是一个由核心「Mandate Engine」驱动的动力学系统（可激发介质 / 快慢变量 + 滞后效应），会因过度扰动跨越临界点而发生生态级灾变；玩家的核心目标是「调制与维稳」——实事求是地监测并安抚这片土地，而非征服它。宏观主线上，玩家通过联合动力学读数与关系因果推演，在既定历史和动力学约束内辨认可达未来并顺势而为，而非直接挑选结局或无限救火。叙事层面以虚构的近现代（1980s）滇西南风格山区为背景，通过档案、报表等 ARG 碎片呈现现代工程与本土祭祀逻辑的碰撞（全部地理/民族/仪式/事件均为虚构，不指涉真实存在）。
 
-注意：早期概念稿已废弃删除（设计草案 01 记载其内容为「星象/草药等」，旧稿中的表述一律不再适用），但 Mandate Engine 的技术骨架（FHN 型 ODE）沿用于新方向。设计文档目录为 `docs/`。
+设计文档目录为 `docs/`。
 
 - 模组 ID：`variations-of-yesterday`
 - 包名：`moe.chestnut.awa.voy`
@@ -52,7 +52,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
 - `src/test/scala/` — 测试代码（现有 `inner/mandate/` 下 5 个 Spec，清单见下文「测试」一节）
-- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8）与 `docs/design-note-02-kanren-worldview-engine.md`（动力学四相 × Kanren 关系引擎：多世界观透镜、式盘因果推导与五阶制度发展史编译器），旧概念稿已废弃清空
+- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8）与 `docs/design-note-02-kanren-worldview-engine.md`（动力学四相 × Kanren 关系引擎：多世界观透镜、式盘因果推导与五阶制度发展史编译器）
 - `tools/voy_world/` — 开发与设定验证用独立 Elixir Mix 包（不进 jar）：`Voy.Kanren` 关系内核、`Voy.World` 世界模型与六个沙盘推演；含 48 种地形组合分类测试和 JVM 迁移用 JSON golden cases
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 
