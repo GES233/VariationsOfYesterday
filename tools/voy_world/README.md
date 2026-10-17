@@ -31,6 +31,20 @@ spec = [
 
 `solve_node/2` also accepts partial topography constraints. `compile_node/2` compiles a complete named node directly, while `reverse_node/1` returns unnamed semantic candidates with stable site IDs. Fate constraints support `:any`, `{:require, fate}`, and `{:one_of, fates}`. The original branch API remains available for compatibility and golden-case verification.
 
+## Diagrams
+
+The current topography, history, fate, and solver relations are illustrated in:
+
+- [Landform to Chronicle](docs/diagrams/01_landform_to_chronicle.png)
+- [Fate-to-landform candidate matrix](docs/diagrams/02_fate_to_landform_matrix.png)
+- [Bidirectional microKanren solving](docs/diagrams/03_microkanren_bidirectional_solver.png)
+
+Regenerate them with Python, matplotlib, and an installed CJK font:
+
+```sh
+python examples/render_landform_diagrams.py
+```
+
 ## Run
 
 ```sh
