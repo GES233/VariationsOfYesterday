@@ -19,6 +19,7 @@
 - **Scala 支持**：通过 `com.kotori316:scalable-cats-force-fabric`（Kotori Scala，`kotori_scala`）加载，`fabric.mod.json` 中的入口点使用 `"adapter": "kotori_scala"`。
 - **并发模型**：**Apache Pekko**（typed actor），`pekko-actor-typed` + `pekko-slf4j`，测试用 `pekko-actor-testkit-typed`。ActorSystem 已接线：`MandateRuntime`（游戏侧桥）随服务器生命周期启停（`SERVER_STARTING`/`SERVER_STOPPED`），`MandateAgent` actor 持有格子场并作为唯一写者。调度语义为 **tick 事件驱动**（设计草案 §1.4，2026-09-30 修订）：`END_SERVER_TICK` 投递固定步长的 `TickArrived`，事件与 tick 同信箱全序，仿真时间恒等于游戏时间；游戏线程只投递事件、消费 `@volatile` 快照（HUD 读 `MandateRuntime.stateAt`），actor 回包经动作队列在下一 tick drain 回主线程。
 - **函数式库**：cats-core / cats-kernel（kotori 定制版本，来自 kotori316 的 Maven 仓库）。
+- **因果推理沙盘**： Elixir + 自建 Kanren 引擎。
 
 ## 构建与运行
 
