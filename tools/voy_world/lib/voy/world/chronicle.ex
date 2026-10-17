@@ -271,13 +271,21 @@ defmodule Voy.World.Chronicle do
     end
   end
 
-  def compile_branch_sliceo(topo, slice) do
-    fresh [branch_id, era1, era2a, era2b, era3, structures, archives] do
-      propso(topo, branch_id: branch_id)
+  def history_through_era3o(topo, history) do
+    fresh [era1, era2a, era2b, era3] do
       era1_headmano(topo, era1)
       era2a_magistrateo(topo, era1, era2a)
       era2b_reclamationo(topo, era1, era2a, era2b)
       era3_catastropheo(topo, era1, era2a, era2b, era3)
+      eq(history, era1: era1, era2a: era2a, era2b: era2b, era3: era3)
+    end
+  end
+
+  def compile_branch_sliceo(topo, slice) do
+    fresh [branch_id, history, era1, era2a, era2b, era3, structures, archives] do
+      propso(topo, branch_id: branch_id)
+      history_through_era3o(topo, history)
+      propso(history, era1: era1, era2a: era2a, era2b: era2b, era3: era3)
       Projection.compile_structureso(topo, era1, era2b, era3, structures)
       Projection.compile_archiveso(topo, era1, era2a, era2b, era3, archives)
 

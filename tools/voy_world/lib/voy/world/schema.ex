@@ -36,18 +36,51 @@ defmodule Voy.World.Schema do
   def feature_domain(key), do: Map.fetch!(@feature_domains, key)
   def fates, do: @fates
 
+  def normalize_fate(fate) when fate in @fates, do: {:ok, fate}
+
+  def normalize_fate(fate) when is_binary(fate) do
+    case Enum.find(@fates, &(Atom.to_string(&1) == fate)) do
+      nil -> {:error, :unknown_fate}
+      normalized -> {:ok, normalized}
+    end
+  end
+
+  def normalize_fate(_fate), do: {:error, :unknown_fate}
+
   def topology(fields) do
     Enum.map(@topology_keys, fn key ->
       {key, normalize(key, fetch_field!(fields, key))}
     end)
   end
 
-  defp fetch_field!(fields, key) when is_list(fields), do: Keyword.fetch!(fields, key)
+  def features(fields) do
+    Enum.flat_map(@feature_keys, fn key ->
+      case fetch_field(fields, key) do
+        {:ok, value} -> [{key, normalize(key, value)}]
+        :error -> []
+      end
+    end)
+  end
 
-  defp fetch_field!(fields, key) when is_map(fields) do
+  def complete_features(fields) do
+    Enum.map(@feature_keys, fn key ->
+      {key, normalize(key, fetch_field!(fields, key))}
+    end)
+  end
+
+  defp fetch_field(fields, key) when is_list(fields), do: Keyword.fetch(fields, key)
+
+  defp fetch_field(fields, key) when is_map(fields) do
     case Map.fetch(fields, key) do
+      {:ok, value} -> {:ok, value}
+      :error -> Map.fetch(fields, Atom.to_string(key))
+    end
+  end
+
+  defp fetch_field!(fields, key) do
+    case fetch_field(fields, key) do
       {:ok, value} -> value
-      :error -> Map.fetch!(fields, Atom.to_string(key))
+      :error -> raise KeyError, key: key, term: fields
     end
   end
 

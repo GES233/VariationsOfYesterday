@@ -3,7 +3,7 @@ defmodule Voy.World do
 
   use Voy.Kanren
 
-  alias Voy.World.{Chronicle, Schema}
+  alias Voy.World.{Chronicle, Node, Schema}
 
   def compile_branch(topo_fields) do
     topo = Schema.topology(topo_fields)
@@ -16,8 +16,28 @@ defmodule Voy.World do
     end
   end
 
+  def solve_node(spec_fields, feature_fields \\ []) do
+    with {:ok, candidates} <- Node.solve(spec_fields, feature_fields) do
+      {:ok, Enum.map(candidates, &Schema.to_public/1)}
+    end
+  end
+
+  def reverse_node(spec_fields), do: solve_node(spec_fields, [])
+
+  def compile_node(spec_fields, feature_fields) do
+    with {:ok, records} <- Node.compile(spec_fields, feature_fields) do
+      {:ok, Enum.map(records, &Schema.to_public/1)}
+    end
+  end
+
+  def materialize_node(spec_fields, candidate) do
+    with {:ok, record} <- Node.materialize(spec_fields, candidate) do
+      {:ok, Schema.to_public(record)}
+    end
+  end
+
   def reverse_worldgen(fate) do
-    with {:ok, fate} <- normalize_fate(fate) do
+    with {:ok, fate} <- Schema.normalize_fate(fate) do
       slices =
         run_all(fn q ->
           fresh [topo, slice, era3, up_type, pass_type, down_type, geology, access] do
@@ -48,22 +68,4 @@ defmodule Voy.World do
   defp era2b_defined?(topo) do
     run(1, fn q -> Chronicle.history_through_era2bo(topo, q) end) != []
   end
-
-  defp normalize_fate(fate)
-       when fate in [
-              :Fate_Assimilated_NewZhai,
-              :Fate_Annihilated_BurnoutZone,
-              :Fate_Ascended_SpatialRift,
-              :Fate_Ancestral_ControlGroup
-            ],
-       do: {:ok, fate}
-
-  defp normalize_fate(fate) when is_binary(fate) do
-    case Enum.find(Schema.fates(), &(Atom.to_string(&1) == fate)) do
-      nil -> {:error, :unknown_fate}
-      normalized -> {:ok, normalized}
-    end
-  end
-
-  defp normalize_fate(_fate), do: {:error, :unknown_fate}
 end
