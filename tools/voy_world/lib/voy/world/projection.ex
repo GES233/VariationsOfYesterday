@@ -3,6 +3,8 @@ defmodule Voy.World.Projection do
 
   use Voy.Kanren
 
+  alias Voy.World.Texts
+
   def compile_structureso(topo, era1, era2b, era3, structures) do
     fresh [up_name, pass_name, down_name, relic, fate, team, pass_desc] do
       propso(topo, up_name: up_name, pass_name: pass_name, down_name: down_name)
@@ -174,30 +176,30 @@ defmodule Voy.World.Projection do
       [
         eq(gazetteer_case, :case_1894_zheng_return_calmed_slide),
         eq(record,
-          title: "《旧州府抚夷清丈残卷·铜钲案》",
+          title: Texts.render!(:archive_gazetteer_zheng, :title),
           recorded_settlement: down_name,
           precedent: :case_1894_zheng_return_calmed_slide,
-          excerpt: "光绪二十年清丈局强收寨门铜钲入库铸钱，是秋山鸣石崩掩没局署；流官惊惧，发还铜钲任山官依古法岁祭叩击，山患遂平（外甲内寨）"
+          excerpt: Texts.render!(:archive_gazetteer_zheng, :excerpt)
         )
       ]
 
       [
         eq(gazetteer_case, :case_1902_stele_restored_stopped_flood),
         eq(record,
-          title: "《旧州府抚夷清丈残卷·石堰案》",
+          title: Texts.render!(:archive_gazetteer_stele, :title),
           recorded_settlement: down_name,
           precedent: :case_1902_stele_restored_stopped_flood,
-          excerpt: "光绪二十八年委员毁峡口分水石碑改辟官田，越旬落水洞暗河倒灌吞没官仓；遂准山官复立石堰，按候泄洪乃安（外甲内寨）"
+          excerpt: Texts.render!(:archive_gazetteer_stele, :excerpt)
         )
       ]
 
       [
         eq(gazetteer_case, :case_mountain_too_steep_for_tithing),
         eq(record,
-          title: "《旧州府抚夷清丈残卷·立碑案》",
+          title: Texts.render!(:archive_gazetteer_cliff, :title),
           recorded_settlement: down_name,
           precedent: :case_mountain_too_steep_for_tithing,
-          excerpt: "其寨悬居绝壁，栈道断绝，丈量胥吏望谷生畏，仅于山口立『归化碑』敷衍上峰，实未入寨门半步，听任山官自治"
+          excerpt: Texts.render!(:archive_gazetteer_cliff, :excerpt)
         )
       ]
     end
@@ -211,7 +213,7 @@ defmodule Voy.World.Projection do
         eq(gazetteer_case, :case_1894_zheng_return_calmed_slide),
         eq(disturbance, :periodic_shallow_blasting),
         eq(cause_tag, :c0_removed_and_vulnerable_window_blasting),
-        eq(text, "对照清丈残卷所载拆钟旧案，79年收缴铜钲再度断绝阻尼（c0=0）；302队点炮又撞上簧片蜂鸣段，致全谷陷入自持振荡")
+        eq(text, Texts.render!(:archive_cause_c0_blasting_zheng, :text))
       ]
 
       [
@@ -220,14 +222,14 @@ defmodule Voy.World.Projection do
         eq(gazetteer_case, :case_1902_stele_restored_stopped_flood),
         eq(disturbance, :periodic_shallow_blasting),
         eq(cause_tag, :c0_removed_and_vulnerable_window_blasting),
-        eq(text, "对照清丈残卷所载毁堰旧案，79年拆毁分水石碑再度断绝阻尼（c0=0）；302队点炮又撞上簧片蜂鸣段，致全谷陷入自持振荡")
+        eq(text, Texts.render!(:archive_cause_c0_blasting_stele, :text))
       ]
 
       [
         eq(fate, :Fate_Assimilated_NewZhai),
         eq(disturbance, :periodic_shallow_blasting),
         eq(cause_tag, :seasonal_rain_mudslide),
-        eq(text, "归咎于连日秋雨导致常规岩移滑坡，绝口不提收缴镇山古器与302队违规点炮")
+        eq(text, Texts.render!(:archive_cause_rain_excuse, :text))
       ]
 
       [
@@ -236,7 +238,7 @@ defmodule Voy.World.Projection do
         eq(gazetteer_case, :case_1894_zheng_return_calmed_slide),
         eq(disturbance, :overwhelming_reverse_suppression),
         eq(cause_tag, :overwhelming_suppression_attractor_burnout),
-        eq(text, "清丈残卷早戒『不可强拆铜钲、绝山阻尼』，总指挥部偏以超高压水泥封井强压山息，应力冲穿截断阈值，整条沟进入 Burnout 吸引子")
+        eq(text, Texts.render!(:archive_cause_overwhelming_zheng, :text))
       ]
 
       [
@@ -245,42 +247,42 @@ defmodule Voy.World.Projection do
         eq(gazetteer_case, :case_1902_stele_restored_stopped_flood),
         eq(disturbance, :overwhelming_reverse_suppression),
         eq(cause_tag, :overwhelming_suppression_attractor_burnout),
-        eq(text, "清丈残卷早戒『不可强堵暗河』，总指挥部偏用超高压反向水泥封井，应力冲穿截断阈值，整条沟进入 Burnout 吸引子")
+        eq(text, Texts.render!(:archive_cause_overwhelming_stele, :text))
       ]
 
       [
         eq(fate, :Fate_Annihilated_BurnoutZone),
         eq(disturbance, :overwhelming_reverse_suppression),
         eq(cause_tag, :planned_relocation_and_mine_closure),
-        eq(text, "宣称矿区资源正常枯竭、垦殖分场全员已按计划整建制平稳搬迁")
+        eq(text, Texts.render!(:archive_cause_relocation, :text))
       ]
 
       [
         eq(fate, :Fate_Ascended_SpatialRift),
         eq(disturbance, :overwhelming_reverse_suppression),
         eq(cause_tag, :excitation_zenith_spatial_exile),
-        eq(text, "依靠半山老寨完好的 c0 缓冲，源头未直接烧毁，但核心组在起峰极值（Excitation）强开谐振腔，全员化为搬石头的末影黑影")
+        eq(text, Texts.render!(:archive_cause_rift_exile, :text))
       ]
 
       [
         eq(fate, :Fate_Ascended_SpatialRift),
         eq(disturbance, :overwhelming_reverse_suppression),
         eq(cause_tag, :equipment_retrieval_completed),
-        eq(text, "深孔观测站科研任务圆满结束，设备回收完毕，人员调离备案")
+        eq(text, Texts.render!(:archive_cause_equipment_retrieval, :text))
       ]
 
       [
         eq(fate, :Fate_Ancestral_ControlGroup),
         eq(disturbance, :low_level_logging_shock),
         eq(cause_tag, :intact_c0_basin_absorption),
-        eq(text, "镇山古器从未离位（c0 完好），林场小震皆被宽容区吸收；莫在鱼鳞水纹时动土，要在万籁俱寂时叩钟")
+        eq(text, Texts.render!(:archive_cause_c0_intact, :text))
       ]
 
       [
         eq(fate, :Fate_Ancestral_ControlGroup),
         eq(disturbance, :low_level_logging_shock),
         eq(cause_tag, :backward_folk_custom_pending_reform),
-        eq(text, "山高路远暂设挂靠林场，旧式山官鸣钟习俗待后续条件成熟再行改组")
+        eq(text, Texts.render!(:archive_cause_backward_custom, :text))
       ]
     end
   end
@@ -299,40 +301,40 @@ defmodule Voy.World.Projection do
       [
         eq(fate, :Fate_Assimilated_NewZhai),
         eq(council_doc,
-          title: "《场部—议事会联席保命规约》",
+          title: Texts.render!(:archive_council_joint_council, :title),
           settlement: down_name,
           governance: :brigade_elder_joint_council,
-          decree: "老保管员（原山官后裔）看水纹听虫鸣掌令旗，场部司务长按《交接班制度》点名记工分；凡死寂回吸窗至，立敲红绸气缸三声"
+          decree: Texts.render!(:archive_council_joint_council, :decree)
         )
       ]
 
       [
         eq(fate, :Fate_Annihilated_BurnoutZone),
         eq(council_doc,
-          title: "《封山隔离水泥墙警示铁牌》",
+          title: Texts.render!(:archive_council_sealed_zone, :title),
           settlement: down_name,
           governance: :depopulated_concrete_sealed_zone,
-          decree: "灰白死寂区内无声无息，场部与议事会筹备组全体失踪，严禁任何人员越过水泥封锁线"
+          decree: Texts.render!(:archive_council_sealed_zone, :decree)
         )
       ]
 
       [
         eq(fate, :Fate_Ascended_SpatialRift),
         eq(council_doc,
-          title: "《山官火塘封山铁誓》",
+          title: Texts.render!(:archive_council_rift_oath, :title),
           settlement: down_name,
           governance: :rift_guarding_cliff_compact,
-          decree: "源头掩体已化为黑影裂隙，见末影搬石切勿直视，镇山古器日夜须有人值守"
+          decree: Texts.render!(:archive_council_rift_oath, :decree)
         )
       ]
 
       [
         eq(fate, :Fate_Ancestral_ControlGroup),
         eq(council_doc,
-          title: "《岁祭账房木刻借阅约》",
+          title: Texts.render!(:archive_council_ancestral_ledger, :title),
           settlement: down_name,
           governance: :restored_ancestral_compact,
-          decree: "林场撤牌后岁祭如仪，外客若以干粮铁器相赠，可借阅旧州府清丈卷与水文台账"
+          decree: Texts.render!(:archive_council_ancestral_ledger, :decree)
         )
       ]
     end

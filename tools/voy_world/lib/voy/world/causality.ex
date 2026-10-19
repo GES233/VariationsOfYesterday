@@ -3,7 +3,7 @@ defmodule Voy.World.Causality do
 
   use Voy.Kanren
 
-  alias Voy.World.Dynamics
+  alias Voy.World.{Dynamics, Texts}
 
   @drainage_edges [
     [up: :boar_gully, mid: :broken_stele_pass, down: :baishui_flat],
@@ -151,28 +151,25 @@ defmodule Voy.World.Causality do
       [
         eq(regime, :Strained),
         eq(cause_tag, :autumn_rain_natural_erosion),
-        eq(explanation_text, "十月连日秋雨导致上游常规岩层疲劳滑坡（系自然损耗，与排险爆破无关）")
+        eq(explanation_text, Texts.render!(:lens_rain, :text))
       ]
 
       [
         eq(regime, :Strained),
         eq(cause_tag, :c0_collapsed_and_vulnerable_blasting),
-        eq(
-          explanation_text,
-          "此前下游聚落恢复变慢（临界慢化 Strained），79年收走铜钲后阻尼归零（c0=0）；302队点炮正撞在簧片蜂鸣段（易损窗），5刻后推过失稳点"
-        )
+        eq(explanation_text, Texts.render!(:lens_blasting, :text))
       ]
 
       [
         eq(regime, :Strained),
         eq(cause_tag, :mountain_god_breath_disturbed),
-        eq(explanation_text, "涧水起鱼鳞碎纹、雀鸟惊飞乃山脉倒换气！四队拆了寨门铜钲断香火，勘探队又在换气口动火药致山神翻身")
+        eq(explanation_text, Texts.render!(:lens_mountain_god, :text))
       ]
 
       [
         eq(regime, :Oscillating),
         eq(cause_tag, :secondary_ignition_in_oscillation),
-        eq(explanation_text, "谷地明明已陷入周期性自激振荡（Oscillating），302队在回潮易损窗追加爆破，把原本40刻后的尖峰直接提前引爆")
+        eq(explanation_text, Texts.render!(:lens_secondary_ignition, :text))
       ]
     end
   end
