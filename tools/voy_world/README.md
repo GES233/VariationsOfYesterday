@@ -5,12 +5,107 @@ A dependency-free Elixir prototype of the Variations of Yesterday relational wor
 ## Layout
 
 - `Voy.Kanren`: microKanren kernel, disequality constraints, open attributes, and thin DSL.
+- `Voy.World.Canon`: linter for a compiled canon (names, dates, attribution split, uniqueness).
 - `Voy.World.Causality`: causal stages, observations, ritual synthesis, and narrative lenses.
 - `Voy.World.Chronicle`: the shared forward/reverse branch-history relation.
+- `Voy.World.Content`: the authoring pack loader, linter, and archive assembly.
+- `Voy.World.Export`: versioned JSON bundle (`schema_version`) for one or more nodes.
+- `Voy.World.Facts`: ordered, append-only log of observations, actions, predictions and settlements.
 - `Voy.World.Node`: stable node identities, rule sets, fate constraints, and name-independent semantic solving.
 - `Voy.World.Naming`: late display-name binding and structure/archive materialization.
+- `Voy.World.Profile`: numeric stock (lag bands, phase windows, dose ranges, regime cut points).
 - `Voy.World.Projection`: structure and archive projections.
+- `Voy.World.Texts`: every document, decree and explanation as data, rendered from the timeline.
+- `Voy.World.Timeline`: dated anchors and the date forms prose is allowed to use.
 - `Voy.World`: JSON-safe branch and node entry points.
+
+## Contracts (M1)
+
+Three boundary objects carry the port. They are additive: none of them changes a
+rule, and the existing relations keep working unchanged.
+
+1. **`Voy.World.Profile`** owns the numbers the symbolic layer is allowed to
+   name. A measured lag is mapped onto a declared band (`:tau_immediate`,
+   `:tau_5`, `:tau_10`) instead of a rule comparing floats; declared gaps stay
+   out of band; `describe/1` renders the whole stock as JSON. Swapping the stock
+   moves the same measurement into another band without touching a rule, and
+   `regime/3` is the reference partition the JVM `MandateReadout` must
+   reproduce.
+2. **`Voy.World.Export`** is the wire format: `schema_version`, `rule_set`,
+   the stock that produced the canon, and normalized node records (structures
+   as `site`/`description`, tagged tuples as `tag`/`value`). Deterministic, no
+   timestamps, validated against a JSON round-trip so atoms and tuples cannot
+   leak into the contract.
+3. **`Voy.World.Facts`** is the time axis: entries carry a tick, a site, an
+   actor and open attributes; `caused_by`/`evidence` build chains; predictions
+   must carry a `claim` and a `due_tick` and stay `pending/1` until a
+   settlement with `outcome: :held | :failed | :partial` closes them.
+
+```sh
+mix run examples/contracts_demo.exs
+```
+
+## Prose and dates as data (M2a)
+
+The rules carry no prose of their own any more: they render it. `Voy.World.Texts`
+holds the code-side templates the relations still use (the archive texts during
+the migration, plus the lens narratives), and `Voy.World.Timeline` owns the dated
+anchors and the three forms prose may use (Gregorian, two-digit field notation,
+reign form). Rendering a date is the only way a year can reach a player-facing
+string, and rendering refuses to leave a placeholder unbound.
+
+The author-owned copy of the same prose lives in `content/` (see M2b); until the
+rules read the pack directly, both copies exist and the equivalence test below
+keeps them honest.
+
+`Voy.World.Canon` then lints the result:
+
+- structures and documents name the same sites as the topography;
+- every year written into prose belongs to the timeline, in whichever form;
+- each history carries a corroborating document (the gazetteer precedent the
+  field notebook cites) and a contradicting one (the official report never
+  adopts the truth's cause tag);
+- a complete topography compiles to exactly one history, so reverse queries are
+  unambiguous;
+- every declared fate is reachable from some topography.
+
+`Canon.check_corpus/1` runs all of it over a list of topographies and reports
+`:ok` / `:unsupported` / issues per shape, which is what the test suite does for
+all 48 feature combinations (8 supported, 40 undecided, 0 inconsistent).
+
+Structure descriptions (the `pass_site` / `upstream_site` strings) are still
+inline in `Voy.World.Projection`: they are place-attached rather than documents,
+and moving them is the next extraction.
+
+## Authoring pack (M2b)
+
+Writers, including non-technical ones, edit `content/` only:
+
+```
+content/claims.tsv             one row per causal claim (who may cite it)
+content/documents/**/*.md      one file per document (slot, applicability, prose)
+content/README.md              the writer's guide (Chinese)
+```
+
+`Voy.World.Content` loads and validates the pack, then assembles the archive
+entries of a compiled history from it. `mix voy.content lint` prints
+author-facing errors (Chinese, `file:line`, legal values); `mix test` treats them
+as assertions.
+
+The migration is deliberately staged: the rules still build the archives
+themselves, and `test/voy/world/content_test.exs` asserts that the pack's
+assembly is **byte-identical** for all 8 supported topographies. That equality is
+the proof that the pack carries everything the rules need, and it is what makes
+the next step (rules read the pack, duplicates deleted) mechanical.
+
+```sh
+mix voy.content lint
+```
+
+CI (`.github/workflows/voy_world.yml`) runs formatting, the suite, and the pack
+lint on every pull request, so the author's compiler is the PR itself. The
+design record lives in `docs/design-note-03-authoring-pipeline.md`.
+
 
 ## Node API
 
@@ -49,7 +144,9 @@ python examples/render_landform_diagrams.py
 
 ```sh
 mix test
+mix voy.content lint
 mix run examples/sandbox.exs
+mix run examples/contracts_demo.exs
 ```
 
-The ExUnit suite covers the six sandbox deductions, all 48 topography feature combinations, forward/reverse round-trips, and language-neutral semantic golden cases in `test/fixtures/world_cases.json`.
+The ExUnit suite covers the six sandbox deductions, all 48 topography feature combinations, forward/reverse round-trips, language-neutral semantic golden cases in `test/fixtures/world_cases.json`, the three M1 contracts (stock coverage of the frozen rule vocabulary, export schema and JSON round-trip, fact-log ordering and prediction settlement), the M2a canon linter (names, dates, attribution split, uniqueness), and the M2b content pack (parsing, lint failures, and byte-identical parity with the rules).
