@@ -53,7 +53,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
 - `src/test/scala/` — 测试代码（现有 `inner/mandate/` 下 5 个 Spec，清单见下文「测试」一节）
-- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8）与 `docs/design-note-02-kanren-worldview-engine.md`（动力学四相 × Kanren 关系引擎：多世界观透镜、式盘因果推导与五阶制度发展史编译器）
+- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8）、`docs/design-note-02-kanren-worldview-engine.md`（动力学四相 × Kanren 关系引擎：多世界观透镜、式盘因果推导与五阶制度发展史编译器）与 `docs/design-note-03-authoring-pipeline.md`（内容流水线：作者层格式、校验清单、Git+PR 工作流与迁移状态）
 - `tools/voy_world/` — 开发与设定验证用独立 Elixir Mix 包（不进 jar）：`Voy.Kanren` 关系内核、`Voy.World` 世界模型与六个沙盘推演；含 48 种地形组合分类测试和 JVM 迁移用 JSON golden cases
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 
@@ -70,7 +70,8 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 
 - 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
 - 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`、`inner/mandate/MandateAgentSpec`（actor 接线契约：tick 事件驱动确定性积分、每 tick 一份快照、无 tick 不积分）。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
-- Elixir 世界模型原型：在 `tools/voy_world/` 运行 `mix test`（ExUnit），`mix run examples/sandbox.exs` 执行六个沙盘推演；`test/fixtures/world_cases.json` 是后续 JVM 移植复用的语义 golden cases。
+- Elixir 世界模型原型：在 `tools/voy_world/` 运行 `mix test`（ExUnit），`mix voy.content lint` 校验内容包，`mix run examples/sandbox.exs` 执行六个沙盘推演；`test/fixtures/world_cases.json` 是后续 JVM 移植复用的语义 golden cases。
+- **内容包（作者层）**：`tools/voy_world/content/` 是交给写作者的纯文本内容（`claims.tsv` 归因卡 + `documents/**/*.md` 档案卡，写法见其 `README.md`），由 `Voy.World.Content` 加载校验、`mix voy.content lint` 报中文错误，CI（`.github/workflows/voy_world.yml`）在 PR 上执行；作者不改 `lib/`。当前规则层仍自带同一份档案文本，`content_test.exs` 断言内容包产物与规则产物逐字节一致，待后续步骤合并。
 - **本机环境注意**：JDK 路径等环境信息因设备而异，不入库；见仓库根目录 `ref/` 目录下的本地说明（该目录被 git 忽略，各设备自行维护）。
 - Fabric/Minecraft 集成无法简单单测，验证集成行为请使用 `./gradlew runClient` 手动运行游戏。
 
