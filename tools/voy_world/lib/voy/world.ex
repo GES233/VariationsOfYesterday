@@ -36,6 +36,18 @@ defmodule Voy.World do
     end
   end
 
+  @doc """
+  Whether the rule layer gives this topography a reclamation-era history.
+
+  A false answer means the disturbance table never pairs this upstream
+  geology: there is no history to compile, which is a different failure from
+  a history whose archives no longer cover it.
+  """
+  def paired?(topo_fields) do
+    topo = Schema.topology(topo_fields)
+    era2b_defined?(topo)
+  end
+
   def reverse_worldgen(fate) do
     with {:ok, fate} <- Schema.normalize_fate(fate) do
       slices =

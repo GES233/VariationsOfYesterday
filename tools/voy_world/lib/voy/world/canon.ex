@@ -42,6 +42,31 @@ defmodule Voy.World.Canon do
     end
   end
 
+  @doc """
+  Check that every topography the rule layer pairs also has a complete archive
+  set.
+
+  `compile_branch/1` reports such a gap as `:unsupported_topography`, the same
+  answer it gives for an upstream geology the disturbance table never pairs.
+  This check separates the two: a paired topography with no slice means the
+  content pack -- or a document's pinned precedent -- no longer covers a
+  history the rules can still produce.
+  """
+  @spec check_archives([Keyword.t()]) :: :ok | {:error, [term()]}
+  def check_archives(topologies) do
+    issues =
+      for topo <- topologies,
+          Voy.World.paired?(topo),
+          match?({:error, _reason}, Voy.World.compile_branch(topo)) do
+        {:archives_uncovered, Keyword.take(topo, Voy.World.Schema.feature_keys())}
+      end
+
+    case issues do
+      [] -> :ok
+      issues -> {:error, issues}
+    end
+  end
+
   @doc "Check that every fate declared by the schema is reachable from some topography."
   @spec check_fates() :: :ok | {:error, [term()]}
   def check_fates do

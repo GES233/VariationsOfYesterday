@@ -51,6 +51,20 @@ defmodule Voy.World.Texts do
       pass_zheng: "完好如初的古寨镇山铜钲亭（c0 维持源完好）",
       pass_stele: "完好如初的古寨石雕分水堰（c0 维持源完好）"
     },
+    structure_chronic_seep: %{
+      bindings: %{},
+      upstream: "302队季节点炮的浅层爆破钻探台（常年低于点火阈值）",
+      downstream: "半撤空的垦殖分场：两套账本并行的待撤观测站（variations-of-yesterday:farm_dorm_unit_*）",
+      pass_zheng: "峡谷隘口·空置的铜钲亭基座（铜钲已入库封存）与一副未挂红绸的空木架",
+      pass_stele: "溶洞峡口·断水的石雕分水堰残槽（碑身已拆运）与验山垂架"
+    },
+    structure_false_alarm: %{
+      bindings: %{},
+      upstream: "仍在点炮的302队浅层爆破钻探台（周期脉冲，屡被吸收）",
+      downstream: "绝壁听山孤寨：悬空木寮与逐次记录的簧片监听匣",
+      pass_zheng: "完好如初的镇山铜钲亭与刻满逐次记痕的验山垂架",
+      pass_stele: "完好如初的石雕分水堰与刻满逐次记痕的验山垂架"
+    },
     lens_rain: %{
       bindings: %{"date.flood_month" => {:month_numeral, :flood_month}},
       text: "{{date.flood_month}}月连日秋雨导致上游常规岩层疲劳滑坡（系自然损耗，与排险爆破无关）"

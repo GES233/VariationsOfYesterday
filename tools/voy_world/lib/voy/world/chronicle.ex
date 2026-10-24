@@ -42,13 +42,13 @@ defmodule Voy.World.Chronicle do
   end
 
   def era2a_magistrateo(topo, era1, era2a) do
-    fresh [down_type, relic, attempt_action, backlash_omen, compromise_polity, gazetteer_case] do
-      propso(topo, down_terrain: down_type)
+    fresh [access, relic, attempt_action, backlash_omen, compromise_polity, gazetteer_case] do
+      propso(topo, accessibility: access)
       propso(era1, guardian_relic: relic)
 
       conde do
         [
-          eq(down_type, :alluvial_flat),
+          eq(access, :tractor_road_accessible),
           eq(relic, :ancestral_bronze_zheng),
           eq(attempt_action, :confiscate_zheng_for_tax_bronze),
           eq(backlash_omen, :magistrate_yamen_buried_by_rockslide),
@@ -57,7 +57,7 @@ defmodule Voy.World.Chronicle do
         ]
 
         [
-          eq(down_type, :alluvial_flat),
+          eq(access, :tractor_road_accessible),
           eq(relic, :carved_diversion_stele),
           eq(attempt_action, :dismantle_stele_for_paddy_tax),
           eq(backlash_omen, :granary_swallowed_by_karst_backflow),
@@ -66,7 +66,7 @@ defmodule Voy.World.Chronicle do
         ]
 
         [
-          eq(down_type, :mid_terrace),
+          eq(access, :cliff_isolated),
           eq(attempt_action, :clerk_halted_at_cliff_foot),
           eq(backlash_omen, :no_disturbance_triggered),
           eq(compromise_polity, :unreached_autonomous_zhai),
@@ -86,7 +86,6 @@ defmodule Voy.World.Chronicle do
 
   def era2b_reclamationo(topo, era1, era2a, era2b) do
     fresh [
-      down_type,
       access,
       geology,
       up_type,
@@ -101,7 +100,6 @@ defmodule Voy.World.Chronicle do
       pulse
     ] do
       propso(topo,
-        down_terrain: down_type,
         accessibility: access,
         up_geology: geology,
         up_terrain: up_type
@@ -112,7 +110,6 @@ defmodule Voy.World.Chronicle do
 
       conde do
         [
-          eq(down_type, :alluvial_flat),
           eq(access, :tractor_road_accessible),
           eq(era2a_polity, :nominal_tithing_inner_headman),
           eq(org_after, :state_reclamation_brigade),
@@ -122,7 +119,6 @@ defmodule Voy.World.Chronicle do
         ]
 
         [
-          eq(down_type, :mid_terrace),
           eq(access, :cliff_isolated),
           eq(era2a_polity, :unreached_autonomous_zhai),
           eq(org_after, :nominal_forestry_joint_zhai),
@@ -257,6 +253,34 @@ defmodule Voy.World.Chronicle do
             social_structure: "挂靠林场撤牌后全面回流的山官—祭司共同体（实行礼物经济，保管旧州府与林场文书）",
             phenomenon: "涧水偶有微澜但不过三息自平，维持源（c0）覆盖下万物生机盎然",
             remnant: "完好运转的镇山古器与世代相传的听山口诀"
+          )
+        ]
+
+        [
+          eq(c0, :c0_collapsed),
+          eq(pulse, :heavy_kick),
+          eq(post_withdrawal_polity, :deferred_evacuation_watchpost),
+          eq(fate_category, :Fate_Deferred_ChronicSeep),
+          eq(resulting_regime, :Strained),
+          eq(target_phase_rule, :drifting_at_RelativeRefractory),
+          eq(emergent_practice,
+            social_structure: "场部与山官后裔共同值守的『待撤观测站』：两套账本并行、撤离方案待批，谁也不敢先走",
+            phenomenon: "山鸣年年不断却从未成灾；谷地常年泛潮锈味，水位线一年比一年低",
+            remnant: "逐年修订却从未上报的《累积应力台账》与一摞『暂无搬迁计划』的复写纸"
+          )
+        ]
+
+        [
+          eq(c0, :c0_intact),
+          eq(pulse, :alpha_shock),
+          eq(post_withdrawal_polity, :cliff_observation_hermitage),
+          eq(fate_category, :Fate_Tolerated_FalseAlarm),
+          eq(resulting_regime, :Calm),
+          eq(target_phase_rule, :absorbed_at_recovery_late),
+          eq(emergent_practice,
+            social_structure: "绝壁孤寨的『听山轮值』：两人一组持簧片监听匣，逐次记下上游爆破回数",
+            phenomenon: "每逢上游点炮，涧水泛起鱼鳞驻波又自行平息；寨里已能凭水位判断炮位深浅",
+            remnant: "记满『第某次虚警、已回落』的监听簿与一架从未用过的撤离背架"
           )
         ]
       end

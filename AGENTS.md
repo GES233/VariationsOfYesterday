@@ -53,7 +53,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
 - `src/test/scala/` — 测试代码（现有 `inner/mandate/` 下 5 个 Spec，清单见下文「测试」一节）
-- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8）、`docs/design-note-02-kanren-worldview-engine.md`（动力学四相 × Kanren 关系引擎：多世界观透镜、式盘因果推导与五阶制度发展史编译器）与 `docs/design-note-03-authoring-pipeline.md`（内容流水线：作者层格式、校验清单、Git+PR 工作流与迁移状态）
+- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8）、`docs/design-note-02-kanren-worldview-engine.md`（动力学四相 × Kanren 关系引擎：多世界观透镜、式盘因果推导与五阶制度发展史编译器）、`docs/design-note-03-authoring-pipeline.md`（内容流水线：作者层格式、校验清单、Git+PR 工作流与迁移状态）与 `docs/design-note-04-quiet-fates-and-access-decoupling.md`（可达性解耦与两种「未爆发的结局」：24/48 可生成、6 结局、先例锚定与 `Canon.check_archives/1`）
 - `tools/voy_world/` — 开发与设定验证用独立 Elixir Mix 包（不进 jar）：`Voy.Kanren` 关系内核、`Voy.World` 世界模型与六个沙盘推演；含 48 种地形组合分类测试和 JVM 迁移用 JSON golden cases
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 

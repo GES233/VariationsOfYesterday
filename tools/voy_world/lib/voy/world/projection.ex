@@ -19,7 +19,9 @@ defmodule Voy.World.Projection do
     {:Fate_Assimilated_NewZhai, :structure_assimilated},
     {:Fate_Annihilated_BurnoutZone, :structure_annihilated},
     {:Fate_Ascended_SpatialRift, :structure_ascended},
-    {:Fate_Ancestral_ControlGroup, :structure_ancestral}
+    {:Fate_Ancestral_ControlGroup, :structure_ancestral},
+    {:Fate_Deferred_ChronicSeep, :structure_chronic_seep},
+    {:Fate_Tolerated_FalseAlarm, :structure_false_alarm}
   ]
 
   @relic_fields [
@@ -75,6 +77,7 @@ defmodule Voy.World.Projection do
       official_text,
       inner_truth,
       inner_text,
+      tech_corroborated,
       council_doc
     ] do
       propso(topo, up_name: up_name, pass_name: pass_name, down_name: down_name)
@@ -98,6 +101,7 @@ defmodule Voy.World.Projection do
         %{up: up_name, pass: pass_name, down: down_name},
         fate,
         relic,
+        gazetteer_case,
         official_claim,
         official_text
       )
@@ -110,8 +114,10 @@ defmodule Voy.World.Projection do
         %{up: up_name, pass: pass_name, down: down_name},
         fate,
         relic,
+        gazetteer_case,
         inner_truth,
-        inner_text
+        inner_text,
+        tech_corroborated
       )
 
       council_recordo(
@@ -134,7 +140,7 @@ defmodule Voy.World.Projection do
         tech_note: [
           true_source: up_name,
           settlement: down_name,
-          corroborated_gazetteer: gazetteer_case,
+          corroborated_gazetteer: tech_corroborated,
           true_cause: inner_truth,
           note: inner_text
         ],
@@ -162,13 +168,14 @@ defmodule Voy.World.Projection do
     |> any()
   end
 
-  defp official_recordo(pack, names, fate, relic, claim_tag, summary) do
+  defp official_recordo(pack, names, fate, relic, gazetteer_case, claim_tag, summary) do
     pack
     |> Content.documents_for(:official_report)
     |> Enum.map(fn doc ->
       all([
         matches_dimo(fate, doc.fates),
         matches_dimo(relic, doc.relics),
+        matches_dimo(gazetteer_case, doc.gazetteer_cases),
         eq(claim_tag, Content.tag_atom(doc.claim)),
         render_bodyo(doc.body, names, summary)
       ])
@@ -176,19 +183,26 @@ defmodule Voy.World.Projection do
     |> any()
   end
 
-  defp tech_recordo(pack, names, fate, relic, claim_tag, note) do
+  defp tech_recordo(pack, names, fate, relic, gazetteer_case, claim_tag, note, corroborated) do
     pack
     |> Content.documents_for(:tech_note)
     |> Enum.map(fn doc ->
       all([
         matches_dimo(fate, doc.fates),
         matches_dimo(relic, doc.relics),
+        matches_dimo(gazetteer_case, doc.gazetteer_cases),
+        corroborated_goal(doc.gazetteer_cases, gazetteer_case, corroborated),
         eq(claim_tag, Content.tag_atom(doc.claim)),
         render_bodyo(doc.body, names, note)
       ])
     end)
     |> any()
   end
+
+  # A notebook that declares which precedent it cites reports that precedent;
+  # a wildcard notebook reports the one the history selected.
+  defp corroborated_goal([], declared_case, corroborated), do: eq(corroborated, declared_case)
+  defp corroborated_goal(cases, _declared_case, corroborated), do: membero(corroborated, cases)
 
   defp council_recordo(pack, names, fate, relic, down_name, council_doc) do
     pack

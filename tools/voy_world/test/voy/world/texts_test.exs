@@ -61,7 +61,7 @@ defmodule Voy.World.TextsTest do
   end
 
   test "every key has payload fields and no placeholder survives rendering" do
-    assert length(Texts.keys()) == 8
+    assert length(Texts.keys()) == 10
 
     for key <- Texts.keys() do
       assert {:ok, fields} = Texts.fields(key)

@@ -28,7 +28,9 @@ defmodule Voy.World.Schema do
     :Fate_Assimilated_NewZhai,
     :Fate_Annihilated_BurnoutZone,
     :Fate_Ascended_SpatialRift,
-    :Fate_Ancestral_ControlGroup
+    :Fate_Ancestral_ControlGroup,
+    :Fate_Deferred_ChronicSeep,
+    :Fate_Tolerated_FalseAlarm
   ]
 
   def topology_keys, do: @topology_keys

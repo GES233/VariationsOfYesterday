@@ -17,9 +17,11 @@ defmodule Voy.World.CanonTest do
     summary = Canon.check_corpus(all_topographies())
 
     assert summary.checked == 48
-    assert summary.ok == 8
-    assert summary.unsupported == 40
+    assert summary.ok == 24
+    assert summary.unsupported == 24
     assert summary.issues == []
+
+    assert :ok = Canon.check_archives(all_topographies())
   end
 
   test "a decided topography lints clean" do
@@ -28,8 +30,8 @@ defmodule Voy.World.CanonTest do
     assert :ok = Canon.check_topography(nuoliang_topo())
   end
 
-  test "an undecided topography is reported as unsupported, not as a canon error" do
-    assert {:unsupported, :unresolved_history} =
+  test "a geology the disturbance table does not pair is unsupported, not a canon error" do
+    assert {:unsupported, :unsupported_topography} =
              Canon.check_topography(
                branch_id: :b,
                up_name: "U",
@@ -38,7 +40,7 @@ defmodule Voy.World.CanonTest do
                up_terrain: :steep_fissure_headwater,
                pass_terrain: :canyon_pass,
                down_terrain: :mid_terrace,
-               up_geology: :active_fault_vein,
+               up_geology: :deep_stress_cavity,
                accessibility: :cliff_isolated
              )
   end

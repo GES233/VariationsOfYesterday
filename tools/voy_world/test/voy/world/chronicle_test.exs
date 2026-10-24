@@ -22,7 +22,7 @@ defmodule Voy.World.ChronicleTest do
     end
   end
 
-  test "coverage distinguishes unsupported topography from unresolved history" do
+  test "coverage distinguishes an absent geology pair from a decided history" do
     classified = Enum.map(TestFixtures.all_topographies(), &{&1, Voy.World.compile_branch(&1)})
 
     frequencies =
@@ -31,43 +31,24 @@ defmodule Voy.World.ChronicleTest do
         {_topo, {:error, reason}} -> reason
       end)
 
-    assert frequencies == %{ok: 8, unresolved_history: 4, unsupported_topography: 36}
+    assert frequencies == %{ok: 24, unsupported_topography: 24}
 
-    unresolved =
-      for {topo, {:error, :unresolved_history}} <- classified,
+    paired = [
+      {:steep_fissure_headwater, :active_fault_vein},
+      {:karst_sinkhole_headwater, :deep_stress_cavity},
+      {:steep_fissure_headwater, :minor_fracture}
+    ]
+
+    unsupported =
+      for {topo, {:error, reason}} <- classified,
+          reason == :unsupported_topography,
           do: TestFixtures.feature_signature(topo)
 
-    assert MapSet.new(unresolved) ==
-             MapSet.new([
-               [
-                 up_terrain: :steep_fissure_headwater,
-                 pass_terrain: :canyon_pass,
-                 down_terrain: :alluvial_flat,
-                 up_geology: :minor_fracture,
-                 accessibility: :tractor_road_accessible
-               ],
-               [
-                 up_terrain: :steep_fissure_headwater,
-                 pass_terrain: :karst_gorge,
-                 down_terrain: :alluvial_flat,
-                 up_geology: :minor_fracture,
-                 accessibility: :tractor_road_accessible
-               ],
-               [
-                 up_terrain: :steep_fissure_headwater,
-                 pass_terrain: :canyon_pass,
-                 down_terrain: :mid_terrace,
-                 up_geology: :active_fault_vein,
-                 accessibility: :cliff_isolated
-               ],
-               [
-                 up_terrain: :steep_fissure_headwater,
-                 pass_terrain: :karst_gorge,
-                 down_terrain: :mid_terrace,
-                 up_geology: :active_fault_vein,
-                 accessibility: :cliff_isolated
-               ]
-             ])
+    assert length(unsupported) == 24
+
+    assert Enum.all?(unsupported, fn signature ->
+             {signature[:up_terrain], signature[:up_geology]} not in paired
+           end)
   end
 
   test "archive prose agrees with relic and gazetteer context" do

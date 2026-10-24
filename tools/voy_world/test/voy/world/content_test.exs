@@ -9,8 +9,8 @@ defmodule Voy.World.ContentTest do
   test "the shipped pack loads and is lint-clean" do
     assert {:ok, pack} = Content.load()
 
-    assert map_size(pack.claims) == 8
-    assert length(pack.documents) == 17
+    assert map_size(pack.claims) == 12
+    assert length(pack.documents) == 24
     assert Content.lint() == %{errors: [], warnings: []}
 
     assert Content.slots() |> Enum.sort() == [
@@ -26,7 +26,7 @@ defmodule Voy.World.ContentTest do
 
     pairs = for topo <- all_topographies(), [slice] <- [raw_slices(topo)], do: {topo, slice}
 
-    assert length(pairs) == 8
+    assert length(pairs) == 24
 
     for {topo, slice} <- pairs do
       assert {:ok, archives} = Content.archives_for(slice, pack)
@@ -99,7 +99,14 @@ defmodule Voy.World.ContentTest do
   end
 
   test "preview renders player-facing dossiers and template scaffolds slots" do
-    assert Content.preview_presets() == ["baishui", "heishui", "xuanguan", "nuoliang"]
+    assert Content.preview_presets() == [
+             "baishui",
+             "heishui",
+             "xuanguan",
+             "nuoliang",
+             "mahao",
+             "tingshan"
+           ]
 
     assert {:ok, text} = Content.preview("baishui")
     assert text =~ "【节点档案预览：baishui（白水坝）】"
@@ -164,9 +171,30 @@ defmodule Voy.World.ContentTest do
     test "two documents competing for the same history" do
       assert error_messages([
                {:replace, "documents/tech/blasting_zheng.md", "relic: ancestral_bronze_zheng\n",
-                ""}
+                ""},
+               {:replace, "documents/tech/blasting_zheng.md",
+                "gazetteer_case: case_1894_zheng_return_calmed_slide\n", ""}
              ])
              |> Enum.any?(&(&1 =~ "适用条件重叠"))
+    end
+
+    test "a notebook pinned to the wrong precedent no longer matches the history" do
+      pack = Content.load!()
+      [slice] = raw_slices(baishui_topo())
+
+      mispinned =
+        Enum.map(pack.documents, fn doc ->
+          if doc.id == "doc.tech.blasting_zheng" do
+            %{doc | gazetteer_cases: [:case_mountain_too_steep_for_tithing]}
+          else
+            doc
+          end
+        end)
+
+      assert {:error, {:no_document, :tech_note, criteria}} =
+               Content.archives_for(slice, %{pack | documents: mispinned})
+
+      assert criteria[:gazetteer_case] == :case_1894_zheng_return_calmed_slide
     end
 
     test "a slot with no document for some history" do

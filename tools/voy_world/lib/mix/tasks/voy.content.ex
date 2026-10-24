@@ -5,7 +5,7 @@ defmodule Mix.Tasks.Voy.Content do
   Authoring tools for the content pack under `content/`:
 
       mix voy.content lint
-      mix voy.content preview [baishui|heishui|xuanguan|nuoliang|all]
+      mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all]
       mix voy.content template <gazetteer|official_report|tech_note|council_document>
 
     * `lint` checks the pack and prints author-facing issues (`file:line` plus
@@ -39,7 +39,7 @@ defmodule Mix.Tasks.Voy.Content do
         Mix.raise(
           "用法：\n" <>
             "  mix voy.content lint\n" <>
-            "  mix voy.content preview [baishui|heishui|xuanguan|nuoliang|all]\n" <>
+            "  mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all]\n" <>
             "  mix voy.content template <gazetteer|official_report|tech_note|council_document>"
         )
     end

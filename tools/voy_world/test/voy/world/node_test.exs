@@ -61,10 +61,13 @@ defmodule Voy.World.NodeTest do
 
   test "reverse node solving returns unnamed semantic candidates with stable site ids" do
     assert {:ok, candidates} = Voy.World.reverse_node(node_spec())
-    assert length(candidates) == 2
+    assert length(candidates) == 4
 
     assert candidates |> Enum.map(& &1["topography"]["pass_terrain"]) |> MapSet.new() ==
              MapSet.new(["canyon_pass", "karst_gorge"])
+
+    assert candidates |> Enum.map(& &1["topography"]["down_terrain"]) |> MapSet.new() ==
+             MapSet.new(["alluvial_flat", "mid_terrace"])
 
     for candidate <- candidates do
       topo = candidate["topography"]
@@ -72,7 +75,7 @@ defmodule Voy.World.NodeTest do
       assert topo["node_id"] == "node_rift_07"
       assert topo["down_site"] == "node_rift_07/down"
       assert topo["up_terrain"] == "karst_sinkhole_headwater"
-      assert topo["down_terrain"] == "mid_terrace"
+      assert topo["down_terrain"] in ["alluvial_flat", "mid_terrace"]
       assert topo["up_geology"] == "deep_stress_cavity"
       assert topo["accessibility"] == "cliff_isolated"
       assert candidate["history"]["era3"]["fate"] == "Fate_Ascended_SpatialRift"
@@ -127,7 +130,7 @@ defmodule Voy.World.NodeTest do
       )
 
     assert {:ok, candidates} = Voy.World.reverse_node(multi_fate_spec)
-    assert length(candidates) == 4
+    assert length(candidates) == 8
 
     assert candidates
            |> Enum.map(& &1["history"]["era3"]["fate"])

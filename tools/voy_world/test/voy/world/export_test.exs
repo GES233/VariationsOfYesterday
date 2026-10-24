@@ -165,8 +165,26 @@ defmodule Voy.World.ExportTest do
     assert {:error, {:invalid_profile, :nope}} =
              Export.export_branch(baishui_topo(), profile: :nope)
 
+    # An upstream geology the disturbance table never pairs has no history.
     unsupported = [
       branch_id: :branch_broken,
+      up_name: "U",
+      pass_name: "P",
+      down_name: "D",
+      up_terrain: :steep_fissure_headwater,
+      pass_terrain: :canyon_pass,
+      down_terrain: :alluvial_flat,
+      up_geology: :deep_stress_cavity,
+      accessibility: :tractor_road_accessible
+    ]
+
+    assert {:error, :unsupported_topography} = Export.export_branch(unsupported)
+
+    # An accessible-headwater basin that tithing could not reach now carries a
+    # decided history instead of an unresolved one: the relic stayed, so the
+    # blasting is absorbed instead of igniting.
+    inaccessible_basin = [
+      branch_id: :branch_inaccessible,
       up_name: "U",
       pass_name: "P",
       down_name: "D",
@@ -177,21 +195,12 @@ defmodule Voy.World.ExportTest do
       accessibility: :cliff_isolated
     ]
 
-    assert {:error, :unsupported_topography} = Export.export_branch(unsupported)
+    assert {:ok, bundle} = Export.export_branch(inaccessible_basin)
+    assert [node] = bundle["nodes"]
+    assert node["history"]["era3"]["fate"] == "Fate_Tolerated_FalseAlarm"
 
-    unresolved = [
-      branch_id: :branch_unresolved,
-      up_name: "U",
-      pass_name: "P",
-      down_name: "D",
-      up_terrain: :steep_fissure_headwater,
-      pass_terrain: :canyon_pass,
-      down_terrain: :mid_terrace,
-      up_geology: :active_fault_vein,
-      accessibility: :cliff_isolated
-    ]
-
-    assert {:error, :unresolved_history} = Export.export_branch(unresolved)
+    assert node["history"]["era2a"]["gazetteer_precedent"] ==
+             "case_mountain_too_steep_for_tithing"
 
     ascending =
       Keyword.put(@spec_fields, :fate_constraint, {:require, :Fate_Ascended_SpatialRift})

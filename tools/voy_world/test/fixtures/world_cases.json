@@ -66,8 +66,88 @@
   ],
   "reverse": [
     {
+      "fate": "Fate_Assimilated_NewZhai",
+      "expected_topographies": [
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "active_fault_vein",
+          "accessibility": "tractor_road_accessible"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "active_fault_vein",
+          "accessibility": "tractor_road_accessible"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "mid_terrace",
+          "up_geology": "active_fault_vein",
+          "accessibility": "tractor_road_accessible"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "mid_terrace",
+          "up_geology": "active_fault_vein",
+          "accessibility": "tractor_road_accessible"
+        }
+      ]
+    },
+    {
+      "fate": "Fate_Annihilated_BurnoutZone",
+      "expected_topographies": [
+        {
+          "up_terrain": "karst_sinkhole_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "deep_stress_cavity",
+          "accessibility": "tractor_road_accessible"
+        },
+        {
+          "up_terrain": "karst_sinkhole_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "deep_stress_cavity",
+          "accessibility": "tractor_road_accessible"
+        },
+        {
+          "up_terrain": "karst_sinkhole_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "mid_terrace",
+          "up_geology": "deep_stress_cavity",
+          "accessibility": "tractor_road_accessible"
+        },
+        {
+          "up_terrain": "karst_sinkhole_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "mid_terrace",
+          "up_geology": "deep_stress_cavity",
+          "accessibility": "tractor_road_accessible"
+        }
+      ]
+    },
+    {
       "fate": "Fate_Ascended_SpatialRift",
       "expected_topographies": [
+        {
+          "up_terrain": "karst_sinkhole_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "deep_stress_cavity",
+          "accessibility": "cliff_isolated"
+        },
+        {
+          "up_terrain": "karst_sinkhole_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "deep_stress_cavity",
+          "accessibility": "cliff_isolated"
+        },
         {
           "up_terrain": "karst_sinkhole_headwater",
           "pass_terrain": "canyon_pass",
@@ -80,6 +160,105 @@
           "pass_terrain": "karst_gorge",
           "down_terrain": "mid_terrace",
           "up_geology": "deep_stress_cavity",
+          "accessibility": "cliff_isolated"
+        }
+      ]
+    },
+    {
+      "fate": "Fate_Ancestral_ControlGroup",
+      "expected_topographies": [
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "minor_fracture",
+          "accessibility": "cliff_isolated"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "minor_fracture",
+          "accessibility": "cliff_isolated"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "mid_terrace",
+          "up_geology": "minor_fracture",
+          "accessibility": "cliff_isolated"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "mid_terrace",
+          "up_geology": "minor_fracture",
+          "accessibility": "cliff_isolated"
+        }
+      ]
+    },
+    {
+      "fate": "Fate_Deferred_ChronicSeep",
+      "expected_topographies": [
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "minor_fracture",
+          "accessibility": "tractor_road_accessible"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "minor_fracture",
+          "accessibility": "tractor_road_accessible"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "mid_terrace",
+          "up_geology": "minor_fracture",
+          "accessibility": "tractor_road_accessible"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "mid_terrace",
+          "up_geology": "minor_fracture",
+          "accessibility": "tractor_road_accessible"
+        }
+      ]
+    },
+    {
+      "fate": "Fate_Tolerated_FalseAlarm",
+      "expected_topographies": [
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "active_fault_vein",
+          "accessibility": "cliff_isolated"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "alluvial_flat",
+          "up_geology": "active_fault_vein",
+          "accessibility": "cliff_isolated"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "canyon_pass",
+          "down_terrain": "mid_terrace",
+          "up_geology": "active_fault_vein",
+          "accessibility": "cliff_isolated"
+        },
+        {
+          "up_terrain": "steep_fissure_headwater",
+          "pass_terrain": "karst_gorge",
+          "down_terrain": "mid_terrace",
+          "up_geology": "active_fault_vein",
           "accessibility": "cliff_isolated"
         }
       ]

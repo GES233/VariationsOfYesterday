@@ -71,7 +71,11 @@ leave a placeholder unbound.
 
 `Canon.check_corpus/1` runs all of it over a list of topographies and reports
 `:ok` / `:unsupported` / issues per shape, which is what the test suite does for
-all 48 feature combinations (8 supported, 40 undecided, 0 inconsistent).
+all 48 feature combinations (24 supported, 24 with an upstream geology the
+disturbance table never pairs, 0 inconsistent). `Canon.check_archives/1`
+separates the two failure modes: a shape the rule layer pairs but the content
+pack cannot dress is reported as an uncovered archive set, not as a missing
+history.
 
 ## Authoring pack (M2b)
 
@@ -87,6 +91,12 @@ content/README.md              the writer's guide (Chinese)
 translates the loaded pack into relational goals so both forward history
 compilation and reverse clue-reconciliation queries select directly from
 `content/` without duplicate code-side archive templates.
+
+A document may pin the precedent it cites (`gazetteer_case`). That turns "the
+field notebook quotes the case the gazetteer recorded" from an author's promise
+into a selection constraint: a notebook pinned to the wrong precedent simply
+matches no history, and the shape stops compiling instead of shipping a
+contradiction.
 
 `mix voy.content` provides the writer workflow:
 
@@ -129,12 +139,34 @@ The current topography, history, fate, and solver relations are illustrated in:
 - [Landform to Chronicle](docs/diagrams/01_landform_to_chronicle.png)
 - [Fate-to-landform candidate matrix](docs/diagrams/02_fate_to_landform_matrix.png)
 - [Bidirectional microKanren solving](docs/diagrams/03_microkanren_bidirectional_solver.png)
+- [Topography → fate causal matrix](docs/diagrams/04_topography_matrix.png) — which combinations
+  compile, why 24 do not, and which knob sets the ending
+- [Six fates, one skeleton](docs/diagrams/05_fate_profiles.png) — the same source → pass → settlement
+  profile for every ending, with the compiled descriptions
+- [Landform glossary, upper half](docs/diagrams/06a_landform_glossary.png) — what each source, pass and
+  settlement atom looks like on a map, and what it must look like once worldgen is wired
+- [Landform glossary, lower half](docs/diagrams/06b_subsurface_glossary.png) — the three upstream
+  geologies and the two accessibilities, which set the pulse and decide whether `c0` survives
+- [Branch anatomy](docs/diagrams/07_branch_anatomy.png) — one branch (白水坝) with all five field
+  values marked on a single plan plus its cross-section
+
+Figures 01–03 predate design note 04 and still draw the old terrain ⟺ access coupling; 04–07 are
+generated from the compiler's current answer. 06a/06b/07 are drawn from the atom vocabulary by hand
+(they are diagrams, not worldgen), but 07 reads its branch and its compiled outcome from the export.
 
 Regenerate them with Python, matplotlib, and an installed CJK font:
 
 ```sh
 python examples/render_landform_diagrams.py
+
+mix run examples/export_topography_cases.exs   # asks the rule layer about all 48 combinations
+python examples/render_topography_atlas.py     # 04 and 05, drawn from that answer
+python examples/render_feature_glossary.py     # 06a / 06b / 07
 ```
+
+`render_topography_atlas.py` refuses to draw unless the exported data still has 12 distinct
+(geology pair, pass, access) worlds and the downstream terrain still changes nothing, so the
+picture cannot silently drift away from `Chronicle`.
 
 ## Run
 

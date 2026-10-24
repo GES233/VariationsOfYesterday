@@ -15,7 +15,10 @@ defmodule Voy.World.Content do
       registered placeholders (`{{place.down}}`, `{{date.era2a_zheng}}`);
     * **no ambiguous history** — for every slot and every applicable
       (fate, relic) combination exactly one document matches, so the archives
-      stay a function of the history;
+      stay a function of the history; a document may additionally pin the
+      precedent it cites (`gazetteer_case`), which turns "the notebook quotes
+      the gazetteer's case" from an author's promise into a selection
+      constraint;
     * **author-facing errors** — `lint/1` reports `file:line` plus, where
       possible, the closest legal value, because the people editing this pack
       are not expected to read Elixir.
@@ -37,7 +40,9 @@ defmodule Voy.World.Content do
     :brigade_elder_joint_council,
     :depopulated_concrete_sealed_zone,
     :rift_guarding_cliff_compact,
-    :restored_ancestral_compact
+    :restored_ancestral_compact,
+    :deferred_evacuation_watchpost,
+    :cliff_observation_hermitage
   ]
 
   @gazetteer_cases [
@@ -53,12 +58,12 @@ defmodule Voy.World.Content do
     gazetteer: %{required: [:gazetteer_case, :title], optional: [], dims: [:gazetteer_case]},
     official_report: %{
       required: [:lens, :fate, :claim],
-      optional: [:title],
+      optional: [:title, :gazetteer_case],
       dims: [:fate, :relic]
     },
     tech_note: %{
       required: [:lens, :fate, :claim],
-      optional: [:relic, :title],
+      optional: [:relic, :title, :gazetteer_case],
       dims: [:fate, :relic]
     },
     council_document: %{
@@ -277,8 +282,20 @@ defmodule Voy.World.Content do
     bindings = bindings(names)
 
     with {:ok, gazetteer} <- select(pack, :gazetteer, gazetteer_case: gazetteer_case),
-         {:ok, official} <- select(pack, :official_report, fate: fate, lens: :official),
-         {:ok, tech} <- select(pack, :tech_note, fate: fate, relic: relic, lens: :tech),
+         {:ok, official} <-
+           select(pack, :official_report,
+             fate: fate,
+             relic: relic,
+             gazetteer_case: gazetteer_case,
+             lens: :official
+           ),
+         {:ok, tech} <-
+           select(pack, :tech_note,
+             fate: fate,
+             relic: relic,
+             gazetteer_case: gazetteer_case,
+             lens: :tech
+           ),
          {:ok, council} <- select(pack, :council_document, fate: fate) do
       {:ok,
        [
@@ -297,7 +314,7 @@ defmodule Voy.World.Content do
          tech_note: [
            true_source: names.up,
            settlement: names.down,
-           corroborated_gazetteer: gazetteer_case,
+           corroborated_gazetteer: corroborated_case(tech, gazetteer_case),
            true_cause: tag_atom(tech.claim),
            note: render(tech.body, bindings)
          ],
@@ -393,6 +410,30 @@ defmodule Voy.World.Content do
        down_terrain: :mid_terrace,
        up_geology: :minor_fracture,
        accessibility: :cliff_isolated
+     ]},
+    {"mahao",
+     [
+       branch_id: :branch_05_mahao,
+       up_name: "蚂蟥窠裂隙",
+       pass_name: "老熊垭口",
+       down_name: "水冬瓜坝",
+       up_terrain: :steep_fissure_headwater,
+       pass_terrain: :canyon_pass,
+       down_terrain: :alluvial_flat,
+       up_geology: :minor_fracture,
+       accessibility: :tractor_road_accessible
+     ]},
+    {"tingshan",
+     [
+       branch_id: :branch_06_tingshan,
+       up_name: "响水箐头",
+       pass_name: "垮岩垭口",
+       down_name: "听山崖寨",
+       up_terrain: :steep_fissure_headwater,
+       pass_terrain: :canyon_pass,
+       down_terrain: :mid_terrace,
+       up_geology: :active_fault_vein,
+       accessibility: :cliff_isolated
      ]}
   ]
 
@@ -405,7 +446,13 @@ defmodule Voy.World.Content do
     "rift" => "xuanguan",
     "Fate_Ascended_SpatialRift" => "xuanguan",
     "ancestral" => "nuoliang",
-    "Fate_Ancestral_ControlGroup" => "nuoliang"
+    "Fate_Ancestral_ControlGroup" => "nuoliang",
+    "seep" => "mahao",
+    "chronic_seep" => "mahao",
+    "Fate_Deferred_ChronicSeep" => "mahao",
+    "falsealarm" => "tingshan",
+    "false_alarm" => "tingshan",
+    "Fate_Tolerated_FalseAlarm" => "tingshan"
   }
 
   @doc "Named presets available to `preview/1`."
@@ -414,7 +461,8 @@ defmodule Voy.World.Content do
 
   @doc """
   Render player-facing dossier text for `"all"` or one preset (`"baishui"`,
-  `"heishui"`, `"xuanguan"`, `"nuoliang"`, or a fate alias).
+  `"heishui"`, `"xuanguan"`, `"nuoliang"`, `"mahao"`, `"tingshan"`, or a fate
+  alias).
   """
   @spec preview(String.t() | atom()) :: {:ok, String.t()} | {:error, String.t()}
   def preview(target \\ "all") do
@@ -469,6 +517,8 @@ defmodule Voy.World.Content do
          lens: official
          # 可选结局：#{Enum.join(Schema.fates(), " / ")}
          fate: Fate_Assimilated_NewZhai
+         # 可选：钉死引用的先例（不写则通配）：#{Enum.join(@gazetteer_cases, " / ")}
+         # gazetteer_case: case_1894_zheng_return_calmed_slide
          # 引用 claims.tsv 中 allowed_for 含 official 的归因卡
          claim: claim.seasonal_rain_mudslide
          ---
@@ -486,6 +536,8 @@ defmodule Voy.World.Content do
          fate: Fate_Assimilated_NewZhai
          # 可选古器（不写则通配）：#{Enum.join(@relics, " / ")}
          relic: ancestral_bronze_zheng
+         # 可选：钉死引用的先例（不写则通配）：#{Enum.join(@gazetteer_cases, " / ")}
+         # gazetteer_case: case_1894_zheng_return_calmed_slide
          # 引用 claims.tsv 中 allowed_for 含 tech 的归因卡
          claim: claim.c0_removed_and_vulnerable_window_blasting
          ---
@@ -1122,8 +1174,21 @@ defmodule Voy.World.Content do
 
   defp count_matches(pack, slot, combination) do
     criteria = Map.new(combination)
-    Enum.count(pack.documents, &matches?(slot, criteria, &1))
+    Enum.count(pack.documents, &covers?(slot, criteria, &1))
   end
+
+  # Coverage asks only about the dimensions a slot declares. A document pinned
+  # to one precedent still covers its (fate, relic) cell: which precedence the
+  # world actually selected decides at selection time whether it is used.
+  defp covers?(slot, criteria, %Document{} = document) do
+    document.slot == slot and
+      membership(document.fates, Map.get(criteria, :fate)) and
+      membership(document.relics, Map.get(criteria, :relic)) and
+      case_covers?(document.gazetteer_cases, criteria)
+  end
+
+  defp case_covers?(_cases, criteria) when not is_map_key(criteria, :gazetteer_case), do: true
+  defp case_covers?(cases, criteria), do: membership(cases, Map.get(criteria, :gazetteer_case))
 
   defp describe_combination(combination) do
     combination
@@ -1177,6 +1242,11 @@ defmodule Voy.World.Content do
   defp lens_matches(document_lens, lens), do: document_lens == lens
 
   # ==== assembly helpers ==== //
+
+  # A notebook that declares which precedent it cites reports that precedent;
+  # a wildcard notebook reports the one the history selected.
+  defp corroborated_case(%Document{gazetteer_cases: [case_id]}, _fallback), do: case_id
+  defp corroborated_case(_document, fallback), do: fallback
 
   defp bindings(names) do
     %{
