@@ -35,10 +35,12 @@ claim: claim.c0_removed_and_vulnerable_window_blasting
 对照清丈残卷所载拆钟旧案，{{date.era2b_short}}年收缴铜钲再度断绝阻尼（c0=0）；……
 ```
 
-3. 跑检查（或等 CI 在 PR 里报错）：
+3. 跑检查、生成空模板或预览玩家实际读到的档案（也可等 CI 在 PR 里报错）：
 
 ```sh
 mix voy.content lint
+mix voy.content preview baishui
+mix voy.content template tech_note
 ```
 
 ## 字段表

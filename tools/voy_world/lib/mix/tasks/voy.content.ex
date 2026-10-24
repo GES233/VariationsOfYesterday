@@ -1,13 +1,19 @@
 defmodule Mix.Tasks.Voy.Content do
-  @shortdoc "Lint the authoring content pack"
+  @shortdoc "Lint, preview, or scaffold the authoring content pack"
 
   @moduledoc """
-  Checks the content pack under `content/` and prints author-facing issues.
+  Authoring tools for the content pack under `content/`:
 
       mix voy.content lint
+      mix voy.content preview [baishui|heishui|xuanguan|nuoliang|all]
+      mix voy.content template <gazetteer|official_report|tech_note|council_document>
 
-  Errors block a merge. Warnings (for example an unused claim) do not, but
-  they usually mean a document is missing.
+    * `lint` checks the pack and prints author-facing issues (`file:line` plus
+      closest-value hints). Errors block a merge; warnings do not.
+    * `preview` compiles the preset node(s) and prints the player-facing
+      structures and archives in reading order so writers can review voice and
+      continuity without running the game.
+    * `template` prints a blank Markdown document card for the chosen slot.
   """
 
   use Mix.Task
@@ -20,8 +26,22 @@ defmodule Mix.Tasks.Voy.Content do
       ["lint"] ->
         lint()
 
+      ["preview"] ->
+        preview("all")
+
+      ["preview", target] ->
+        preview(target)
+
+      ["template", slot] ->
+        template(slot)
+
       _other ->
-        Mix.raise("用法：mix voy.content lint")
+        Mix.raise(
+          "用法：\n" <>
+            "  mix voy.content lint\n" <>
+            "  mix voy.content preview [baishui|heishui|xuanguan|nuoliang|all]\n" <>
+            "  mix voy.content template <gazetteer|official_report|tech_note|council_document>"
+        )
     end
   end
 
@@ -37,6 +57,26 @@ defmodule Mix.Tasks.Voy.Content do
 
       errors ->
         Mix.raise("#{length(errors)} 个内容错误，修正后再提交")
+    end
+  end
+
+  defp preview(target) do
+    case Voy.World.Content.preview(target) do
+      {:ok, output} ->
+        IO.puts(output)
+
+      {:error, message} ->
+        Mix.raise(message)
+    end
+  end
+
+  defp template(slot) do
+    case Voy.World.Content.template(slot) do
+      {:ok, output} ->
+        IO.write(output)
+
+      {:error, message} ->
+        Mix.raise(message)
     end
   end
 end

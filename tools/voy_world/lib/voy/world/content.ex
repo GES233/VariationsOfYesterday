@@ -20,9 +20,10 @@ defmodule Voy.World.Content do
       possible, the closest legal value, because the people editing this pack
       are not expected to read Elixir.
 
-  `archives_for/2` is the seam the rule layer will use next; today the rules
-  still build the archives themselves and `test/voy/world/content_test.exs`
-  asserts the two agree byte for byte for every supported topography.
+  `Voy.World.Projection.compile_archiveso/7` translates the loaded pack into
+  relational goals directly; `archives_for/2` provides direct deterministic
+  assembly for a compiled slice, and `preview/2` renders player-facing
+  dossiers for writers without running the game.
   """
 
   alias Voy.World.{Schema, Timeline}
@@ -199,6 +200,56 @@ defmodule Voy.World.Content do
     end
   end
 
+  @doc """
+  Return the default authoring pack.
+
+  When `VOY_CONTENT_DIR` is not set, the validated default pack is cached in
+  `:persistent_term` so repeated relational queries do not re-parse files on
+  every branch compilation.
+  """
+  @spec default_pack() :: Pack.t()
+  def default_pack do
+    case System.get_env("VOY_CONTENT_DIR") do
+      nil ->
+        key = {__MODULE__, :default_pack}
+
+        case :persistent_term.get(key, nil) do
+          %Pack{} = pack ->
+            pack
+
+          nil ->
+            pack = load!(@pack_dir)
+            :persistent_term.put(key, pack)
+            pack
+        end
+
+      dir ->
+        load!(dir)
+    end
+  end
+
+  @doc "All documents in `pack` belonging to `slot`, in deterministic order."
+  @spec documents_for(Pack.t(), atom()) :: [Document.t()]
+  def documents_for(%Pack{documents: documents}, slot) when is_atom(slot) do
+    Enum.filter(documents, &(&1.slot == slot))
+  end
+
+  @doc "All claim tag atoms that `lens` is forbidden to cite."
+  @spec forbidden_claims_for(Pack.t(), atom()) :: [atom()]
+  def forbidden_claims_for(%Pack{claims: claims}, lens) when is_atom(lens) do
+    claims
+    |> Map.values()
+    |> Enum.filter(&(lens in &1.forbidden_for))
+    |> Enum.map(&tag_atom(&1.id))
+    |> Enum.sort()
+  end
+
+  @doc "Render a document body given a `%{up: ..., pass: ..., down: ...}` name map."
+  @spec render_body(String.t(), map()) :: String.t()
+  def render_body(body, names) when is_binary(body) and is_map(names) do
+    render(body, bindings(names))
+  end
+
   @doc "Lint the pack; errors block a merge, warnings do not."
   @spec lint(Path.t()) :: %{errors: [map()], warnings: [map()]}
   def lint(dir \\ pack_dir()) do
@@ -294,6 +345,217 @@ defmodule Voy.World.Content do
     "#{file}:#{line}: #{message}"
   end
 
+  @preview_presets [
+    {"baishui",
+     [
+       branch_id: :branch_01_baishui,
+       up_name: "野猪箐裂隙",
+       pass_name: "断碑垭口",
+       down_name: "白水坝",
+       up_terrain: :steep_fissure_headwater,
+       pass_terrain: :canyon_pass,
+       down_terrain: :alluvial_flat,
+       up_geology: :active_fault_vein,
+       accessibility: :tractor_road_accessible
+     ]},
+    {"heishui",
+     [
+       branch_id: :branch_02_heishui,
+       up_name: "鬼哭漏斗",
+       pass_name: "锁龙峡",
+       down_name: "黑水坪",
+       up_terrain: :karst_sinkhole_headwater,
+       pass_terrain: :karst_gorge,
+       down_terrain: :alluvial_flat,
+       up_geology: :deep_stress_cavity,
+       accessibility: :tractor_road_accessible
+     ]},
+    {"xuanguan",
+     [
+       branch_id: :branch_04_xuanguan,
+       up_name: "鬼哭漏斗",
+       pass_name: "断碑垭口",
+       down_name: "悬棺寨",
+       up_terrain: :karst_sinkhole_headwater,
+       pass_terrain: :canyon_pass,
+       down_terrain: :mid_terrace,
+       up_geology: :deep_stress_cavity,
+       accessibility: :cliff_isolated
+     ]},
+    {"nuoliang",
+     [
+       branch_id: :branch_03_nuoliang,
+       up_name: "老君林场",
+       pass_name: "响水涧口",
+       down_name: "糯良古寨",
+       up_terrain: :steep_fissure_headwater,
+       pass_terrain: :canyon_pass,
+       down_terrain: :mid_terrace,
+       up_geology: :minor_fracture,
+       accessibility: :cliff_isolated
+     ]}
+  ]
+
+  @preview_aliases %{
+    "assimilated" => "baishui",
+    "Fate_Assimilated_NewZhai" => "baishui",
+    "annihilated" => "heishui",
+    "Fate_Annihilated_BurnoutZone" => "heishui",
+    "ascended" => "xuanguan",
+    "rift" => "xuanguan",
+    "Fate_Ascended_SpatialRift" => "xuanguan",
+    "ancestral" => "nuoliang",
+    "Fate_Ancestral_ControlGroup" => "nuoliang"
+  }
+
+  @doc "Named presets available to `preview/1`."
+  @spec preview_presets() :: [String.t()]
+  def preview_presets, do: Enum.map(@preview_presets, &elem(&1, 0))
+
+  @doc """
+  Render player-facing dossier text for `"all"` or one preset (`"baishui"`,
+  `"heishui"`, `"xuanguan"`, `"nuoliang"`, or a fate alias).
+  """
+  @spec preview(String.t() | atom()) :: {:ok, String.t()} | {:error, String.t()}
+  def preview(target \\ "all") do
+    target = to_string(target)
+    canonical = Map.get(@preview_aliases, target, target)
+
+    cond do
+      canonical == "all" ->
+        rendered =
+          @preview_presets
+          |> Enum.map(fn {name, topo} -> format_preset_preview(name, topo) end)
+          |> Enum.join("\n\n")
+
+        {:ok, rendered}
+
+      topo = List.keyfind(@preview_presets, canonical, 0) |> then(&(&1 && elem(&1, 1))) ->
+        {:ok, format_preset_preview(canonical, topo)}
+
+      true ->
+        candidates = preview_presets() ++ ["all" | Map.keys(@preview_aliases)]
+
+        {:error,
+         "未知预览节点 #{inspect(target)}；可用预设：#{Enum.join(preview_presets() ++ ["all"], " / ")}" <>
+           did_you_mean(target, candidates)}
+    end
+  end
+
+  @doc "Starter Markdown template for an authoring slot."
+  @spec template(String.t() | atom()) :: {:ok, String.t()} | {:error, String.t()}
+  def template(slot) do
+    slot_str = to_string(slot)
+
+    case enum_value(slot_str, Map.keys(@slots)) do
+      {:ok, :gazetteer} ->
+        {:ok,
+         """
+         ---
+         slot: gazetteer
+         # 可选先例：#{Enum.join(@gazetteer_cases, " / ")}
+         gazetteer_case: case_1894_zheng_return_calmed_slide
+         title: 《旧州府抚夷清丈残卷·某案》
+         ---
+
+         {{date.era2a_zheng}}于{{place.down}}……
+         """}
+
+      {:ok, :official_report} ->
+        {:ok,
+         """
+         ---
+         slot: official_report
+         lens: official
+         # 可选结局：#{Enum.join(Schema.fates(), " / ")}
+         fate: Fate_Assimilated_NewZhai
+         # 引用 claims.tsv 中 allowed_for 含 official 的归因卡
+         claim: claim.seasonal_rain_mudslide
+         ---
+
+         归咎于……
+         """}
+
+      {:ok, :tech_note} ->
+        {:ok,
+         """
+         ---
+         slot: tech_note
+         lens: tech
+         # 可选结局：#{Enum.join(Schema.fates(), " / ")}
+         fate: Fate_Assimilated_NewZhai
+         # 可选古器（不写则通配）：#{Enum.join(@relics, " / ")}
+         relic: ancestral_bronze_zheng
+         # 引用 claims.tsv 中 allowed_for 含 tech 的归因卡
+         claim: claim.c0_removed_and_vulnerable_window_blasting
+         ---
+
+         对照清丈残卷，{{date.era2b_short}}年……
+         """}
+
+      {:ok, :council_document} ->
+        {:ok,
+         """
+         ---
+         slot: council_document
+         # 可选结局：#{Enum.join(Schema.fates(), " / ")}
+         fate: Fate_Assimilated_NewZhai
+         # 可选政体：#{Enum.join(@governances, " / ")}
+         governance: brigade_elder_joint_council
+         title: 《某规约》
+         ---
+
+         凡……
+         """}
+
+      :error ->
+        allowed = Enum.map(Map.keys(@slots), &to_string/1)
+
+        {:error,
+         "未知档案槽位 #{inspect(slot_str)}；可用：#{Enum.join(allowed, " / ")}" <>
+           did_you_mean(slot_str, allowed)}
+    end
+  end
+
+  defp format_preset_preview(name, topo) do
+    {:ok, [slice]} = Voy.World.compile_branch(topo)
+    structures = slice["structures"]
+    archives = slice["archives"]
+    gazetteer = archives["gazetteer"]
+    official = archives["official_report"]
+    tech = archives["tech_note"]
+    council = archives["council_document"]
+    [up_site, up_desc] = structures["upstream_site"]
+    [pass_site, pass_desc] = structures["pass_site"]
+    [down_site, down_desc] = structures["downstream_site"]
+
+    """
+    ==================================================================
+    【节点档案预览：#{name}（#{topo[:down_name]}）】
+    支沟：#{topo[:up_name]} → #{topo[:pass_name]} → #{topo[:down_name]}
+    结局：#{slice["era3"]["fate"]}（慢变量分区：#{slice["era3"]["final_regime"]}）
+    古器：#{slice["era1"]["guardian_relic"]}
+    ------------------------------------------------------------------
+    [聚落与遗迹落位]
+    · 源头（#{up_site}）：#{up_desc}
+    · 隘口（#{pass_site}）：#{pass_desc}
+    · 聚落（#{down_site}）：#{down_desc}
+    ------------------------------------------------------------------
+    ① 旧州府残卷：#{gazetteer["title"]}（#{gazetteer["precedent"]}）
+       #{gazetteer["excerpt"]}
+
+    ② 垦殖总场官样通报（口径归因：#{official["claimed_cause"]}）
+       #{official["summary"]}
+
+    ③ 技术员手簿批注（真实归因：#{tech["true_cause"]}，印证：#{tech["corroborated_gazetteer"]}）
+       #{tech["note"]}
+
+    ④ 第三纪规约：#{council["title"]}（政体：#{council["governance"]}）
+       #{council["decree"]}
+    ==================================================================\
+    """
+  end
+
   # ==== claims ==== //
 
   defp read_claims(path, dir) do
@@ -336,12 +598,18 @@ defmodule Voy.World.Content do
 
     cond do
       unknown != [] ->
+        suggestion =
+          unknown
+          |> Enum.map(&did_you_mean(&1, @claim_columns))
+          |> Enum.find("", &(&1 != ""))
+
         {:error,
          issue(
            path,
            dir,
            line,
-           "表头有未知列：#{Enum.join(unknown, ", ")}；可用列：#{Enum.join(@claim_columns, ", ")}"
+           "表头有未知列：#{Enum.join(unknown, ", ")}；可用列：#{Enum.join(@claim_columns, ", ")}" <>
+             suggestion
          )}
 
       duplicated != [] ->
@@ -417,7 +685,8 @@ defmodule Voy.World.Content do
               path,
               dir,
               line,
-              "#{field} 里的 #{inspect(value)} 不是合法口径；可用：#{Enum.join(@lenses, ", ")}"
+              "#{field} 里的 #{inspect(value)} 不是合法口径；可用：#{Enum.join(@lenses, ", ")}" <>
+                did_you_mean(value, @lenses)
             )}}
       end
     end)
@@ -531,7 +800,8 @@ defmodule Voy.World.Content do
                     path,
                     pack_dir,
                     number,
-                    "未知字段 #{inspect(key)}；可用字段：#{Enum.join(@front_matter_keys, " / ")}"
+                    "未知字段 #{inspect(key)}；可用字段：#{Enum.join(@front_matter_keys, " / ")}" <>
+                      did_you_mean(key, @front_matter_keys)
                   )}}
               end
 
@@ -549,12 +819,15 @@ defmodule Voy.World.Content do
 
     case enum_value(slot, Map.keys(@slots)) do
       :error ->
+        allowed = Enum.map(Map.keys(@slots), &to_string/1)
+
         {:error,
          issue(
            path,
            pack_dir,
            2,
-           "slot 必须是 #{Enum.join(Enum.map(Map.keys(@slots), &to_string/1), " / ")}，实际是 #{inspect(slot)}"
+           "slot 必须是 #{Enum.join(allowed, " / ")}，实际是 #{inspect(slot)}" <>
+             did_you_mean(slot, allowed)
          )}
 
       {:ok, slot} ->
@@ -601,6 +874,7 @@ defmodule Voy.World.Content do
 
     with :ok <- check_body(body, path, pack_dir, body_line),
          :ok <- check_placeholders(body, path, pack_dir, body_line),
+         :ok <- check_hardcoded_dates(body, path, pack_dir, body_line),
          {:ok, slot} <- enum_value(fields["slot"], Map.keys(@slots)),
          {:ok, lens} <- parse_optional_enum(fields["lens"], @lenses, "lens", path, pack_dir),
          :ok <- check_slot_lens(slot, lens, path, pack_dir),
@@ -673,12 +947,50 @@ defmodule Voy.World.Content do
         :ok
 
       tokens ->
+        suggestion =
+          tokens
+          |> Enum.map(fn token -> did_you_mean(token, allowed, &"{{#{&1}}}") end)
+          |> Enum.find("", &(&1 != ""))
+
         {:error,
          issue(
            path,
            pack_dir,
            line,
-           "无法解析的占位符：#{Enum.map_join(tokens, ", ", &"{{#{&1}}}")}；可用：#{Enum.join(allowed, ", ")}"
+           "无法解析的占位符：#{Enum.map_join(tokens, ", ", &"{{#{&1}}}")}；可用：#{Enum.join(allowed, ", ")}" <>
+             suggestion
+         )}
+    end
+  end
+
+  defp check_hardcoded_dates(body, path, pack_dir, line) do
+    stripped = Regex.replace(~r/\{\{[a-z0-9_.]+\}\}/, body, "")
+
+    found =
+      [
+        ~r/光绪[一二三四五六七八九十零]+年/,
+        ~r/(?<!\d)\d{4}年/,
+        ~r/(?<!\d)(?:18|19|20)\d{2}(?!\d)/,
+        ~r/(?<!\d)\d{2}年/
+      ]
+      |> Enum.flat_map(&Regex.scan(&1, stripped))
+      |> List.flatten()
+      |> Enum.uniq()
+
+    case found do
+      [] ->
+        :ok
+
+      literals ->
+        date_placeholders =
+          @date_tokens |> Map.keys() |> Enum.sort() |> Enum.map_join(", ", &"{{#{&1}}}")
+
+        {:error,
+         issue(
+           path,
+           pack_dir,
+           line,
+           "正文不能直接写死年份 #{Enum.join(literals, "、")}，请改用日期占位符：#{date_placeholders}"
          )}
     end
   end
@@ -706,10 +1018,12 @@ defmodule Voy.World.Content do
     if Map.has_key?(pack.claims, claim) do
       []
     else
+      ids = pack.claims |> Map.keys() |> Enum.sort()
+
       hint =
-        case pack.claims |> Map.keys() |> Enum.sort() do
+        case ids do
           [] -> "；归因卡表里没有可用条目，先修正 claims.tsv"
-          ids -> "；现有：" <> Enum.join(ids, ", ")
+          ids -> "；现有：" <> Enum.join(ids, ", ") <> did_you_mean(claim, ids)
         end
 
       [issue_at(source, "档案卡 #{id} 引用了不存在的归因卡 #{inspect(claim)}" <> hint)]
@@ -928,7 +1242,8 @@ defmodule Voy.World.Content do
            path,
            dir,
            2,
-           "#{field} 的值 #{inspect(value)} 不合法；可用：#{Enum.join(allowed, ", ")}"
+           "#{field} 的值 #{inspect(value)} 不合法；可用：#{Enum.join(allowed, ", ")}" <>
+             did_you_mean(value, allowed)
          )}
     end
   end
@@ -950,7 +1265,8 @@ defmodule Voy.World.Content do
               path,
               dir,
               2,
-              "#{field} 里的 #{inspect(item)} 不合法；可用：#{Enum.join(allowed, ", ")}"
+              "#{field} 里的 #{inspect(item)} 不合法；可用：#{Enum.join(allowed, ", ")}" <>
+                did_you_mean(item, allowed)
             )}}
       end
     end)
@@ -959,6 +1275,28 @@ defmodule Voy.World.Content do
       {:error, _issue} = error -> error
     end
   end
+
+  defp did_you_mean(input, candidates, formatter \\ & &1)
+
+  defp did_you_mean(input, candidates, formatter) when is_binary(input) and input != "" do
+    downcased = String.downcase(input)
+
+    candidates
+    |> Enum.map(&to_string/1)
+    |> Enum.map(fn candidate ->
+      {candidate, String.jaro_distance(downcased, String.downcase(candidate))}
+    end)
+    |> Enum.max_by(&elem(&1, 1), fn -> {nil, 0.0} end)
+    |> case do
+      {best, score} when is_binary(best) and score >= 0.72 ->
+        "（你是不是想写 #{inspect(formatter.(best))}？）"
+
+      _ ->
+        ""
+    end
+  end
+
+  defp did_you_mean(_input, _candidates, _formatter), do: ""
 
   defp relative(path, dir), do: Path.relative_to(path, dir) |> String.replace("\\", "/")
 

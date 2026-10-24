@@ -1,114 +1,70 @@
 defmodule Voy.World.Projection do
-  @moduledoc "Structure and archive projections derived from a shared historical relation."
+  @moduledoc """
+  Structure and archive projections derived from a shared historical relation.
+
+  `Projection` holds no prose of its own:
+
+    * place-attached structure descriptions come from `Voy.World.Texts`;
+    * archive documents and attribution taboos come from the authoring pack
+      loaded by `Voy.World.Content`, translated into relational goals so both
+      forward compilation and reverse clue-reconciliation queries work through
+      the same relation.
+  """
 
   use Voy.Kanren
 
-  alias Voy.World.Texts
+  alias Voy.World.{Content, Texts}
+
+  @structure_keys [
+    {:Fate_Assimilated_NewZhai, :structure_assimilated},
+    {:Fate_Annihilated_BurnoutZone, :structure_annihilated},
+    {:Fate_Ascended_SpatialRift, :structure_ascended},
+    {:Fate_Ancestral_ControlGroup, :structure_ancestral}
+  ]
+
+  @relic_fields [
+    {:ancestral_bronze_zheng, :pass_zheng},
+    {:carved_diversion_stele, :pass_stele}
+  ]
 
   def compile_structureso(topo, era1, era2b, era3, structures) do
-    fresh [up_name, pass_name, down_name, relic, fate, team, pass_desc] do
+    fresh [up_name, pass_name, down_name, relic, fate, team, up_desc, pass_desc, down_desc] do
       propso(topo, up_name: up_name, pass_name: pass_name, down_name: down_name)
       propso(era1, guardian_relic: relic)
       propso(era2b, stationed_team: team)
       propso(era3, fate: fate)
-      pass_relic_structureo(fate, relic, pass_desc)
+      structure_descriptionso(fate, relic, up_desc, pass_desc, down_desc)
 
-      conde do
-        [
-          eq(fate, :Fate_Assimilated_NewZhai),
-          eq(structures,
-            upstream_site: {up_name, "302队废弃爆破钻探台（常驻脉冲源）"},
-            pass_site: {pass_name, pass_desc},
-            downstream_site:
-              {down_name, "场部—议事会驻地：贴有火塘符纸的农场砖混宿舍（variations-of-yesterday:farm_dorm_unit_*）"}
-          )
-        ]
+      eq(structures,
+        upstream_site: {up_name, up_desc},
+        pass_site: {pass_name, pass_desc},
+        downstream_site: {down_name, down_desc}
+      )
+    end
+  end
 
-        [
-          eq(fate, :Fate_Annihilated_BurnoutZone),
-          eq(structures,
-            upstream_site: {up_name, "水泥封死的超高压注浆井群（灰白死寂核心）"},
-            pass_site: {pass_name, pass_desc},
-            downstream_site: {down_name, "空无一人的钙化垦殖分场废墟（Burnout 绝对静默区）"}
-          )
-        ]
-
-        [
-          eq(fate, :Fate_Ascended_SpatialRift),
-          eq(structures,
-            upstream_site: {up_name, "深渊谐振掩体与黑曜石畸变裂隙（末影人游荡点）"},
-            pass_site: {pass_name, pass_desc},
-            downstream_site: {down_name, "严守封山戒律的半山绝壁孤寨（偶受空间裂隙微扰）"}
-          )
-        ]
-
-        [
-          eq(fate, :Fate_Ancestral_ControlGroup),
-          eq(structures,
-            upstream_site: {up_name, "撤牌废弃的林场水文观测哨"},
-            pass_site: {pass_name, pass_desc},
-            downstream_site: {down_name, "恢复山官岁祭的原生老寨（以物易物交换旧档案）"}
-          )
-        ]
+  defp structure_descriptionso(fate, relic, up_desc, pass_desc, down_desc) do
+    branches =
+      for {fate_tag, text_key} <- @structure_keys,
+          {relic_tag, pass_field} <- @relic_fields do
+        all([
+          eq(fate, fate_tag),
+          eq(relic, relic_tag),
+          eq(up_desc, Texts.render!(text_key, :upstream)),
+          eq(pass_desc, Texts.render!(text_key, pass_field)),
+          eq(down_desc, Texts.render!(text_key, :downstream))
+        ])
       end
-    end
+
+    any(branches)
   end
 
-  defp pass_relic_structureo(fate, relic, pass_desc) do
-    conde do
-      [
-        eq(fate, :Fate_Assimilated_NewZhai),
-        eq(relic, :ancestral_bronze_zheng),
-        eq(pass_desc, "峡谷隘口·原铜钲基座改挂红绸东方红气缸体的木架 + 验山垂架")
-      ]
+  def compile_archiveso(topo, era1, era2a, era2b, era3, archives, pack \\ nil) do
+    pack = pack || Content.default_pack()
 
-      [
-        eq(fate, :Fate_Assimilated_NewZhai),
-        eq(relic, :carved_diversion_stele),
-        eq(pass_desc, "溶洞峡口·原分水碑残座改挂红绸东方红气缸体的铁架 + 验山垂架")
-      ]
-
-      [
-        eq(fate, :Fate_Annihilated_BurnoutZone),
-        eq(relic, :ancestral_bronze_zheng),
-        eq(pass_desc, "被水泥封堵的古铜钲亭废墟与焊死在极值的验山垂架")
-      ]
-
-      [
-        eq(fate, :Fate_Annihilated_BurnoutZone),
-        eq(relic, :carved_diversion_stele),
-        eq(pass_desc, "坍塌钙化的石雕分水堰与焊死在极值的验山垂架")
-      ]
-
-      [
-        eq(fate, :Fate_Ascended_SpatialRift),
-        eq(relic, :ancestral_bronze_zheng),
-        eq(pass_desc, "尚存岁祭镇山铜钲与流官归化断碑的险峻峡口")
-      ]
-
-      [
-        eq(fate, :Fate_Ascended_SpatialRift),
-        eq(relic, :carved_diversion_stele),
-        eq(pass_desc, "尚存石雕分水古碑与流官归化断碑的溶洞峡口")
-      ]
-
-      [
-        eq(fate, :Fate_Ancestral_ControlGroup),
-        eq(relic, :ancestral_bronze_zheng),
-        eq(pass_desc, "完好如初的古寨镇山铜钲亭（c0 维持源完好）")
-      ]
-
-      [
-        eq(fate, :Fate_Ancestral_ControlGroup),
-        eq(relic, :carved_diversion_stele),
-        eq(pass_desc, "完好如初的古寨石雕分水堰（c0 维持源完好）")
-      ]
-    end
-  end
-
-  def compile_archiveso(topo, era1, era2a, era2b, era3, archives) do
     fresh [
       up_name,
+      pass_name,
       down_name,
       relic,
       disturbance,
@@ -121,35 +77,51 @@ defmodule Voy.World.Projection do
       inner_text,
       council_doc
     ] do
-      propso(topo, up_name: up_name, down_name: down_name)
+      propso(topo, up_name: up_name, pass_name: pass_name, down_name: down_name)
       propso(era1, guardian_relic: relic)
       propso(era2a, gazetteer_precedent: gazetteer_case)
       propso(era2b, disturbance_mode: disturbance)
       propso(era3, fate: fate)
-      era2a_gazetteer_recordo(gazetteer_case, down_name, gazetteer_record)
-      official_tabooo(official_claim)
 
-      branch_cause_candidateo(
+      gazetteer_recordo(
+        pack,
+        %{up: up_name, pass: pass_name, down: down_name},
+        gazetteer_case,
+        down_name,
+        gazetteer_record
+      )
+
+      lens_tabooo(pack, :official, official_claim)
+
+      official_recordo(
+        pack,
+        %{up: up_name, pass: pass_name, down: down_name},
         fate,
         relic,
-        gazetteer_case,
-        disturbance,
         official_claim,
         official_text
       )
 
+      lens_tabooo(pack, :tech, inner_truth)
       neq(inner_truth, official_claim)
 
-      branch_cause_candidateo(
+      tech_recordo(
+        pack,
+        %{up: up_name, pass: pass_name, down: down_name},
         fate,
         relic,
-        gazetteer_case,
-        disturbance,
         inner_truth,
         inner_text
       )
 
-      era3_council_recordo(fate, down_name, council_doc)
+      council_recordo(
+        pack,
+        %{up: up_name, pass: pass_name, down: down_name},
+        fate,
+        relic,
+        down_name,
+        council_doc
+      )
 
       eq(archives,
         gazetteer: gazetteer_record,
@@ -171,172 +143,92 @@ defmodule Voy.World.Projection do
     end
   end
 
-  defp era2a_gazetteer_recordo(gazetteer_case, down_name, record) do
-    conde do
-      [
-        eq(gazetteer_case, :case_1894_zheng_return_calmed_slide),
-        eq(record,
-          title: Texts.render!(:archive_gazetteer_zheng, :title),
-          recorded_settlement: down_name,
-          precedent: :case_1894_zheng_return_calmed_slide,
-          excerpt: Texts.render!(:archive_gazetteer_zheng, :excerpt)
-        )
-      ]
+  defp gazetteer_recordo(pack, names, gazetteer_case, down_name, record) do
+    pack
+    |> Content.documents_for(:gazetteer)
+    |> Enum.map(fn doc ->
+      fresh [excerpt] do
+        matches_dimo(gazetteer_case, doc.gazetteer_cases)
+        render_bodyo(doc.body, names, excerpt)
 
-      [
-        eq(gazetteer_case, :case_1902_stele_restored_stopped_flood),
         eq(record,
-          title: Texts.render!(:archive_gazetteer_stele, :title),
+          title: doc.title,
           recorded_settlement: down_name,
-          precedent: :case_1902_stele_restored_stopped_flood,
-          excerpt: Texts.render!(:archive_gazetteer_stele, :excerpt)
+          precedent: gazetteer_case,
+          excerpt: excerpt
         )
-      ]
-
-      [
-        eq(gazetteer_case, :case_mountain_too_steep_for_tithing),
-        eq(record,
-          title: Texts.render!(:archive_gazetteer_cliff, :title),
-          recorded_settlement: down_name,
-          precedent: :case_mountain_too_steep_for_tithing,
-          excerpt: Texts.render!(:archive_gazetteer_cliff, :excerpt)
-        )
-      ]
-    end
+      end
+    end)
+    |> any()
   end
 
-  defp branch_cause_candidateo(fate, relic, gazetteer_case, disturbance, cause_tag, text) do
-    conde do
-      [
-        eq(fate, :Fate_Assimilated_NewZhai),
-        eq(relic, :ancestral_bronze_zheng),
-        eq(gazetteer_case, :case_1894_zheng_return_calmed_slide),
-        eq(disturbance, :periodic_shallow_blasting),
-        eq(cause_tag, :c0_removed_and_vulnerable_window_blasting),
-        eq(text, Texts.render!(:archive_cause_c0_blasting_zheng, :text))
-      ]
-
-      [
-        eq(fate, :Fate_Assimilated_NewZhai),
-        eq(relic, :carved_diversion_stele),
-        eq(gazetteer_case, :case_1902_stele_restored_stopped_flood),
-        eq(disturbance, :periodic_shallow_blasting),
-        eq(cause_tag, :c0_removed_and_vulnerable_window_blasting),
-        eq(text, Texts.render!(:archive_cause_c0_blasting_stele, :text))
-      ]
-
-      [
-        eq(fate, :Fate_Assimilated_NewZhai),
-        eq(disturbance, :periodic_shallow_blasting),
-        eq(cause_tag, :seasonal_rain_mudslide),
-        eq(text, Texts.render!(:archive_cause_rain_excuse, :text))
-      ]
-
-      [
-        eq(fate, :Fate_Annihilated_BurnoutZone),
-        eq(relic, :ancestral_bronze_zheng),
-        eq(gazetteer_case, :case_1894_zheng_return_calmed_slide),
-        eq(disturbance, :overwhelming_reverse_suppression),
-        eq(cause_tag, :overwhelming_suppression_attractor_burnout),
-        eq(text, Texts.render!(:archive_cause_overwhelming_zheng, :text))
-      ]
-
-      [
-        eq(fate, :Fate_Annihilated_BurnoutZone),
-        eq(relic, :carved_diversion_stele),
-        eq(gazetteer_case, :case_1902_stele_restored_stopped_flood),
-        eq(disturbance, :overwhelming_reverse_suppression),
-        eq(cause_tag, :overwhelming_suppression_attractor_burnout),
-        eq(text, Texts.render!(:archive_cause_overwhelming_stele, :text))
-      ]
-
-      [
-        eq(fate, :Fate_Annihilated_BurnoutZone),
-        eq(disturbance, :overwhelming_reverse_suppression),
-        eq(cause_tag, :planned_relocation_and_mine_closure),
-        eq(text, Texts.render!(:archive_cause_relocation, :text))
-      ]
-
-      [
-        eq(fate, :Fate_Ascended_SpatialRift),
-        eq(disturbance, :overwhelming_reverse_suppression),
-        eq(cause_tag, :excitation_zenith_spatial_exile),
-        eq(text, Texts.render!(:archive_cause_rift_exile, :text))
-      ]
-
-      [
-        eq(fate, :Fate_Ascended_SpatialRift),
-        eq(disturbance, :overwhelming_reverse_suppression),
-        eq(cause_tag, :equipment_retrieval_completed),
-        eq(text, Texts.render!(:archive_cause_equipment_retrieval, :text))
-      ]
-
-      [
-        eq(fate, :Fate_Ancestral_ControlGroup),
-        eq(disturbance, :low_level_logging_shock),
-        eq(cause_tag, :intact_c0_basin_absorption),
-        eq(text, Texts.render!(:archive_cause_c0_intact, :text))
-      ]
-
-      [
-        eq(fate, :Fate_Ancestral_ControlGroup),
-        eq(disturbance, :low_level_logging_shock),
-        eq(cause_tag, :backward_folk_custom_pending_reform),
-        eq(text, Texts.render!(:archive_cause_backward_custom, :text))
-      ]
-    end
+  defp official_recordo(pack, names, fate, relic, claim_tag, summary) do
+    pack
+    |> Content.documents_for(:official_report)
+    |> Enum.map(fn doc ->
+      all([
+        matches_dimo(fate, doc.fates),
+        matches_dimo(relic, doc.relics),
+        eq(claim_tag, Content.tag_atom(doc.claim)),
+        render_bodyo(doc.body, names, summary)
+      ])
+    end)
+    |> any()
   end
 
-  defp official_tabooo(cause_tag) do
-    all([
-      neq(cause_tag, :c0_removed_and_vulnerable_window_blasting),
-      neq(cause_tag, :overwhelming_suppression_attractor_burnout),
-      neq(cause_tag, :excitation_zenith_spatial_exile),
-      neq(cause_tag, :intact_c0_basin_absorption)
-    ])
+  defp tech_recordo(pack, names, fate, relic, claim_tag, note) do
+    pack
+    |> Content.documents_for(:tech_note)
+    |> Enum.map(fn doc ->
+      all([
+        matches_dimo(fate, doc.fates),
+        matches_dimo(relic, doc.relics),
+        eq(claim_tag, Content.tag_atom(doc.claim)),
+        render_bodyo(doc.body, names, note)
+      ])
+    end)
+    |> any()
   end
 
-  defp era3_council_recordo(fate, down_name, council_doc) do
-    conde do
-      [
-        eq(fate, :Fate_Assimilated_NewZhai),
-        eq(council_doc,
-          title: Texts.render!(:archive_council_joint_council, :title),
-          settlement: down_name,
-          governance: :brigade_elder_joint_council,
-          decree: Texts.render!(:archive_council_joint_council, :decree)
-        )
-      ]
+  defp council_recordo(pack, names, fate, relic, down_name, council_doc) do
+    pack
+    |> Content.documents_for(:council_document)
+    |> Enum.map(fn doc ->
+      fresh [decree] do
+        matches_dimo(fate, doc.fates)
+        matches_dimo(relic, doc.relics)
+        render_bodyo(doc.body, names, decree)
 
-      [
-        eq(fate, :Fate_Annihilated_BurnoutZone),
         eq(council_doc,
-          title: Texts.render!(:archive_council_sealed_zone, :title),
+          title: doc.title,
           settlement: down_name,
-          governance: :depopulated_concrete_sealed_zone,
-          decree: Texts.render!(:archive_council_sealed_zone, :decree)
+          governance: Content.governance_atom(doc.governance),
+          decree: decree
         )
-      ]
+      end
+    end)
+    |> any()
+  end
 
-      [
-        eq(fate, :Fate_Ascended_SpatialRift),
-        eq(council_doc,
-          title: Texts.render!(:archive_council_rift_oath, :title),
-          settlement: down_name,
-          governance: :rift_guarding_cliff_compact,
-          decree: Texts.render!(:archive_council_rift_oath, :decree)
-        )
-      ]
+  defp lens_tabooo(pack, lens, claim_tag) do
+    pack
+    |> Content.forbidden_claims_for(lens)
+    |> Enum.map(&neq(claim_tag, &1))
+    |> all()
+  end
 
-      [
-        eq(fate, :Fate_Ancestral_ControlGroup),
-        eq(council_doc,
-          title: Texts.render!(:archive_council_ancestral_ledger, :title),
-          settlement: down_name,
-          governance: :restored_ancestral_compact,
-          decree: Texts.render!(:archive_council_ancestral_ledger, :decree)
-        )
-      ]
+  defp matches_dimo(_var, []), do: all([])
+  defp matches_dimo(var, [value]), do: eq(var, value)
+  defp matches_dimo(var, values), do: membero(var, values)
+
+  defp render_bodyo(body, names, rendered) do
+    fn state ->
+      resolved =
+        Map.new(names, fn {role, term} ->
+          {role, walk_star(term, state.subst)}
+        end)
+
+      eq(rendered, Content.render_body(body, resolved)).(state)
     end
   end
 end

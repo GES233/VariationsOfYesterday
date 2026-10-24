@@ -6,9 +6,10 @@ defmodule Voy.World.CanonTest do
 
   import Voy.World.TestFixtures
 
-  test "the timeline, the text table and the fate table are coherent" do
+  test "the timeline, the text table, the content pack and the fate table are coherent" do
     assert :ok = Canon.check_timeline()
     assert :ok = Canon.check_texts()
+    assert :ok = Canon.check_content()
     assert :ok = Canon.check_fates()
   end
 

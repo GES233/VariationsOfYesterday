@@ -23,15 +23,24 @@ defmodule Voy.World.Canon do
 
   use Voy.Kanren
 
-  alias Voy.World.{Chronicle, Texts, Timeline}
+  alias Voy.World.{Chronicle, Content, Texts, Timeline}
 
   @doc "Check the timeline's internal coherence."
   @spec check_timeline() :: :ok | {:error, term()}
   def check_timeline, do: Timeline.validate()
 
-  @doc "Check that every document renders and every placeholder is bound."
+  @doc "Check that every code-side template renders and every placeholder is bound."
   @spec check_texts() :: :ok | {:error, [term()]}
   def check_texts, do: Texts.validate()
+
+  @doc "Check that the authoring content pack loads cleanly with no errors or unused claims."
+  @spec check_content(Path.t()) :: :ok | {:error, [map()]}
+  def check_content(dir \\ Content.pack_dir()) do
+    case Content.lint(dir) do
+      %{errors: [], warnings: []} -> :ok
+      %{errors: errors, warnings: warnings} -> {:error, errors ++ warnings}
+    end
+  end
 
   @doc "Check that every fate declared by the schema is reachable from some topography."
   @spec check_fates() :: :ok | {:error, [term()]}
@@ -148,9 +157,8 @@ defmodule Voy.World.Canon do
 
   defp check_archive_dates(slice) do
     texts =
-      slice
-      |> Keyword.fetch!(:archives)
-      |> strings()
+      strings(Keyword.fetch!(slice, :archives)) ++
+        strings(Keyword.fetch!(slice, :structures))
 
     years = Timeline.years()
     short_years = Enum.map(years, &Timeline.short_year/1)

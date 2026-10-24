@@ -47,35 +47,31 @@ mix run examples/contracts_demo.exs
 
 ## Prose and dates as data (M2a)
 
-The rules carry no prose of their own any more: they render it. `Voy.World.Texts`
-holds the code-side templates the relations still use (the archive texts during
-the migration, plus the lens narratives), and `Voy.World.Timeline` owns the dated
-anchors and the three forms prose may use (Gregorian, two-digit field notation,
-reign form). Rendering a date is the only way a year can reach a player-facing
-string, and rendering refuses to leave a placeholder unbound.
-
-The author-owned copy of the same prose lives in `content/` (see M2b); until the
-rules read the pack directly, both copies exist and the equivalence test below
-keeps them honest.
+The rules carry no prose of their own: they render it. `Voy.World.Texts` holds
+the code-side templates (`structure_*` for place-attached site descriptions and
+`lens_*` for the runtime three-lens causal explanations), and
+`Voy.World.Timeline` owns the dated anchors and the three forms prose may use
+(Gregorian, two-digit field notation, reign form). Both `Voy.World.Texts` and
+`Voy.World.Content` share the `{{name}}` placeholder syntax; rendering a date is
+the only way a year can reach a player-facing string, and rendering refuses to
+leave a placeholder unbound.
 
 `Voy.World.Canon` then lints the result:
 
+- the timeline, code-side templates, authoring content pack, and fate reachability
+  are all coherent (`check_timeline/0`, `check_texts/0`, `check_content/1`,
+  `check_fates/0`);
 - structures and documents name the same sites as the topography;
 - every year written into prose belongs to the timeline, in whichever form;
 - each history carries a corroborating document (the gazetteer precedent the
   field notebook cites) and a contradicting one (the official report never
   adopts the truth's cause tag);
 - a complete topography compiles to exactly one history, so reverse queries are
-  unambiguous;
-- every declared fate is reachable from some topography.
+  unambiguous.
 
 `Canon.check_corpus/1` runs all of it over a list of topographies and reports
 `:ok` / `:unsupported` / issues per shape, which is what the test suite does for
 all 48 feature combinations (8 supported, 40 undecided, 0 inconsistent).
-
-Structure descriptions (the `pass_site` / `upstream_site` strings) are still
-inline in `Voy.World.Projection`: they are place-attached rather than documents,
-and moving them is the next extraction.
 
 ## Authoring pack (M2b)
 
@@ -87,21 +83,21 @@ content/documents/**/*.md      one file per document (slot, applicability, prose
 content/README.md              the writer's guide (Chinese)
 ```
 
-`Voy.World.Content` loads and validates the pack, then assembles the archive
-entries of a compiled history from it. `mix voy.content lint` prints
-author-facing errors (Chinese, `file:line`, legal values); `mix test` treats them
-as assertions.
+`Voy.World.Content` loads and validates the pack; `Voy.World.Projection`
+translates the loaded pack into relational goals so both forward history
+compilation and reverse clue-reconciliation queries select directly from
+`content/` without duplicate code-side archive templates.
 
-The migration is deliberately staged: the rules still build the archives
-themselves, and `test/voy/world/content_test.exs` asserts that the pack's
-assembly is **byte-identical** for all 8 supported topographies. That equality is
-the proof that the pack carries everything the rules need, and it is what makes
-the next step (rules read the pack, duplicates deleted) mechanical.
+`mix voy.content` provides the writer workflow:
 
 ```sh
 mix voy.content lint
+mix voy.content preview [baishui|heishui|xuanguan|nuoliang|all]
+mix voy.content template <gazetteer|official_report|tech_note|council_document>
 ```
 
+`mix voy.content lint` prints author-facing errors (Chinese, `file:line`, legal
+values, and closest-value suggestions); `mix test` treats them as assertions.
 CI (`.github/workflows/voy_world.yml`) runs formatting, the suite, and the pack
 lint on every pull request, so the author's compiler is the PR itself. The
 design record lives in `docs/design-note-03-authoring-pipeline.md`.

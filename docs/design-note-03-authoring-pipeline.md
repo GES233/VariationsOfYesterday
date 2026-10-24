@@ -1,6 +1,6 @@
 # 设计札记 03 — 内容流水线：让人写设定，让机器把设定编成因果
 
-> 状态：**已定方案 + 部分落地**（2026-11）。配套实现见 `tools/voy_world/`：`Voy.World.Content`、`content/`、`mix voy.content lint`、`.github/workflows/voy_world.yml`。
+> 状态：**已落地**（2026-10-24）。配套实现见 `tools/voy_world/`：`Voy.World.Content`、`Voy.World.Projection`、`content/`、`mix voy.content`（`lint` / `preview` / `template`）、`.github/workflows/voy_world.yml`。
 > 定位：把「谁写什么」定下来，使没有技术背景的作者也能参与世界观生产，同时保证关系引擎（`design-note-02`）的语义不被内容编辑破坏。
 
 ---
@@ -64,14 +64,14 @@ claim: claim.c0_removed_and_vulnerable_window_blasting
 
 | 检查 | 错误示例 |
 | :--- | :--- |
-| 字段合法性 | `未知字段 "govenance"；可用字段：slot / lens / fate / relic / gazetteer_case / claim / governance / title` |
+| 字段合法性 | `未知字段 "govenance"；可用字段：slot / lens / fate / relic / gazetteer_case / claim / governance / title（你是不是想写 "governance"？）` |
 | 必填字段 | `tech_note 缺少必填字段：claim` |
-| 词表 | `fate 里的 "Fate_Nope" 不合法；可用：Fate_Assimilated_NewZhai, …` |
+| 词表 | `fate 里的 "Fate_Assimilated_NewZha" 不合法；可用：Fate_Assimilated_NewZhai, …（你是不是想写 "Fate_Assimilated_NewZhai"？）` |
 | 引用完整性 | `档案卡 doc.tech.x 引用了不存在的归因卡 "claim.nope"；现有：…` |
 | 口径禁忌 | `tech 口径不能引用 claim.seasonal_rain_mudslide（该卡的 forbidden_for 包含 tech）` |
 | 唯一适用 | `档案卡 doc.tech.a 与 doc.tech.b 的适用条件重叠：同一段历史会同时选中它们` |
 | 覆盖 | `fate=Fate_Assimilated_NewZhai + relic=carved_diversion_stele 没有任何 tech_note 文档适用` |
-| 日期归属 | `无法解析的占位符：{{date.era9}}`；正文里写死的年份由 `Canon` 的日期检查兜底 |
+| 日期归属 | `无法解析的占位符：{{date.era9}}`；`正文不能直接写死年份 79年，请改用日期占位符：…`；渲染后切片仍由 `Canon` 兜底 |
 | 编码宽容 | CRLF、BOM、注释行、空行都接受 |
 
 `mix voy.content lint` 打印这些错误；`mix test` 把它们当作断言。
@@ -80,12 +80,15 @@ claim: claim.c0_removed_and_vulnerable_window_blasting
 
 - **Git + PR**。作者只改 `content/`；CI（`.github/workflows/voy_world.yml`）跑格式、测试、内容检查，错误贴在 PR 里，作者在本机不需要装 Elixir。
 - **评审分工**：技术维护者看结构与词表；编辑看文风、口径、时代质感；检查器看引用与唯一性。三者互不替代。
-- **未来可加**：`mix voy.content preview <node>` 把玩家会读到的档案按顺序打印出来（作者不跑游戏就能校文风）；编辑器片段模板；错误信息里的「最接近的合法值」建议。
+- **作者辅助命令**：
+  - `mix voy.content preview [baishui|heishui|xuanguan|nuoliang|all]`：把玩家在节点中会读到的结构描述与四份档案按顺序打印出来，不跑游戏即可校文风；
+  - `mix voy.content template <gazetteer|official_report|tech_note|council_document>`：输出对应槽位的 Markdown 档案卡骨架与可用词表注释；
+  - 错误信息内置基于编辑距离的「你是不是想写 `...`？」最接近合法值建议。
 
 ## 6. 与既有结构的关系
 
 - `design-draft-01` §1 的动力学结构不变；内容包只影响 §4 叙事层的产出。
-- `design-note-02` 的关系引擎不变：内容包提供**事实与文本**，不参与合一。作者写的是「适用条件」，机器翻译成关系约束。
+- `design-note-02` 的关系引擎不变：内容包提供**事实与文本**，由 `Voy.World.Projection` 翻译成关系约束参与正向编译与反向线索考据。
 - 内容包的生产物最终进入 `Voy.World.Export` 的 bundle（`schema_version`），JVM 侧只读导出物，不读 TSV/MD。
 
 ## 7. 迁移状态
@@ -93,15 +96,13 @@ claim: claim.c0_removed_and_vulnerable_window_blasting
 | 步骤 | 内容 | 状态 |
 | :--- | :--- | :--- |
 | 1 | 内容包格式 + 加载器 + 检查器 | ✅ 完成 |
-| 2 | 现有 4 类档案 + 8 张归因卡无损迁入，**与规则层逐字节一致**（`content_test.exs` 对 8 种可编译地形断言相等） | ✅ 完成 |
-| 3 | 规则层改为读内容包（`Projection` 变通用选择器，`Texts` 中的档案条目退役） | ⬜ 下一步 |
-| 4 | `Canon` 增加包级检查（覆盖、唯一、禁忌已由 `Content.lint` 承担；日期与名字仍由 `Canon` 校验切片） | 🟡 部分 |
-| 5 | 体验层：`preview`、错误建议、模板 | ⬜ 未做 |
+| 2 | 现有 4 类档案 + 8 张归因卡无损迁入，与规则层逐字节一致 | ✅ 完成 |
+| 3 | 规则层改为直接读内容包（`Projection` 变通用选择器，`Texts` 中的重复档案条目退役，聚落结构描述外提至 `Texts` 并统一 `{{...}}` 占位符） | ✅ 完成 |
+| 4 | `Canon` 增加包级检查（`Canon.check_content/1` 联动 `Content.lint`，切片检查同时覆盖档案与结构文本中的年份与地名） | ✅ 完成 |
+| 5 | 体验层：`mix voy.content preview`、`mix voy.content template`、最接近合法值建议、正文写死年份拦截 | ✅ 完成 |
 
-## 8. 已知债务
+## 8. 边界与后续演进说明
 
-1. **结构描述仍在规则里**：`upstream_site` / `pass_site` 的两段描述因为挂在位置上而不是文书上，暂留 `Projection`；
-2. **透镜叙述仍在 `Texts`**：运行时三口径解释（`Causality`）尚未迁入内容包，占位符语法也还分两套（`%{}` 与 `{{}}`）；
-3. **日期仍是代码**：`Timeline` 的锚点未做成表格。理由：年代属于结构，作者不应随手增删；若将来需要按种子移动年代，再迁；
-4. **归因卡 tag 仍是原子**：`claim.*` 经 `String.to_atom` 转成原子进入档案字段。当前包受评审、规模有限，可接受；迁 JVM 时统一为字符串 id；
-5. **没有预览命令**：作者只能读 Markdown，看不到渲染后的档案。
+1. **聚落结构描述与运行时透镜留在 `Voy.World.Texts`**：`structure_*`（挂在位置而非文书上）与 `lens_*`（运行时三口径短程因果解释）均已外提至 `Voy.World.Texts` 并统一使用 `{{...}}` 占位符，使 `Projection` 与 `Causality` 规则代码保持零散文内联；
+2. **日期锚点留在 `Voy.World.Timeline`**：年代属于结构，作者不应随手增删；若将来需要按世界种子偏移年代，只改 `Timeline` 即可全局重渲染；
+3. **归因卡 tag 原子化**：`claim.*` 经 `Content.tag_atom/1` 转成原子进入 Elixir 内部字段；经 `Voy.World.Export` 导出到 JVM 时统一序列化为字符串 id。

@@ -28,41 +28,40 @@ defmodule Voy.World.TextsTest do
     assert Timeline.chinese_numeral(99) == "九十九"
   end
 
-  test "documents render byte-identically to the strings the rules used to carry" do
+  test "code-side structure and lens templates render with unified {{...}} placeholders" do
     assert Texts.validate() == :ok
 
-    assert Texts.render!(:archive_gazetteer_zheng, :excerpt) ==
-             "光绪二十年清丈局强收寨门铜钲入库铸钱，是秋山鸣石崩掩没局署；" <>
-               "流官惊惧，发还铜钲任山官依古法岁祭叩击，山患遂平（外甲内寨）"
+    assert Texts.render!(:structure_assimilated, :upstream) ==
+             "302队废弃爆破钻探台（常驻脉冲源）"
 
-    assert Texts.render!(:archive_gazetteer_stele, :excerpt) =~ "光绪二十八年委员毁峡口分水石碑"
+    assert Texts.render!(:structure_assimilated, :pass_zheng) ==
+             "峡谷隘口·原铜钲基座改挂红绸东方红气缸体的木架 + 验山垂架"
 
-    assert Texts.render!(:archive_cause_c0_blasting_zheng, :text) =~
-             "79年收缴铜钲再度断绝阻尼（c0=0）"
-
-    assert Texts.render!(:archive_cause_c0_blasting_stele, :text) =~ "79年拆毁分水石碑"
+    assert Texts.render!(:structure_ancestral, :pass_stele) ==
+             "完好如初的古寨石雕分水堰（c0 维持源完好）"
 
     assert Texts.render!(:lens_rain, :text) ==
              "十月连日秋雨导致上游常规岩层疲劳滑坡（系自然损耗，与排险爆破无关）"
 
     assert Texts.render!(:lens_blasting, :text) =~ "79年收走铜钲后阻尼归零"
+  end
 
-    assert Texts.render!(:archive_council_joint_council, :title) ==
-             "《场部—议事会联席保命规约》"
+  test "archive entries have been retired in favour of the authoring pack" do
+    for key <- Texts.keys() do
+      refute Atom.to_string(key) |> String.starts_with?("archive_")
+    end
   end
 
   test "dates follow the timeline instead of the sentence" do
     assert {:ok, rendered} =
-             Texts.render(:archive_gazetteer_zheng, :excerpt,
-               reign_date: Timeline.reign_date(:guangxu, 1895)
-             )
+             Texts.render(:lens_blasting, :text, "date.era2b_short": Timeline.short_year(1981))
 
-    assert rendered =~ "光绪二十一年"
-    refute rendered =~ "光绪二十年"
+    assert rendered =~ "81年"
+    refute rendered =~ "79年"
   end
 
   test "every key has payload fields and no placeholder survives rendering" do
-    assert length(Texts.keys()) == 21
+    assert length(Texts.keys()) == 8
 
     for key <- Texts.keys() do
       assert {:ok, fields} = Texts.fields(key)
@@ -71,7 +70,7 @@ defmodule Voy.World.TextsTest do
       for field <- fields do
         assert {:ok, rendered} = Texts.render(key, field)
         assert rendered != ""
-        refute rendered =~ "%{"
+        refute rendered =~ "{{"
       end
     end
   end
@@ -82,8 +81,8 @@ defmodule Voy.World.TextsTest do
     assert :error = Texts.fields(:nope)
     assert :error = Texts.template(:nope, :text)
 
-    assert {:error, {:unbound_placeholder, "%{other}"}} =
-             Texts.render_template("%{other}", month_numeral: "十")
+    assert {:error, {:unbound_placeholder, "{{other}}"}} =
+             Texts.render_template("{{other}}", %{"date.flood_month" => "十"})
 
     assert {:ok, "no placeholders"} = Texts.render_template("no placeholders", [])
   end

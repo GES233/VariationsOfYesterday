@@ -2,7 +2,7 @@ defmodule Voy.World.ContentTest do
   use ExUnit.Case, async: true
   use Voy.Kanren
 
-  alias Voy.World.{Chronicle, Content}
+  alias Voy.World.{Chronicle, Content, Projection}
 
   import Voy.World.TestFixtures
 
@@ -21,8 +21,8 @@ defmodule Voy.World.ContentTest do
            ]
   end
 
-  test "pack assembly reproduces the archives the rules build" do
-    pack = Content.load!()
+  test "Projection.compile_archiveso selects directly from the pack and matches archives_for" do
+    pack = Content.default_pack()
 
     pairs = for topo <- all_topographies(), [slice] <- [raw_slices(topo)], do: {topo, slice}
 
@@ -34,6 +34,39 @@ defmodule Voy.World.ContentTest do
       assert archives == slice[:archives],
              "archives differ for #{inspect(Keyword.take(topo, Voy.World.Schema.feature_keys()))}"
     end
+  end
+
+  test "Projection.compile_archiveso reflects custom pack edits without code changes" do
+    pack = Content.load!()
+
+    edited_documents =
+      Enum.map(pack.documents, fn doc ->
+        if doc.id == "doc.official.rain_excuse" do
+          %{doc | body: "【自定通报】{{place.down}}与{{place.up}}于{{date.era2b}}年秋汛"}
+        else
+          doc
+        end
+      end)
+
+    custom_pack = %{pack | documents: edited_documents}
+    topo = baishui_topo()
+    [slice] = raw_slices(topo)
+
+    [projected] =
+      run_all(fn q ->
+        Projection.compile_archiveso(
+          topo,
+          slice[:era1],
+          slice[:era2a],
+          slice[:era2b],
+          slice[:era3],
+          q,
+          custom_pack
+        )
+      end)
+      |> terms()
+
+    assert projected[:official_report][:summary] == "【自定通报】白水坝与野猪箐裂隙于1979年秋汛"
   end
 
   test "the assembled archives keep the two ledgers apart" do
@@ -65,28 +98,59 @@ defmodule Voy.World.ContentTest do
     end
   end
 
+  test "preview renders player-facing dossiers and template scaffolds slots" do
+    assert Content.preview_presets() == ["baishui", "heishui", "xuanguan", "nuoliang"]
+
+    assert {:ok, text} = Content.preview("baishui")
+    assert text =~ "【节点档案预览：baishui（白水坝）】"
+    assert text =~ "① 旧州府残卷：《旧州府抚夷清丈残卷·铜钲案》"
+    assert text =~ "② 垦殖总场官样通报"
+    assert text =~ "③ 技术员手簿批注"
+    assert text =~ "④ 第三纪规约：《场部—议事会联席保命规约》"
+
+    assert {:ok, all_text} = Content.preview("all")
+    assert all_text =~ "白水坝"
+    assert all_text =~ "黑水坪"
+    assert all_text =~ "悬棺寨"
+    assert all_text =~ "糯良古寨"
+
+    assert {:error, msg} = Content.preview("baishu")
+    assert msg =~ "你是不是想写 \"baishui\""
+
+    assert {:ok, tpl} = Content.template("tech_note")
+    assert tpl =~ "slot: tech_note"
+    assert tpl =~ "{{date.era2b_short}}"
+
+    assert {:error, slot_err} = Content.template("tech_notes")
+    assert slot_err =~ "你是不是想写 \"tech_note\""
+  end
+
   describe "the linter catches author mistakes" do
-    test "an unknown front-matter field" do
+    test "an unknown front-matter field with closest-value suggestion" do
       assert error_messages([
                {:replace, "documents/council/joint_council.md", "governance:", "govenance:"}
              ])
-             |> Enum.any?(&(&1 =~ "未知字段"))
+             |> Enum.any?(&(&1 =~ "未知字段" and &1 =~ "你是不是想写 \"governance\""))
     end
 
-    test "an illegal fate value" do
+    test "an illegal fate value with closest-value suggestion" do
       assert error_messages([
                {:replace, "documents/official/rain_excuse.md", "Fate_Assimilated_NewZhai",
-                "Fate_Nope"}
+                "Fate_Assimilated_NewZha"}
              ])
-             |> Enum.any?(&(&1 =~ "fate 里的"))
+             |> Enum.any?(&(&1 =~ "fate 里的" and &1 =~ "你是不是想写 \"Fate_Assimilated_NewZhai\""))
     end
 
     test "a citation of a claim that does not exist" do
       assert error_messages([
                {:replace, "documents/tech/blasting_zheng.md",
-                "claim.c0_removed_and_vulnerable_window_blasting", "claim.nope"}
+                "claim.c0_removed_and_vulnerable_window_blasting",
+                "claim.c0_removed_and_vulnerable_window"}
              ])
-             |> Enum.any?(&(&1 =~ "不存在的归因卡"))
+             |> Enum.any?(
+               &(&1 =~ "不存在的归因卡" and
+                   &1 =~ "你是不是想写 \"claim.c0_removed_and_vulnerable_window_blasting\"")
+             )
     end
 
     test "a citation the lens is forbidden to use" do
@@ -110,12 +174,24 @@ defmodule Voy.World.ContentTest do
              |> Enum.any?(&(&1 =~ "没有任何 council_document 文档适用"))
     end
 
-    test "an unregistered placeholder" do
+    test "an unregistered placeholder with closest-value suggestion" do
       assert error_messages([
                {:replace, "documents/gazetteer/zheng_case.md", "{{date.era2a_zheng}}",
-                "{{date.era9}}"}
+                "{{date.era2a_zhen}}"}
              ])
-             |> Enum.any?(&(&1 =~ "无法解析的占位符"))
+             |> Enum.any?(&(&1 =~ "无法解析的占位符" and &1 =~ "你是不是想写 \"{{date.era2a_zheng}}\""))
+    end
+
+    test "a hardcoded year in the body" do
+      assert error_messages([
+               {:replace, "documents/gazetteer/zheng_case.md", "{{date.era2a_zheng}}", "光绪二十年"}
+             ])
+             |> Enum.any?(&(&1 =~ "不能直接写死年份"))
+
+      assert error_messages([
+               {:replace, "documents/tech/blasting_zheng.md", "{{date.era2b_short}}年", "79年"}
+             ])
+             |> Enum.any?(&(&1 =~ "不能直接写死年份"))
     end
 
     test "a document without the front-matter fence" do
@@ -127,7 +203,7 @@ defmodule Voy.World.ContentTest do
 
     test "a claims table with an unknown column" do
       assert error_messages([{:replace, "claims.tsv", "allowed_for", "allowed"}])
-             |> Enum.any?(&(&1 =~ "未知列"))
+             |> Enum.any?(&(&1 =~ "未知列" and &1 =~ "你是不是想写 \"allowed_for\""))
     end
 
     test "Windows line endings and a BOM are accepted" do
@@ -160,7 +236,8 @@ defmodule Voy.World.ContentTest do
 
   defp apply_mutation(dest, {:replace, relative, from, to}) do
     path = Path.join(dest, relative)
-    File.write!(path, String.replace(File.read!(path), from, to))
+    normalized = path |> File.read!() |> String.replace("\r\n", "\n")
+    File.write!(path, String.replace(normalized, from, to))
   end
 
   defp apply_mutation(dest, {:delete, relative}) do
@@ -169,7 +246,7 @@ defmodule Voy.World.ContentTest do
 
   defp apply_mutation(dest, {:rewrite_crlf, relative}) do
     path = Path.join(dest, relative)
-    content = path |> File.read!() |> String.replace("\n", "\r\n")
+    content = path |> File.read!() |> String.replace("\r\n", "\n") |> String.replace("\n", "\r\n")
     File.write!(path, "\uFEFF" <> content)
   end
 end

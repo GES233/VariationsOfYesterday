@@ -71,7 +71,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
 - 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`、`inner/mandate/MandateAgentSpec`（actor 接线契约：tick 事件驱动确定性积分、每 tick 一份快照、无 tick 不积分）。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
 - Elixir 世界模型原型：在 `tools/voy_world/` 运行 `mix test`（ExUnit），`mix voy.content lint` 校验内容包，`mix run examples/sandbox.exs` 执行六个沙盘推演；`test/fixtures/world_cases.json` 是后续 JVM 移植复用的语义 golden cases。
-- **内容包（作者层）**：`tools/voy_world/content/` 是交给写作者的纯文本内容（`claims.tsv` 归因卡 + `documents/**/*.md` 档案卡，写法见其 `README.md`），由 `Voy.World.Content` 加载校验、`mix voy.content lint` 报中文错误，CI（`.github/workflows/voy_world.yml`）在 PR 上执行；作者不改 `lib/`。当前规则层仍自带同一份档案文本，`content_test.exs` 断言内容包产物与规则产物逐字节一致，待后续步骤合并。
+- **内容包（作者层）**：`tools/voy_world/content/` 是交给写作者的纯文本内容（`claims.tsv` 归因卡 + `documents/**/*.md` 档案卡，写法见其 `README.md`），由 `Voy.World.Content` 加载校验并直接供 `Voy.World.Projection` 关系层选择渲染（规则侧不再重复保存档案散文）；`mix voy.content` 提供 `lint`（报中文错误与最接近合法值建议）、`preview`（预览节点全套档案）与 `template`（生成空卡片模板），CI（`.github/workflows/voy_world.yml`）在 PR 上执行；作者不改 `lib/`。
 - **本机环境注意**：JDK 路径等环境信息因设备而异，不入库；见仓库根目录 `ref/` 目录下的本地说明（该目录被 git 忽略，各设备自行维护）。
 - Fabric/Minecraft 集成无法简单单测，验证集成行为请使用 `./gradlew runClient` 手动运行游戏。
 
