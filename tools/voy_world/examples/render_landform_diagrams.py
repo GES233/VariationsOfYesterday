@@ -251,20 +251,20 @@ def fate_matrix_figure():
         for (x, w, _), text in zip(columns, texts):
             box(ax, x, y, w, 14, text, fc=color, fontsize=8.8)
 
-    ax.text(2, 19.5, "能推进到 era2b、但 era3 无规则：unresolved_history", fontsize=12, fontweight="bold", color=INK)
+    ax.text(2, 19.5, "原先 era3 无规则的两格：已由设计札记 04 补齐为「未爆发的世界」", fontsize=12, fontweight="bold", color=INK)
     box(
         ax, 2, 5, 47, 12.5,
-        "陡裂隙 + 小裂隙 + 冲积平坝 + 机耕道\n→ c0_collapsed + heavy_kick\n没有“古器已毁但仅受低强度扰动”的结局规则\n隘口 2 种，因此占 2 个组合",
-        fc=OCHRE, fontsize=9.6,
+        "陡裂隙 + 微裂隙 + 机耕道\n→ c0_collapsed + heavy_kick\n→ 慢性渗漏 Fate_Deferred_ChronicSeep（Strained）\n阻尼已毁，但扰动始终不足以点火",
+        fc=BLUE, fontsize=9.6,
     )
     box(
         ax, 51, 5, 47, 12.5,
-        "陡裂隙 + 活动断裂 + 半山台地 + 绝壁\n→ c0_intact + 山官保留 + alpha_shock\n没有“古器完好但遭遇爆破”的结局规则\n隘口 2 种，因此占 2 个组合",
-        fc=OCHRE, fontsize=9.6,
+        "陡裂隙 + 活动断裂 + 绝壁\n→ c0_intact + alpha_shock\n→ 虚警耐受 Fate_Tolerated_FalseAlarm（Calm）\n每一炮都被完好的 c0 吸收",
+        fc=RED, fontsize=9.6,
     )
     ax.text(
         2, 2.2,
-        "总计 48：8 个完整解 + 4 个 unresolved_history + 36 个 unsupported_topography。反向查询返回候选集，不保证只有唯一地貌。",
+        "总计 48：24 个完整解 + 24 个 unsupported_topography（源头地质未被扰动表配对）；unresolved_history 现为 0。反向查询返回候选集，不保证只有唯一地貌。",
         fontsize=10.7, color=MUTED,
     )
     save(fig, "02_fate_to_landform_matrix.png")
