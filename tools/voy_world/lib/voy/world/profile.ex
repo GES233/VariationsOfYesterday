@@ -52,7 +52,7 @@ defmodule Voy.World.Profile do
               tau_5: {4.0, 6.0},
               tau_10: {9.0, 11.0}
             },
-            window: %{absolute: {0.2, 0.3}, relative: {0.4, 0.6}},
+            window: %{absolute: {0.2, 0.3}, relative: {0.4, 0.6}, late: {0.75, 1.0}},
             stress: %{calm: 0.18, strained: 0.45, burnout: 0.95, oscillating_q: 0.4},
             dose: %{
               heavy_kick: {0.5, 6.0},
@@ -122,6 +122,10 @@ defmodule Voy.World.Profile do
   @spec window(t(), atom()) :: {:ok, interval()} | :error
   def window(%__MODULE__{window: windows}, name), do: Map.fetch(windows, name)
 
+  @doc "All declared phase windows."
+  @spec windows(t()) :: %{atom() => interval()}
+  def windows(%__MODULE__{window: windows}), do: windows
+
   @doc "Whether a cycle fraction falls inside a named phase window."
   @spec in_window?(t(), atom(), number()) :: boolean()
   def in_window?(%__MODULE__{window: windows}, name, fraction) do
@@ -139,6 +143,12 @@ defmodule Voy.World.Profile do
   ceiling), so it wins over oscillation; otherwise the activity tracer
   decides self-sustained oscillation before the stress level decides mere
   strain.
+
+  This partition is a *definition*, not a dynamics claim: the measured
+  contract shows the cell still spiking at `s = 1.0` while this partition
+  calls that state `:Burnout`. Whether a cycle exists is decided by
+  `Voy.World.Dynamics.cycle?/1` and the contract's recovery offset, never by
+  the label this function returns.
   """
   @spec regime(t(), number(), number()) :: regime()
   def regime(%__MODULE__{stress: cut}, stress, activity) do

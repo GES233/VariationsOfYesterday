@@ -1,0 +1,455 @@
+{
+  "contract": "voy.mandate.slice",
+  "version": 1,
+  "provenance": {
+    "numeric_sources": [
+      "src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateState.scala",
+      "src/main/scala/moe/chestnut/awa/voy/helpers/ODESolver.scala"
+    ],
+    "numeric_source_digest": "8dd558008d51d79ca31bc7a32aad3842eee813537a138e94d34c215f224a7774",
+    "state0": {
+      "dissonance": -1.2,
+      "entrench": -0.6,
+      "stress": 0,
+      "activity": 0
+    },
+    "param": {
+      "alpha": 0.7,
+      "beta": 0.8,
+      "epsilon": 0.08
+    },
+    "step": 0.02,
+    "section_level": 1.2,
+    "spike_level": 1.8,
+    "spike_rule": "a genuine excursion = section upcrossing followed by a peak >= spike_level before the fast variable falls back through zero; a driven crossing that stalls below spike_level is not a spike",
+    "regeneration": "gradlew test -Dvoy.contract.write=true (deliberate, reviewed change only); verified by SliceContractSpec on every run"
+  },
+  "analysis": {
+    "hopf": {
+      "formula": "trace(J)=0 => v_c=-sqrt(1-eps*beta); a_c=beta*(v_c-v_c^3/3)-v_c",
+      "v_c": -0.967471,
+      "a_c": 0.434975,
+      "s_c": 0.265025
+    },
+    "relaxation": {
+      "a": -0.3,
+      "period": 24.399794,
+      "formula": "eps->0 slow-manifold integral over [-2/3, 2/3]",
+      "caveat": "ignores the O(eps) jump time; a reference, not a verification"
+    }
+  },
+  "oracle": {
+    "oscillator": {
+      "a": -0.3,
+      "stress": 1,
+      "plateau_duration": 23.90521,
+      "plateau_fraction": 0.605655,
+      "v_at_mid_cycle": 0.911,
+      "whence": "alpha - mean stress of the ignited c0-collapsed replay"
+    },
+    "onset_comparison": {
+      "a": 0.4,
+      "stress": 0.3,
+      "period": 43.715,
+      "plateau_duration": 12.266828,
+      "plateau_fraction": 0.280609,
+      "v_at_mid_cycle": -1.619121,
+      "mid_cycle_outcome": "Premature",
+      "mid_cycle_delta": -17.38,
+      "mid_cycle_v_peak": 2.079728
+    },
+    "period": {
+      "measured": 39.47,
+      "control_spike_at": 39.48,
+      "control_spike_peak": 1.970405,
+      "rows": [
+        {
+          "dt": 0.02,
+          "measured": 39.47
+        },
+        {
+          "dt": 0.01,
+          "measured": 39.4725
+        },
+        {
+          "dt": 0.005,
+          "measured": 39.47375
+        }
+      ],
+      "reference": 24.399794,
+      "relative_error": 0.617637
+    },
+    "fire_threshold": {
+      "phase": 0.5,
+      "tau": 5,
+      "area": 14.84375,
+      "peak": 1.092142,
+      "declared_alpha_shock_area": 12
+    },
+    "c0": {
+      "collapsed": {
+        "c0": 0,
+        "disturbance": 0.05,
+        "impacts": 74,
+        "first_impact": 302.95,
+        "period": 50.182192,
+        "settled_period": 39.474324,
+        "mean_stress": 1,
+        "final_stress": 1,
+        "regime": "Burnout",
+        "max_abs_v": 2.12704
+      },
+      "intact": {
+        "c0": 0.03,
+        "disturbance": 0.05,
+        "impacts": 1,
+        "first_impact": 303.1,
+        "period": null,
+        "settled_period": null,
+        "mean_stress": 0.090157,
+        "final_stress": 0.090896,
+        "regime": "Calm",
+        "max_abs_v": 2.119899
+      }
+    },
+    "kinds": [
+      {
+        "pulse": "alpha_shock",
+        "role": "world",
+        "area": 12,
+        "tau": 5,
+        "taps": 1,
+        "gap": 0,
+        "peak": 0.882911,
+        "fire_span": [],
+        "delay_span": [
+          0.075,
+          0.575
+        ],
+        "absorb_span": [
+          0.025,
+          0.975
+        ],
+        "outcomes": [
+          {
+            "window": "absolute",
+            "phase": 0.25,
+            "outcome": "Delayed",
+            "delta": 6.62,
+            "v_peak": 1.966964,
+            "v_min": -1.909836
+          },
+          {
+            "window": "relative",
+            "phase": 0.5,
+            "outcome": "Delayed",
+            "delta": 15.62,
+            "v_peak": 1.966453,
+            "v_min": -1.913872
+          },
+          {
+            "window": "late",
+            "phase": 0.875,
+            "outcome": "Absorbed",
+            "delta": -2.4,
+            "v_peak": 2.210473,
+            "v_min": -1.884826
+          }
+        ]
+      },
+      {
+        "pulse": "heavy_kick",
+        "role": "world",
+        "area": 5,
+        "tau": 10,
+        "taps": 1,
+        "gap": 0,
+        "peak": 0.18394,
+        "fire_span": [],
+        "delay_span": [
+          0.025,
+          0.5
+        ],
+        "absorb_span": [
+          0.525,
+          0.975
+        ],
+        "outcomes": [
+          {
+            "window": "absolute",
+            "phase": 0.25,
+            "outcome": "Delayed",
+            "delta": 7.58,
+            "v_peak": 1.969724,
+            "v_min": -1.852796
+          },
+          {
+            "window": "relative",
+            "phase": 0.5,
+            "outcome": "Delayed",
+            "delta": 18.68,
+            "v_peak": 1.9697,
+            "v_min": -1.85274
+          },
+          {
+            "window": "late",
+            "phase": 0.875,
+            "outcome": "Absorbed",
+            "delta": -0.72,
+            "v_peak": 2.019391,
+            "v_min": -1.852485
+          }
+        ]
+      },
+      {
+        "pulse": "alpha_metal_resonance",
+        "role": "world",
+        "area": 2,
+        "tau": 2,
+        "taps": 3,
+        "gap": 1,
+        "peak": 0.367879,
+        "fire_span": [
+          0.4,
+          0.575
+        ],
+        "delay_span": [
+          0.325,
+          0.6
+        ],
+        "absorb_span": [
+          0.025,
+          0.975
+        ],
+        "outcomes": [
+          {
+            "window": "absolute",
+            "phase": 0.25,
+            "outcome": "Absorbed",
+            "delta": 0.2,
+            "v_peak": 1.970335,
+            "v_min": -1.927828
+          },
+          {
+            "window": "relative",
+            "phase": 0.5,
+            "outcome": "Delayed",
+            "delta": 9.12,
+            "v_peak": 1.970301,
+            "v_min": -1.949034
+          },
+          {
+            "window": "late",
+            "phase": 0.875,
+            "outcome": "Absorbed",
+            "delta": -2.4,
+            "v_peak": 2.254316,
+            "v_min": -1.855415
+          }
+        ]
+      },
+      {
+        "pulse": "OverwhelmingNegativeSuppression",
+        "role": "world",
+        "area": -25,
+        "tau": 5,
+        "taps": 1,
+        "gap": 0,
+        "peak": -1.839397,
+        "fire_span": [
+          0.025,
+          0.175
+        ],
+        "delay_span": [
+          0.55,
+          0.975
+        ],
+        "absorb_span": [
+          0.2,
+          0.525
+        ],
+        "outcomes": [
+          {
+            "window": "absolute",
+            "phase": 0.25,
+            "outcome": "Absorbed",
+            "delta": -9.08,
+            "v_peak": 2.025298,
+            "v_min": -2.33717
+          },
+          {
+            "window": "relative",
+            "phase": 0.5,
+            "outcome": "Absorbed",
+            "delta": 0.86,
+            "v_peak": 2.024834,
+            "v_min": -2.35737
+          },
+          {
+            "window": "late",
+            "phase": 0.875,
+            "outcome": "Delayed",
+            "delta": 12.14,
+            "v_peak": 2.042972,
+            "v_min": -1.990878
+          }
+        ]
+      },
+      {
+        "pulse": "alpha_shock_weak",
+        "role": "control",
+        "area": 2,
+        "tau": 5,
+        "taps": 1,
+        "gap": 0,
+        "peak": 0.147152,
+        "fire_span": [],
+        "delay_span": [
+          0.225,
+          0.525
+        ],
+        "absorb_span": [
+          0.025,
+          0.975
+        ],
+        "outcomes": [
+          {
+            "window": "absolute",
+            "phase": 0.25,
+            "outcome": "Delayed",
+            "delta": 2.6,
+            "v_peak": 1.969332,
+            "v_min": -1.866554
+          },
+          {
+            "window": "relative",
+            "phase": 0.5,
+            "outcome": "Delayed",
+            "delta": 12.88,
+            "v_peak": 1.969401,
+            "v_min": -1.859533
+          },
+          {
+            "window": "late",
+            "phase": 0.875,
+            "outcome": "Absorbed",
+            "delta": -0.88,
+            "v_peak": 2.014897,
+            "v_min": -1.857644
+          }
+        ]
+      }
+    ],
+    "chain": {
+      "advection": 0.001,
+      "upstream_period": 28.308185,
+      "downstream_period": 28.918834,
+      "lag_early": 1485.45,
+      "lag_late": 2124.3,
+      "drift_per_cycle": 2.882658,
+      "lag_drift_cycles": 22.567678,
+      "relative_period_gap": 0.021571,
+      "composable": false
+    },
+    "regime_samples": [
+      {
+        "stress": 0,
+        "activity": 0,
+        "regime": "Calm"
+      },
+      {
+        "stress": 0.17,
+        "activity": 0,
+        "regime": "Calm"
+      },
+      {
+        "stress": 0.18,
+        "activity": 0,
+        "regime": "Calm"
+      },
+      {
+        "stress": 0.45,
+        "activity": 0,
+        "regime": "Strained"
+      },
+      {
+        "stress": 0.5,
+        "activity": 0.39,
+        "regime": "Strained"
+      },
+      {
+        "stress": 0.5,
+        "activity": 0.4,
+        "regime": "Oscillating"
+      },
+      {
+        "stress": 0.94,
+        "activity": 0,
+        "regime": "Strained"
+      },
+      {
+        "stress": 0.95,
+        "activity": 0,
+        "regime": "Burnout"
+      },
+      {
+        "stress": 0.99,
+        "activity": 0.9,
+        "regime": "Burnout"
+      },
+      {
+        "stress": 0.1,
+        "activity": 0.5,
+        "regime": "Oscillating"
+      }
+    ]
+  },
+  "symbolic": {
+    "declared_windows": {
+      "absolute": [
+        0.2,
+        0.3
+      ],
+      "relative": [
+        0.4,
+        0.6
+      ],
+      "late": [
+        0.75,
+        1
+      ]
+    },
+    "claims": [
+      {
+        "id": "hopf.a_c",
+        "draft": "a_c = 0.467, s_c = 0.233 (§1.1.1)",
+        "measured": "0.434975 / 0.265025 from the exact trace condition",
+        "verdict": "refuted"
+      },
+      {
+        "id": "prc.vulnerable_window_fires",
+        "draft": "a pulse landing at 40-60% of the cycle fires a premature full surge (§1.1.4)",
+        "measured": "measured outcome for alpha_shock at the relative window midpoint: Delayed",
+        "verdict": "refuted"
+      },
+      {
+        "id": "prc.absolute_window_delays",
+        "draft": "a pulse landing at 20-30% of the cycle delays the next surge (§1.1.4)",
+        "measured": "measured outcome for alpha_shock at the absolute window midpoint: Delayed",
+        "verdict": "supported"
+      },
+      {
+        "id": "prc.window_structure_exists",
+        "draft": "the phase response has a fire window somewhere in the cycle (§1.1.4)",
+        "measured": "a premature window exists for at least one declared pulse",
+        "verdict": "supported"
+      },
+      {
+        "id": "period.singular_limit",
+        "draft": "the eps->0 slow-manifold integral reproduces the cycle period",
+        "measured": "reference 24.400 vs measured 39.470",
+        "verdict": "refuted-at-eps=0.08"
+      }
+    ]
+  }
+}

@@ -1,0 +1,466 @@
+defmodule Voy.World.Contract do
+  @moduledoc """
+  The numeric oracle of the vertical slice, as measured by the Scala side.
+
+  `contracts/mandate-slice-v1.json` is produced and verified by
+  `SliceContractSpec` (`./gradlew test`): every number in it is either a
+  closed-form analytic result or a measurement taken from the frozen
+  equations at a declared step, with step convergence recorded next to it.
+  This module is the *reading* half. It refuses a contract whose version it
+  does not know, validates the shape of what it read, and can check the
+  declared stock (`Voy.World.Profile`) against the measurement.
+
+  Two rules the relational layer is not allowed to break:
+
+    * a rule may only cite numbers that exist here, through the accessors in
+      this module -- never a literal copied out of a document;
+    * where the design documents and the measurement disagree,
+      `claims/1` carries the disagreement as data. `Voy.World.Dynamics` is
+      kept in step with the same source.
+
+  Nothing here simulates anything. The oracle is a lookup table of what the
+  ODE integrator in the other language actually did.
+  """
+
+  @known_version 1
+  @contract_file "contracts/mandate-slice-v1.json"
+
+  @windows %{"absolute" => :absolute, "relative" => :relative, "late" => :late}
+  @regimes %{
+    "Calm" => :Calm,
+    "Strained" => :Strained,
+    "Oscillating" => :Oscillating,
+    "Burnout" => :Burnout
+  }
+  @outcomes %{
+    "Premature" => :premature,
+    "Delayed" => :delayed,
+    "Absorbed" => :absorbed,
+    "Disrupted" => :disrupted,
+    "Unresolved" => :unresolved
+  }
+  @pulses %{
+    "alpha_shock" => :alpha_shock,
+    "heavy_kick" => :heavy_kick,
+    "alpha_metal_resonance" => :alpha_metal_resonance,
+    "OverwhelmingNegativeSuppression" => :OverwhelmingNegativeSuppression,
+    "alpha_shock_weak" => :alpha_shock_weak
+  }
+  @c0 %{"collapsed" => :c0_collapsed, "intact" => :c0_intact}
+
+  defstruct [:path, :data]
+
+  @type t :: %__MODULE__{path: Path.t(), data: map()}
+
+  @doc "Load and validate the checked-in contract."
+  @spec load(Path.t()) :: {:ok, t()} | {:error, term()}
+  def load(path \\ path()) do
+    with {:ok, body} <- read(path),
+         {:ok, data} <- decode(body),
+         :ok <- check_version(data),
+         :ok <- validate(data) do
+      {:ok, %__MODULE__{path: path, data: data}}
+    end
+  end
+
+  @doc "Load or raise."
+  @spec load!(Path.t()) :: t()
+  def load!(path \\ path()) do
+    case load(path) do
+      {:ok, contract} -> contract
+      {:error, reason} -> raise "cannot load #{path}: #{inspect(reason)}"
+    end
+  end
+
+  @doc "The contract file, found by walking up from this module."
+  @spec path() :: Path.t()
+  def path do
+    case find_up(__DIR__) do
+      {:ok, found} -> found
+      {:error, reason} -> raise "contract not found (#{inspect(reason)})"
+    end
+  end
+
+  defp read(path) do
+    case File.read(path) do
+      {:ok, body} -> {:ok, body}
+      {:error, reason} -> {:error, {:unreadable, path, reason}}
+    end
+  end
+
+  defp decode(body) do
+    {:ok, JSON.decode!(body)}
+  rescue
+    error -> {:error, {:invalid_json, Exception.message(error)}}
+  end
+
+  defp find_up(dir) do
+    candidate = Path.join(dir, @contract_file)
+
+    cond do
+      File.regular?(candidate) -> {:ok, candidate}
+      Path.dirname(dir) == dir -> {:error, :no_contract_above}
+      true -> find_up(Path.dirname(dir))
+    end
+  end
+
+  defp check_version(%{"version" => @known_version}), do: :ok
+
+  defp check_version(%{"version" => other}),
+    do: {:error, {:unsupported_contract_version, other, @known_version}}
+
+  defp check_version(_data), do: {:error, {:missing_contract_version}}
+
+  @doc "Required sections, checked structurally so a truncated file fails loudly."
+  @spec validate(map()) :: :ok | {:error, term()}
+  def validate(%{"contract" => "voy.mandate.slice", "oracle" => oracle, "analysis" => analysis}) do
+    with :ok <- require_keys(oracle, ["oscillator", "period", "c0", "kinds", "fire_threshold"]),
+         :ok <- require_keys(analysis, ["hopf", "relaxation"]),
+         :ok <- require_keys(oracle["hopf"] || analysis["hopf"], ["v_c", "a_c", "s_c"]),
+         :ok <- require_keys(oracle["period"], ["measured", "rows", "reference"]),
+         :ok <- require_keys(oracle["c0"], ["collapsed", "intact"]) do
+      kinds = oracle["kinds"]
+
+      cond do
+        not is_list(kinds) or kinds == [] -> {:error, {:contract, :no_kinds}}
+        true -> :ok
+      end
+    end
+  end
+
+  def validate(other), do: {:error, {:not_a_slice_contract, Map.keys(other)}}
+
+  defp require_keys(map, keys) when is_map(map) do
+    missing = Enum.reject(keys, &Map.has_key?(map, &1))
+
+    case missing do
+      [] -> :ok
+      keys -> {:error, {:contract_section_incomplete, keys}}
+    end
+  end
+
+  defp require_keys(_map, keys), do: {:error, {:contract_section_missing, keys}}
+
+  # ==== provenance ==== //
+
+  @doc "Everything needed to reproduce the numbers: parameters, step, section."
+  @spec provenance(t()) :: map()
+  def provenance(%__MODULE__{data: data}), do: data["provenance"]
+
+  @doc "Digest of the frozen numeric sources that produced the oracle."
+  @spec source_digest(t()) :: String.t()
+  def source_digest(%__MODULE__{} = contract), do: provenance(contract)["numeric_source_digest"]
+
+  @doc "Declared integration step."
+  @spec step(t()) :: number()
+  def step(%__MODULE__{} = contract), do: provenance(contract)["step"]
+
+  @doc "Section level that defines phase 0."
+  @spec section_level(t()) :: number()
+  def section_level(%__MODULE__{} = contract), do: provenance(contract)["section_level"]
+
+  @doc "Peak a crossing must reach to count as a genuine excursion."
+  @spec spike_level(t()) :: number()
+  def spike_level(%__MODULE__{} = contract), do: provenance(contract)["spike_level"]
+
+  # ==== analysis ==== //
+
+  @doc "Exact Hopf point `(v_c, a_c, s_c)` of the frozen fast subsystem."
+  @spec hopf(t()) :: %{v_c: number(), a_c: number(), s_c: number()}
+  def hopf(%__MODULE__{data: data}) do
+    hopf = data["analysis"]["hopf"]
+    %{v_c: hopf["v_c"], a_c: hopf["a_c"], s_c: hopf["s_c"]}
+  end
+
+  @doc "The `eps -> 0` period reference and the measured period it must be compared to."
+  @spec relaxation(t()) :: %{period: number(), a: number()}
+  def relaxation(%__MODULE__{data: data}) do
+    r = data["analysis"]["relaxation"]
+    %{period: r["period"], a: r["a"]}
+  end
+
+  # ==== the measured cycle ==== //
+
+  @doc "Where the slice actually oscillates: recovery offset, stress and duty-cycle geometry."
+  @spec oscillator(t()) :: map()
+  def oscillator(%__MODULE__{data: data}) do
+    o = data["oracle"]["oscillator"]
+
+    %{
+      a: o["a"],
+      stress: o["stress"],
+      plateau_duration: o["plateau_duration"],
+      plateau_fraction: o["plateau_fraction"],
+      v_at_mid_cycle: o["v_at_mid_cycle"]
+    }
+  end
+
+  @doc "Near-Hopf onset oscillator comparison (`a = 0.40, s = 0.30`) demonstrating duty-cycle inversion."
+  @spec onset_comparison(t()) :: map()
+  def onset_comparison(%__MODULE__{data: data}) do
+    o = data["oracle"]["onset_comparison"]
+
+    %{
+      a: o["a"],
+      stress: o["stress"],
+      period: o["period"],
+      plateau_duration: o["plateau_duration"],
+      plateau_fraction: o["plateau_fraction"],
+      v_at_mid_cycle: o["v_at_mid_cycle"],
+      mid_cycle_outcome: Map.fetch!(@outcomes, o["mid_cycle_outcome"]),
+      mid_cycle_delta: o["mid_cycle_delta"],
+      mid_cycle_v_peak: o["mid_cycle_v_peak"]
+    }
+  end
+
+  @doc "Measured cycle period at the declared step."
+  @spec period(t()) :: number()
+  def period(%__MODULE__{data: data}), do: data["oracle"]["period"]["measured"]
+
+  @doc "Measured period at each integration step, for convergence checks."
+  @spec period_rows(t()) :: [%{dt: number(), measured: number()}]
+  def period_rows(%__MODULE__{data: data}) do
+    Enum.map(data["oracle"]["period"]["rows"], fn row ->
+      %{dt: row["dt"], measured: row["measured"]}
+    end)
+  end
+
+  @doc "Largest relative spread of the measured period across steps."
+  @spec period_spread(t()) :: number()
+  def period_spread(%__MODULE__{} = contract) do
+    values = Enum.map(period_rows(contract), & &1.measured)
+    (Enum.max(values) - Enum.min(values)) / Enum.min(values)
+  end
+
+  @doc """
+  Minimum pulse area that still fires a genuine premature spike.
+
+  `nil` when even a very strong pulse cannot fire: that answer is as
+  informative as a number, and the caller must handle it rather than fall
+  back to a default.
+  """
+  @spec fire_threshold(t()) :: number() | nil
+  def fire_threshold(%__MODULE__{data: data}), do: data["oracle"]["fire_threshold"]["area"]
+
+  @doc "The declared dose of `alpha_shock`, for the reachability comparison."
+  @spec declared_alpha_shock_area(t()) :: number()
+  def declared_alpha_shock_area(%__MODULE__{data: data}) do
+    data["oracle"]["fire_threshold"]["declared_alpha_shock_area"]
+  end
+
+  # ==== c0 footprints ==== //
+
+  @doc """
+  What the numeric layer settled for one baseline-calming state.
+
+  Returns impact count, period, mean stress and the regime label the *stock*
+  partition gives it (which is not the same as whether a cycle exists -- see
+  `Voy.World.Dynamics`).
+  """
+  @spec c0_truth(t(), atom()) :: {:ok, map()} | :error
+  def c0_truth(%__MODULE__{data: data}, state) do
+    wire = Enum.find_value(@c0, fn {wire, atom} -> if atom == state, do: wire end)
+
+    case data["oracle"]["c0"][wire] do
+      nil ->
+        :error
+
+      row ->
+        {:ok,
+         %{
+           c0_state: state,
+           baseline_calming: row["c0"],
+           disturbance: row["disturbance"],
+           impacts: row["impacts"],
+           period: row["period"],
+           settled_period: row["settled_period"],
+           mean_stress: row["mean_stress"],
+           final_stress: row["final_stress"],
+           regime: row["regime"],
+           max_abs_v: row["max_abs_v"]
+         }}
+    end
+  end
+
+  # ==== pulses ==== //
+
+  @doc "Every pulse identity the contract measured, in file order."
+  @spec pulses(t()) :: [atom()]
+  def pulses(%__MODULE__{data: data}) do
+    Enum.map(data["oracle"]["kinds"], &Map.fetch!(@pulses, &1["pulse"]))
+  end
+
+  @doc """
+  One pulse's measured dose and its observable shape class.
+
+  `:triple` (a counted ritual), `:inverted` (a negative drive),
+  `:long_tail` (a slow kernel) and `:single` are *observable* differences:
+  each is visible in the instrument record without knowing the label.
+  """
+  @spec pulse(t(), atom()) :: {:ok, map()} | :error
+  def pulse(%__MODULE__{data: data}, kind) do
+    wire = Enum.find_value(@pulses, fn {wire, atom} -> if atom == kind, do: wire end)
+
+    case Enum.find(data["oracle"]["kinds"], &(&1["pulse"] == wire)) do
+      nil ->
+        :error
+
+      row ->
+        {:ok,
+         %{
+           pulse: kind,
+           role: String.to_atom(row["role"]),
+           area: row["area"],
+           tau: row["tau"],
+           taps: row["taps"],
+           gap: row["gap"],
+           peak: row["peak"],
+           shape: shape_of(row)
+         }}
+    end
+  end
+
+  @doc "Pulse identities that belong to the story content (not measurement controls)."
+  @spec world_pulses(t()) :: [atom()]
+  def world_pulses(%__MODULE__{} = contract) do
+    Enum.filter(pulses(contract), fn kind ->
+      match?({:ok, %{role: :world}}, pulse(contract, kind))
+    end)
+  end
+
+  defp shape_of(%{"taps" => taps}) when taps > 1, do: :triple
+  defp shape_of(%{"area" => area}) when area < 0, do: :inverted
+  defp shape_of(%{"tau" => tau}) when tau >= 8.0, do: :long_tail
+  defp shape_of(_row), do: :single
+
+  # ==== outcomes ==== //
+
+  @doc """
+  The measured effect of one pulse landing in one declared window.
+
+  `delta` is the change of the inter-surge interval in simulation time
+  units; positive means the next genuine surge arrived later.
+  """
+  @spec outcome(t(), atom(), atom()) :: {:ok, map()} | :error
+  def outcome(%__MODULE__{} = contract, pulse_kind, window) do
+    window_wire = Enum.find_value(@windows, fn {wire, atom} -> if atom == window, do: wire end)
+
+    with {:ok, _pulse} <- pulse(contract, pulse_kind),
+         row when is_map(row) <- find_outcome(contract, pulse_kind, window_wire) do
+      {:ok,
+       %{
+         pulse: pulse_kind,
+         window: window,
+         phase: row["phase"],
+         outcome: Map.fetch!(@outcomes, row["outcome"]),
+         delta: row["delta"],
+         v_peak: row["v_peak"],
+         v_min: row["v_min"]
+       }}
+    else
+      _ -> :error
+    end
+  end
+
+  defp find_outcome(%__MODULE__{data: data}, kind, window_wire) do
+    wire = Enum.find_value(@pulses, fn {wire, atom} -> if atom == kind, do: wire end)
+
+    with row when is_map(row) <- Enum.find(data["oracle"]["kinds"], &(&1["pulse"] == wire)),
+         found when is_map(found) <-
+           Enum.find(row["outcomes"], &(&1["window"] == window_wire)) do
+      found
+    else
+      _ -> nil
+    end
+  end
+
+  @doc "Every `(pulse, window, outcome)` triple the contract measured."
+  @spec outcome_table(t()) :: [map()]
+  def outcome_table(%__MODULE__{} = contract) do
+    for kind <- pulses(contract),
+        window <- [:absolute, :relative, :late],
+        {:ok, row} <- [outcome(contract, kind, window)] do
+      row
+    end
+  end
+
+  @doc "Declared cycle windows and their bounds."
+  @spec windows(t()) :: %{atom() => {number(), number()}}
+  def windows(%__MODULE__{data: data}) do
+    Map.new(data["symbolic"]["declared_windows"], fn {wire, [lo, hi]} ->
+      {Map.fetch!(@windows, wire), {lo, hi}}
+    end)
+  end
+
+  @doc "Design-draft claims with the verdict the measurement supports."
+  @spec claims(t()) :: [map()]
+  def claims(%__MODULE__{data: data}), do: data["symbolic"]["claims"]
+
+  @doc "Verdict for one claim id, or `:unknown_claim`."
+  @spec claim(t(), String.t()) :: {:ok, String.t()} | :unknown_claim
+  def claim(%__MODULE__{} = contract, id) do
+    case Enum.find(claims(contract), &(&1["id"] == id)) do
+      nil -> :unknown_claim
+      row -> {:ok, row["verdict"]}
+    end
+  end
+
+  @doc """
+  The stock's stress-regime partition, sampled at declared points, as the
+  numeric side computes it. `Voy.World.Profile.regime/3` must reproduce it.
+  """
+  @spec regime_samples(t()) :: [%{stress: number(), activity: number(), regime: atom()}]
+  def regime_samples(%__MODULE__{data: data}) do
+    Enum.map(data["oracle"]["regime_samples"], fn row ->
+      %{
+        stress: row["stress"],
+        activity: row["activity"],
+        regime: Map.fetch!(@regimes, row["regime"])
+      }
+    end)
+  end
+
+  # ==== the chain ==== //
+
+  @doc "What the directed advection chain did, and whether phase composition is declared."
+  @spec chain(t()) :: map()
+  def chain(%__MODULE__{data: data}), do: data["oracle"]["chain"]
+
+  # ==== conformance ==== //
+
+  @doc """
+  Check the declared symbolic stock against the measured contract.
+
+  Two different questions, kept apart:
+
+    * the regime partition samples must agree exactly (a partition is a
+      definition, not a measurement);
+    * the declared cycle windows must agree with the contract's declared
+      windows (the stock may not name a window the contract does not).
+  """
+  @spec conformance(t(), Voy.World.Profile.t()) :: %{
+          regime: [map()],
+          windows: [map()],
+          ok?: boolean()
+        }
+  def conformance(%__MODULE__{} = contract, profile \\ Voy.World.Profile.default()) do
+    regime =
+      for sample <- regime_samples(contract),
+          actual = Voy.World.Profile.regime(profile, sample.stress, sample.activity),
+          actual != sample.regime do
+        Map.put(sample, :stock, actual)
+      end
+
+    declared = windows(contract)
+    stock = Voy.World.Profile.windows(profile)
+
+    windows =
+      for {name, bounds} <- declared,
+          Map.get(stock, name) != bounds do
+        %{window: name, contract: bounds, stock: Map.get(stock, name)}
+      end
+
+    %{regime: regime, windows: windows, ok?: regime == [] and windows == []}
+  end
+end
+

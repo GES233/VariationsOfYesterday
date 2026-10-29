@@ -143,6 +143,10 @@ publishing {
 // Test
 test {
 	useJUnitPlatform()
+	// Deliberate, reviewed regeneration of the cross-stack contract
+	// (`contracts/mandate-slice-v1.json`): an ordinary test run verifies the
+	// checked-in file byte for byte and fails if the measurement moved.
+	systemProperty "voy.contract.write", System.getProperty("voy.contract.write", "false")
 	// Opt-in lattice benchmark (GridBenchmarkSpec) needs headroom for
 	// ~1.2M cells; normal test runs keep the default heap.
 	if (System.getenv("VOY_BENCH")) {
