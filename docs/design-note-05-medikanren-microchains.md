@@ -163,3 +163,59 @@ Pathway.connect_edges(edges) :: [%{start: term(), finish: term(), vessel: term()
    - Hop 2 与 Hop 3 节点元组显式携带 `c0_status`（`:c0_collapsed` vs `:c0_intact`），使得 `c0_collapsed` 的「全数拆解回炉」单据在 Kanren 中**无法**与 `c0_intact` 的观测手簿/守山条规合一；
    - `c0_intact` 三种结局（幸存对照、虚警耐受、空间裂隙）在 Hop 2 中严格保持「绝壁栈道断绝，主器留存原地未拆」，仅取副耳/副坎试片登记 `batch_id` 配制耦合副件；
    - 全部 6 种结局在 Hop 4（302 队手簿）与 Hop 5（现行条规）中呈现完全互异的物理相区与制度文本（自持振荡代钟、烧毁钙化水泥封井、慢性渗漏双账本、宽容区幸存对照、四十七次虚警核销、极值黑影裂隙封山铁誓）。
+
+---
+
+## 5. 阶段二（路线 1 + 2 联合规格）：管线合流与交互式「盲拼调查台」
+
+> 用途：供 `deepseek-account/deepseek-flash` 子代理一次性完成「内容管线合流（路线 1）」与「交互式档案盲拼调查台 HTML（路线 2）」。
+> 硬性纪律：
+> 1. 执行任何 `mix` 或 `gradlew` 命令前，先读 `ref/本地环境.md`；
+> 2. **严禁执行 `git add` 或 `git commit`**；
+> 3. **严禁破坏现有的 146 条 Elixir 测试（尤其是 `golden_test.exs`、`node_test.exs`、`content_test.exs`）**。
+
+### 5.1 路线 1：`Node` / `Naming` / `Content.preview` / `Canon` 合流
+
+1. **`Voy.World.Node` 与 `Voy.World.Naming` 可选种子卷宗挂载（保持无种子调用 100% 向后兼容）**：
+   - 在 `Voy.World.Node.normalize_spec/1` 中支持可选字段 `:seed`（`integer() | nil`，默认为 `nil`）。当调用方未传 `:seed` 时，保持现有返回结构**完全不变**（确保 `golden_test.exs` 与 `world_cases.json` 零回归）！
+   - 当 `spec.seed` 为整数时，`Naming.materialize/2` 在生成的 keyword record 尾部追加 `dossier: Witness.render_dossier(spec.seed, spec.branch_id, relic, fate, spec.names)`（其中 `relic = era1[:guardian_relic]`，`fate = era3[:fate]`），并在 `Voy.World.Export`（若转换 keyword record 为 JSON map）或 `Voy.World.compile_node_dossier(spec_fields, feature_fields, seed)` 中提供便捷入口：
+     ```elixir
+     Voy.World.compile_node_dossier(spec_fields, feature_fields, seed) :: {:ok, [map()]} | {:error, term()}
+     ```
+2. **`Voy.World.Content.preview` 与 `mix voy.content preview` 扩展**：
+   - `Content.preview(target \\ "all", opts \\ [])`：支持可选 `seed: integer()`（默认 `seed: 101`）。在原有预设节点预览文本（地貌、四纪、三处遗迹、四份表层档案）之后，追加一段 **`【五跳微链卷宗（seed=101，含2份同车间干扰单据）】`**，按顺序列出 `Witness.render_dossier(seed, branch_id, relic, fate, %{up: up_name, pass: pass_name, down: down_name})` 的 5 份主链单据与 2 份干扰单据。
+   - **注意**：必须保留原有 `Content.preview/1` 输出中的全部既有段落与标题，确保现有的 `content_test.exs` 100% 通过！
+   - 在 `Mix.Tasks.Voy.Content` 中支持 `mix voy.content preview [target] [--seed N]`。
+3. **`Voy.World.Canon.check_pathways/1` 静态检查器**：
+   - 在 `Voy.World.Canon` 中新增 `check_pathways(seeds \\ [101, 202]) :: :ok | {:error, [term()]}`：
+     - 遍历全部 12 个 `(relic, fate)` 组合与给定的 `seeds`；
+     - 验证 5 跳微链合一唯一性、单跳消融断链（删任意 1 跳 `connect_edges` 为 `[]`）、干扰边排斥、以及单卡认知局部性（`batch_id` 仅在 Hop 2/3、`vessel_code` 仅在 Hop 3/5、`"28.1%"` 与 `"60.6%"` 仅在 Hop 4、无单卡同时含古器名+批号+图号）；
+     - 全部通过返回 `:ok`。
+4. **新增测试**：
+   - 在 `tools/voy_world/test/voy/world/pathway_test.exs`（或对应测试文件）中新增针对 `Canon.check_pathways/1`、`Voy.World.compile_node_dossier/3` 与 `Content.preview/2` 微链段落的断言测试。
+
+### 5.2 路线 2：交互式「mediKanren 档案盲拼调查台」（`ref/show-me-dossier-desk.html`）
+
+请生成自包含、零外部依赖的单文件 HTML：`ref/show-me-dossier-desk.html`（视觉风格严格对齐 `ref/mandate-cell-lab.html` 与 `ref/show-me-phase-duty-inversion.html`：深灰黑底色 `#111516`、卡片底色 `#181d1f`、暖铜金主色 `#e0b56a`、青绿通过色 `#6bc4a6`、砖红断链告警色 `#d96b6b`、衬线与等宽混排）。
+
+页面内嵌由 Elixir 真实导出的 **6 个预设支沟（`baishui` 同化新寨、`heishui` 烧毁封禁、`xuanguan` 空间裂隙、`nuoliang` 幸存对照、`mahao` 慢性渗漏、`tingshan` 虚警耐受）× 4 个种子（`101, 202, 303, 404`）** 的完整 `Witness.render_dossier` + `Pathway` 节点元组数据（可在生成 HTML 前用 `mix run` 小脚本直接导出真实 JSON 嵌进 HTML，严禁手敲假文本！）。
+
+**必须具备的四大交互功能**：
+1. **顶部控制台（Top Bar）**：
+   - 支沟/案件切换（6 个预设支沟 + 一个「🎲 随机盲测案件（隐藏结局名）」按钮）；
+   - 世界种子切换（`Seed 101` / `202` / `303` / `404`）；
+   - 模式切换：**「🕵️ 盲拼断案模式（乱序隐去跳数与真伪标签）」** vs **「🔬 Kanren 图谱透视模式（显示 Hop 1..5、`:from`/`:to` 元组与干扰断点）」**。
+2. **左侧桌面：7 张散落单据（5 真 + 2 干扰）与桥接词高亮**：
+   - 展示当前案件的 7 张单据卡片；
+   - **桥接词联动高亮**：将单据正文中的关键桥接词（`batch_id`、`vessel_name`、`vessel_code`、`三息`/`十二米水头`、`28.1%`/`60.6%`、`第N格`）渲染为可点击/悬停的胶囊标签（badge），点击任一桥接词时，桌面上所有包含该桥接词的单据同步高亮，直观呈现「单卡只知一跳，桥接词跨卡咬合」！
+3. **右侧上栏：5 槽位 Kanren 合一拼图板（Unification Chain Board）+ 消融开关**：
+   - 提供 5 个有向槽位：`[槽1: 旧志先例] ──(==)──> [槽2: 收缴/代管单] ──(==)──> [槽3: 车间配料卡] ──(==)──> [槽4: 302队手簿] ──(==)──> [槽5: 现行守山条规]`；
+   - 玩家点击桌面卡片可填入槽位（或一键「自动按 Kanren 求解排布」）；
+   - **实时 Unification 校验器**：每两个相邻槽位之间显示合一状态：
+     - 若 `slot[i].to` 与 `slot[i+1].from` 严格相等，显示绿色 `✓ 合一成功` 及共享的中间元组（如 `{:scrap_batch, "滇垦废字（79）第04号", :high_tin_bronze, :c0_collapsed, {:tau_breaths, 3}}`）；
+     - 若玩家把**材质干扰卡（`:material_mismatch`）**放入槽 3，槽 3↔4 之间立即亮起红色告警：`✗ 合一失败: {:tau_breaths, 0} =/= {:tau_breaths, 3}（生铁无阻尼，无法与手簿谐振要求合一）`；
+     - 若玩家把**外运干扰卡（`:destination_dead_end`）**放入槽 2，槽 2↔3 之间立即亮起红色告警：`✗ 合一失败: :scrap_shipment =/= :scrap_batch（废料已外运省局，未进本场车间）`；
+   - **单跳消融开关（Ablation Toggle）**：每个槽位旁有一个「✂️ 抽掉此跳」按钮，点击后实时模拟 `Pathway.connect_edges(remaining)`，顶部立即显示 `路径断裂 (Connected Path: []) —— 证明无任何单卡可跨跳剧透`。
+4. **右侧下栏：车间实物指认与相位拨盘验证（The Obra Dinn Verdict）**：
+   - 展示车间/山口里的 **3 件候选实物**（1 件真载体 `vessel_name (vessel_code)`、1 件生铁/毛石干扰载体 `decoy_a_vessel_name (decoy_a_vessel_code)`、1 堆外运废料回单 `decoy_b_batch`）+ **1 个周期刻度拨盘（Tick 1..39，标出起振区 `28.1%` 旧黄历误区与饱和区 `60.6%` 占空比反转陷阱 `φ=0.50`）**；
+   - 玩家选定「目标实物」与「操作刻度第 N 格」后点击 **【执行勘定 / 叩击验证】**，系统核对是否命中当前 seed 的 `(binding.vessel_code, binding.safe_tick)` 并给出动力学反馈说明。

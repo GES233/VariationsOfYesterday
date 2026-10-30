@@ -23,7 +23,16 @@ defmodule Voy.World.Canon do
 
   use Voy.Kanren
 
-  alias Voy.World.{Chronicle, Content, Texts, Timeline}
+  alias Voy.World.{Chronicle, Content, Pathway, Schema, Texts, Timeline, Witness}
+
+  @pathway_relic_names %{
+    ancestral_bronze_zheng: "铜钲",
+    carved_diversion_stele: "分水石堰"
+  }
+
+  # The witness only uses the branch id as a hash salt, so a canonical,
+  # non-world branch keeps `check_pathways/1` independent of any topography.
+  @pathway_branch :canon_pathway
 
   @doc "Check the timeline's internal coherence."
   @spec check_timeline() :: :ok | {:error, term()}
@@ -59,6 +68,41 @@ defmodule Voy.World.Canon do
           Voy.World.paired?(topo),
           match?({:error, _reason}, Voy.World.compile_branch(topo)) do
         {:archives_uncovered, Keyword.take(topo, Voy.World.Schema.feature_keys())}
+      end
+
+    case issues do
+      [] -> :ok
+      issues -> {:error, issues}
+    end
+  end
+
+  @doc """
+  Check that every five-hop micro-chain obeys the mediKanren contract.
+
+  For all twelve `(relic, fate)` pairs and every seed in `seeds` this verifies:
+
+    1. **unique synthesis** — `compile_chain/2` yields exactly one five-hop
+       chain whose `:to`/`:from` anchors bind end to end;
+    2. **path ablation** — deleting any single hop from the chain leaves a
+       pile that `connect_edges/1` cannot connect at all, so no card can
+       short-cut the story;
+    3. **decoy rejection** — mixing the two same-workshop decoys into the
+       five true cards still yields only the true `{:vessel, :main}` path;
+    4. **epistemic locality** — the seed-bound batch number occurs only in
+       hops 2 and 3, the carrier drawing code only in hops 3 and 5, the two
+       duty-cycle readings only in hop 4, and no single card joins the relic
+       name, the batch and the carrier code.
+
+  Returns `:ok`, or `{:error, issues}` with one tuple per violation.
+  """
+  @spec check_pathways([integer()]) :: :ok | {:error, [term()]}
+  def check_pathways(seeds \\ [101, 202]) when is_list(seeds) do
+    issues =
+      for relic <- Pathway.relics(),
+          fate <- Schema.fates(),
+          seed <- seeds,
+          issue <- check_pathway(relic, fate, seed) do
+        issue
       end
 
     case issues do
@@ -244,6 +288,138 @@ defmodule Voy.World.Canon do
 
   defp add(issues, false, _issue), do: issues
   defp add(issues, true, issue), do: issues ++ [issue]
+
+  # ==== pathway checks ==== //
+
+  defp check_pathway(relic, fate, seed) do
+    case Pathway.compile_chain(relic, fate) do
+      {:ok, %{chain: chain, decoys: decoys}} ->
+        chain_issues(relic, fate, seed, chain) ++
+          ablation_issues(relic, fate, seed, chain) ++
+          decoy_issues(relic, fate, seed, chain, decoys) ++
+          locality_issues(relic, fate, seed)
+
+      {:error, reason} ->
+        [{:pathway_uncompilable, relic, fate, seed, reason}]
+    end
+  end
+
+  defp chain_issues(relic, fate, seed, chain) do
+    shape_issues =
+      cond do
+        length(chain) != 5 ->
+          [{:pathway_chain_shape, relic, fate, seed, {:hop_count, length(chain)}}]
+
+        Enum.map(chain, & &1.hop) != [1, 2, 3, 4, 5] ->
+          [{:pathway_chain_shape, relic, fate, seed, {:hop_order, Enum.map(chain, & &1.hop)}}]
+
+        not anchored?(chain) ->
+          [{:pathway_chain_shape, relic, fate, seed, :unanchored_hops}]
+
+        true ->
+          []
+      end
+
+    uniqueness_issues =
+      case Pathway.connect_edges(chain) do
+        [%{path: ^chain, vessel: {:vessel, :main}}] ->
+          []
+
+        connections ->
+          [
+            {:pathway_chain_not_unique, relic, fate, seed, length(connections),
+             Enum.map(connections, & &1.vessel)}
+          ]
+      end
+
+    shape_issues ++ uniqueness_issues
+  end
+
+  defp anchored?([_single]), do: true
+
+  defp anchored?([left, right | rest]) do
+    left.to == right.from and anchored?([right | rest])
+  end
+
+  defp ablation_issues(relic, fate, seed, chain) do
+    Enum.flat_map(1..5, fn dropped ->
+      remaining = Enum.reject(chain, &(&1.hop == dropped))
+
+      if Pathway.connect_edges(remaining) == [] do
+        []
+      else
+        [{:pathway_ablation_connected, relic, fate, seed, dropped}]
+      end
+    end)
+  end
+
+  defp decoy_issues(relic, fate, seed, chain, decoys) do
+    mixed =
+      case Pathway.connect_edges(chain ++ decoys) do
+        [%{path: ^chain, vessel: {:vessel, :main}}] ->
+          []
+
+        connections ->
+          [
+            {:pathway_decoy_not_rejected, relic, fate, seed, length(connections),
+             Enum.map(connections, & &1.vessel)}
+          ]
+      end
+
+    case Pathway.connect_edges(decoys) do
+      [] -> mixed
+      connections -> mixed ++ [{:pathway_decoy_self_chains, relic, fate, seed, length(connections)}]
+    end
+  end
+
+  defp locality_issues(relic, fate, seed) do
+    dossier = Witness.render_dossier(seed, @pathway_branch, relic, fate, [])
+    binding = dossier.binding
+    main = Enum.filter(dossier.documents, &(&1.role == :main))
+    relic_name = Map.fetch!(@pathway_relic_names, relic)
+    total = fn needle -> Enum.sum(Enum.map(main, &occurrences(&1.body, needle))) end
+
+    batch_positions = positions(main, binding.batch_id)
+    carrier_positions = positions(main, binding.vessel_code)
+
+    []
+    |> add(
+      batch_positions != [2, 3] or total.(binding.batch_id) != 2,
+      {:pathway_batch_leak, relic, fate, seed, batch_positions}
+    )
+    |> add(
+      carrier_positions != [3, 5] or total.(binding.vessel_code) != 2,
+      {:pathway_carrier_leak, relic, fate, seed, carrier_positions}
+    )
+    |> add_duty_cycle(main, "28.1%", relic, fate, seed)
+    |> add_duty_cycle(main, "60.6%", relic, fate, seed)
+    |> add(
+      Enum.any?(main, fn document ->
+        String.contains?(document.body, relic_name) and
+          String.contains?(document.body, binding.batch_id) and
+          String.contains?(document.body, binding.vessel_code)
+      end),
+      {:pathway_omniscient_card, relic, fate, seed}
+    )
+  end
+
+  defp add_duty_cycle(issues, main, marker, relic, fate, seed) do
+    add(
+      issues,
+      positions(main, marker) != [4],
+      {:pathway_duty_cycle_leak, relic, fate, seed, marker, positions(main, marker)}
+    )
+  end
+
+  defp positions(documents, needle) do
+    documents
+    |> Enum.filter(&String.contains?(&1.body, needle))
+    |> Enum.map(& &1.hop)
+  end
+
+  defp occurrences(body, needle) do
+    body |> String.split(needle) |> length() |> Kernel.-(1)
+  end
 
   # ==== helpers ==== //
 

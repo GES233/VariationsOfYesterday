@@ -38,14 +38,16 @@ defmodule Voy.World.Node do
          {:ok, rule_set} <- normalize_rule_set(value(fields, :rule_set, :default_branch_v1)),
          {:ok, fate_constraint} <-
            normalize_fate_constraint(value(fields, :fate_constraint, :any)),
-         {:ok, names} <- normalize_names(fields) do
+         {:ok, names} <- normalize_names(fields),
+         {:ok, seed} <- normalize_seed(value(fields, :seed, nil)) do
       {:ok,
        %{
          node_id: node_id,
          branch_id: branch_id,
          rule_set: rule_set,
          fate_constraint: fate_constraint,
-         names: names
+         names: names,
+         seed: seed
        }}
     end
   end
@@ -185,6 +187,13 @@ defmodule Voy.World.Node do
   end
 
   defp normalize_fate_constraint(_value), do: {:error, :invalid_fate_constraint}
+
+  # An optional world seed. Absent (`nil`) keeps the historical record shape
+  # untouched; an integer additionally mounts the seeded five-hop dossier in
+  # `Voy.World.Naming.materialize/2`.
+  defp normalize_seed(nil), do: {:ok, nil}
+  defp normalize_seed(seed) when is_integer(seed), do: {:ok, seed}
+  defp normalize_seed(_seed), do: {:error, :invalid_seed}
 
   defp normalize_names(fields) do
     case fetch_field(fields, :names) do

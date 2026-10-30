@@ -29,7 +29,7 @@ defmodule Voy.World.Content do
   dossiers for writers without running the game.
   """
 
-  alias Voy.World.{Schema, Timeline}
+  alias Voy.World.{Schema, Timeline, Witness}
 
   @pack_dir Path.expand("../../../content", __DIR__)
 
@@ -463,30 +463,47 @@ defmodule Voy.World.Content do
   Render player-facing dossier text for `"all"` or one preset (`"baishui"`,
   `"heishui"`, `"xuanguan"`, `"nuoliang"`, `"mahao"`, `"tingshan"`, or a fate
   alias).
+
+  Options:
+
+    * `:seed` — the world seed the five-hop micro-chain evidence is bound to
+      (default `101`). Every preset's historical preview is followed by a
+      `【五跳微链卷宗（seed=…，含2份同车间干扰单据）】` section listing the
+      five main documents and the two same-workshop decoys in card order.
   """
-  @spec preview(String.t() | atom()) :: {:ok, String.t()} | {:error, String.t()}
-  def preview(target \\ "all") do
+  @spec preview(String.t() | atom(), Keyword.t()) :: {:ok, String.t()} | {:error, String.t()}
+  def preview(target \\ "all", opts \\ []) do
     target = to_string(target)
-    canonical = Map.get(@preview_aliases, target, target)
 
-    cond do
-      canonical == "all" ->
-        rendered =
-          @preview_presets
-          |> Enum.map(fn {name, topo} -> format_preset_preview(name, topo) end)
-          |> Enum.join("\n\n")
+    with {:ok, seed} <- preview_seed(opts) do
+      canonical = Map.get(@preview_aliases, target, target)
 
-        {:ok, rendered}
+      cond do
+        canonical == "all" ->
+          rendered =
+            @preview_presets
+            |> Enum.map(fn {name, topo} -> format_preset_preview(name, topo, seed) end)
+            |> Enum.join("\n\n")
 
-      topo = List.keyfind(@preview_presets, canonical, 0) |> then(&(&1 && elem(&1, 1))) ->
-        {:ok, format_preset_preview(canonical, topo)}
+          {:ok, rendered}
 
-      true ->
-        candidates = preview_presets() ++ ["all" | Map.keys(@preview_aliases)]
+        topo = List.keyfind(@preview_presets, canonical, 0) |> then(&(&1 && elem(&1, 1))) ->
+          {:ok, format_preset_preview(canonical, topo, seed)}
 
-        {:error,
-         "未知预览节点 #{inspect(target)}；可用预设：#{Enum.join(preview_presets() ++ ["all"], " / ")}" <>
-           did_you_mean(target, candidates)}
+        true ->
+          candidates = preview_presets() ++ ["all" | Map.keys(@preview_aliases)]
+
+          {:error,
+           "未知预览节点 #{inspect(target)}；可用预设：#{Enum.join(preview_presets() ++ ["all"], " / ")}" <>
+             did_you_mean(target, candidates)}
+      end
+    end
+  end
+
+  defp preview_seed(opts) do
+    case Keyword.get(opts, :seed, 101) do
+      seed when is_integer(seed) -> {:ok, seed}
+      seed -> {:error, "seed 必须是整数，实际是 #{inspect(seed)}"}
     end
   end
 
@@ -569,7 +586,7 @@ defmodule Voy.World.Content do
     end
   end
 
-  defp format_preset_preview(name, topo) do
+  defp format_preset_preview(name, topo, seed) do
     {:ok, [slice]} = Voy.World.compile_branch(topo)
     structures = slice["structures"]
     archives = slice["archives"]
@@ -581,7 +598,7 @@ defmodule Voy.World.Content do
     [pass_site, pass_desc] = structures["pass_site"]
     [down_site, down_desc] = structures["downstream_site"]
 
-    """
+    preview = """
     ==================================================================
     【节点档案预览：#{name}（#{topo[:down_name]}）】
     支沟：#{topo[:up_name]} → #{topo[:pass_name]} → #{topo[:down_name]}
@@ -606,7 +623,55 @@ defmodule Voy.World.Content do
        #{council["decree"]}
     ==================================================================\
     """
+
+    preview <> "\n\n" <> format_dossier_section(slice, topo, seed)
   end
+
+  # Design note 05 section 5.1: the micro-chain dossier is an *append*, never a
+  # rewrite, so every pre-existing heading above keeps its exact wording.
+  defp format_dossier_section(slice, topo, seed) do
+    dossier =
+      Witness.render_dossier(
+        seed,
+        topo[:branch_id],
+        slice["era1"]["guardian_relic"] |> String.to_existing_atom(),
+        slice["era3"]["fate"] |> String.to_existing_atom(),
+        %{up: topo[:up_name], pass: topo[:pass_name], down: topo[:down_name]}
+      )
+
+    main = Enum.filter(dossier.documents, &(&1.role == :main))
+    decoys = Enum.filter(dossier.documents, &(&1.role == :decoy))
+
+    main_text =
+      Enum.map_join(main, "\n\n", fn document ->
+        "· [真链 Hop #{document.hop}｜#{document.lens}] #{document.title}\n" <>
+          "  #{document.body}"
+      end)
+
+    decoy_text =
+      Enum.map_join(decoys, "\n\n", fn document ->
+        "· [同车间干扰｜#{decoy_label(document.decoy_class)}] #{document.title}\n" <>
+          "  #{document.body}"
+      end)
+
+    """
+    【五跳微链卷宗（seed=#{seed}，含2份同车间干扰单据）】
+    古器：#{dossier.relic}｜结局：#{dossier.fate}｜勘定格：第#{dossier.binding.safe_tick}格（φ≈#{decimals(dossier.binding.safe_phase, 2)}）
+
+    #{main_text}
+
+    #{decoy_text}\
+    """
+  end
+
+  @decoy_labels %{
+    material_mismatch: "材质/阻尼断链 Hop 3→4",
+    destination_dead_end: "去向断链 Hop 2→3"
+  }
+
+  defp decoy_label(class), do: Map.get(@decoy_labels, class, to_string(class))
+
+  defp decimals(number, places), do: :erlang.float_to_binary(number * 1.0, decimals: places)
 
   # ==== claims ==== //
 

@@ -5,14 +5,15 @@ defmodule Mix.Tasks.Voy.Content do
   Authoring tools for the content pack under `content/`:
 
       mix voy.content lint
-      mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all]
+      mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all] [--seed N]
       mix voy.content template <gazetteer|official_report|tech_note|council_document>
 
     * `lint` checks the pack and prints author-facing issues (`file:line` plus
       closest-value hints). Errors block a merge; warnings do not.
     * `preview` compiles the preset node(s) and prints the player-facing
       structures and archives in reading order so writers can review voice and
-      continuity without running the game.
+      continuity without running the game. `--seed N` selects the world seed
+      the appended five-hop micro-chain dossier is bound to (default 101).
     * `template` prints a blank Markdown document card for the chosen slot.
   """
 
@@ -22,27 +23,37 @@ defmodule Mix.Tasks.Voy.Content do
   def run(argv) do
     Mix.Task.run("compile")
 
-    case argv do
-      ["lint"] ->
-        lint()
+    {opts, args, invalid} = OptionParser.parse(argv, strict: [seed: :integer])
 
-      ["preview"] ->
-        preview("all")
-
-      ["preview", target] ->
-        preview(target)
-
-      ["template", slot] ->
-        template(slot)
-
-      _other ->
-        Mix.raise(
-          "用法：\n" <>
-            "  mix voy.content lint\n" <>
-            "  mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all]\n" <>
-            "  mix voy.content template <gazetteer|official_report|tech_note|council_document>"
-        )
+    case invalid do
+      [] -> dispatch(args, opts)
+      [{flag, _value} | _] -> Mix.raise("无法识别的参数 #{flag}；用法见 mix help voy.content")
     end
+  end
+
+  defp dispatch(["lint"], _opts) do
+    lint()
+  end
+
+  defp dispatch(["preview"], opts) do
+    preview("all", opts)
+  end
+
+  defp dispatch(["preview", target], opts) do
+    preview(target, opts)
+  end
+
+  defp dispatch(["template", slot], _opts) do
+    template(slot)
+  end
+
+  defp dispatch(_other, _opts) do
+    Mix.raise(
+      "用法：\n" <>
+        "  mix voy.content lint\n" <>
+        "  mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all] [--seed N]\n" <>
+        "  mix voy.content template <gazetteer|official_report|tech_note|council_document>"
+    )
   end
 
   defp lint do
@@ -60,8 +71,8 @@ defmodule Mix.Tasks.Voy.Content do
     end
   end
 
-  defp preview(target) do
-    case Voy.World.Content.preview(target) do
+  defp preview(target, opts) do
+    case Voy.World.Content.preview(target, opts) do
       {:ok, output} ->
         IO.puts(output)
 

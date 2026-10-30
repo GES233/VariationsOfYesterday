@@ -37,6 +37,34 @@ defmodule Voy.World do
   end
 
   @doc """
+  Compile one named node with the seeded five-hop dossier mounted.
+
+  This is the convenience entry point for callers that want concrete, seeded
+  evidence next to the semantic record without hand-writing the `:seed`
+  field: it injects the seed into the node specification and returns the
+  public records, whose `dossier` key is
+  `Voy.World.Witness.render_dossier(seed, branch_id, relic, fate, names)`.
+
+  A call without a seed is deliberately *not* this function:
+  `compile_node/2` keeps returning exactly the historical record shape.
+  """
+  @spec compile_node_dossier(Keyword.t() | map(), Keyword.t() | map(), integer()) ::
+          {:ok, [map()]} | {:error, term()}
+  def compile_node_dossier(spec_fields, feature_fields, seed) when is_integer(seed) do
+    with {:ok, records} <- Node.compile(with_seed(spec_fields, seed), feature_fields) do
+      {:ok, Enum.map(records, &Schema.to_public/1)}
+    end
+  rescue
+    error in [KeyError, ArgumentError] -> {:error, {:invalid_features, Exception.message(error)}}
+  end
+
+  def compile_node_dossier(_spec_fields, _feature_fields, seed), do: {:error, {:invalid_seed, seed}}
+
+  defp with_seed(fields, seed) when is_list(fields), do: Keyword.put(fields, :seed, seed)
+  defp with_seed(fields, seed) when is_map(fields), do: Map.put(fields, :seed, seed)
+  defp with_seed(fields, _seed), do: fields
+
+  @doc """
   Whether the rule layer gives this topography a reclamation-era history.
 
   A false answer means the disturbance table never pairs this upstream

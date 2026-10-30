@@ -10,7 +10,7 @@ defmodule Voy.World.PathwayTest do
   use ExUnit.Case, async: true
 
   alias Voy.Kanren.Core
-  alias Voy.World.{Contract, Pathway, Schema, Witness}
+  alias Voy.World.{Canon, Content, Contract, Pathway, Schema, Witness}
 
   @relic_names %{
     ancestral_bronze_zheng: "铜钲",
@@ -20,6 +20,22 @@ defmodule Voy.World.PathwayTest do
   @settled_period 39.474324
   @names %{up: "野猪箐", pass: "断碑垭口", down: "白水坝"}
   @branch :branch_01_baishui
+
+  @ascended_spec [
+    node_id: "node_rift_07",
+    branch_id: "branch_rift",
+    rule_set: :default_branch_v1,
+    fate_constraint: {:require, :Fate_Ascended_SpatialRift},
+    names: [node: "黑水支沟", up: "鬼哭漏斗", pass: "断碑垭口", down: "悬棺寨"]
+  ]
+
+  @ascended_features [
+    up_terrain: :karst_sinkhole_headwater,
+    pass_terrain: :canyon_pass,
+    down_terrain: :mid_terrace,
+    up_geology: :deep_stress_cavity,
+    accessibility: :cliff_isolated
+  ]
 
   defp pairs do
     for relic <- Pathway.relics(), fate <- Schema.fates(), do: {relic, fate}
@@ -500,6 +516,95 @@ defmodule Voy.World.PathwayTest do
       seep_hop5 = by_hop(main_documents(dossiers[:Fate_Deferred_ChronicSeep]))[5].body
       assert seep_hop5 =~ "慢渗"
     end
+  end
+
+  # ==== canon static checker (design note 05 section 5.1) ==== //
+
+  test "Canon.check_pathways accepts every declared pair and seed" do
+    assert Canon.check_pathways() == :ok
+    assert Canon.check_pathways([101, 202, 303, 404]) == :ok
+    assert Canon.check_pathways([]) == :ok
+  end
+
+  # ==== seeded node dossier (design note 05 section 5.1) ==== //
+
+  test "normalize_spec treats the seed as optional and rejects non-integers" do
+    assert {:ok, spec} = Voy.World.Node.normalize_spec(@ascended_spec)
+    assert spec.seed == nil
+
+    assert {:ok, %{seed: 42}} =
+             Voy.World.Node.normalize_spec(Keyword.put(@ascended_spec, :seed, 42))
+
+    assert {:error, :invalid_seed} =
+             Voy.World.Node.normalize_spec(Keyword.put(@ascended_spec, :seed, "42"))
+  end
+
+  test "compile_node_dossier mounts a seeded dossier and leaves compile_node/2 untouched" do
+    assert {:ok, [seeded]} =
+             Voy.World.compile_node_dossier(@ascended_spec, @ascended_features, 303)
+
+    assert {:ok, [plain]} = Voy.World.compile_node(@ascended_spec, @ascended_features)
+
+    # Zero regression: the unseeded record has no dossier key and the seeded
+    # record differs from it only by that key.
+    refute Map.has_key?(plain, "dossier")
+    assert Map.delete(seeded, "dossier") == plain
+
+    dossier = seeded["dossier"]
+    assert dossier["seed"] == 303
+    assert dossier["relic"] == plain["era1"]["guardian_relic"]
+    assert dossier["fate"] == plain["era3"]["fate"]
+    assert length(dossier["documents"]) == 7
+    assert length(Enum.filter(dossier["documents"], &(&1["role"] == "main"))) == 5
+    assert length(Enum.filter(dossier["documents"], &(&1["role"] == "decoy"))) == 2
+    assert dossier["binding"]["safe_tick"] in Witness.safe_ticks()
+
+    assert {:error, {:invalid_seed, "303"}} =
+             Voy.World.compile_node_dossier(@ascended_spec, @ascended_features, "303")
+  end
+
+  # ==== content preview micro-chain section (design note 05 section 5.1) ==== //
+
+  test "preview appends the seeded five-hop dossier after every existing section" do
+    assert {:ok, text} = Content.preview("baishui", seed: 202)
+
+    # The historical preview is kept verbatim ...
+    assert text =~ "【节点档案预览：baishui（白水坝）】"
+    assert text =~ "结局：Fate_Assimilated_NewZhai"
+    assert text =~ "① 旧州府残卷"
+    assert text =~ "② 垦殖总场官样通报"
+    assert text =~ "③ 技术员手簿批注"
+    assert text =~ "④ 第三纪规约"
+
+    # ... and the five-hop dossier is appended after it.
+    assert text =~ "【五跳微链卷宗（seed=202，含2份同车间干扰单据）】"
+
+    dossier =
+      Witness.render_dossier(
+        202,
+        :branch_01_baishui,
+        :ancestral_bronze_zheng,
+        :Fate_Assimilated_NewZhai,
+        %{up: "野猪箐裂隙", pass: "断碑垭口", down: "白水坝"}
+      )
+
+    for document <- dossier.documents do
+      assert text =~ document.body
+      assert text =~ document.title
+    end
+
+    assert {:ok, default_text} = Content.preview("baishui")
+    assert default_text =~ "seed=101"
+
+    assert {:ok, other} = Content.preview("baishui", seed: 303)
+    assert other != default_text
+    assert other =~ "seed=303"
+
+    assert {:ok, all} = Content.preview("all", seed: 404)
+    assert length(String.split(all, "【五跳微链卷宗（seed=404，含2份同车间干扰单据）】")) == 7
+
+    assert {:error, message} = Content.preview("baishui", seed: "202")
+    assert message =~ "seed 必须是整数"
   end
 
   # ==== determinism ==== //

@@ -3,7 +3,7 @@ defmodule Voy.World.Naming do
 
   use Voy.Kanren
 
-  alias Voy.World.{Projection, Schema}
+  alias Voy.World.{Projection, Schema, Witness}
 
   def materialize_all(spec, candidates) do
     candidates
@@ -53,12 +53,29 @@ defmodule Voy.World.Naming do
            era3: era3,
            structures: Keyword.fetch!(projection, :structures),
            archives: Keyword.fetch!(projection, :archives)
-         ]}
+         ] ++ dossier(spec, era1, era3)}
 
       _ ->
         {:error, :projection_failed}
     end
   end
+
+  # A seed is opt-in: without one the record is byte-for-byte the historical
+  # keyword list, so the golden cases and `world_cases.json` cannot drift.
+  defp dossier(%{seed: seed} = spec, era1, era3) when is_integer(seed) do
+    [
+      dossier:
+        Witness.render_dossier(
+          seed,
+          spec.branch_id,
+          Keyword.fetch!(era1, :guardian_relic),
+          Keyword.fetch!(era3, :fate),
+          spec.names
+        )
+    ]
+  end
+
+  defp dossier(_spec, _era1, _era3), do: []
 
   defp named_topography(spec, topo) do
     [
