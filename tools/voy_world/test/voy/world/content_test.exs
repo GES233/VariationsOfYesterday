@@ -1,104 +1,77 @@
 defmodule Voy.World.ContentTest do
   use ExUnit.Case, async: true
-  use Voy.Kanren
 
-  alias Voy.World.{Chronicle, Content, Projection}
+  alias Voy.World.{Content, Pathway, Schema, Witness}
 
-  import Voy.World.TestFixtures
+  @branch :branch_01_baishui
+  @names %{up: "野猪箐", pass: "断碑垭口", down: "白水坝"}
 
-  test "the shipped pack loads and is lint-clean" do
+  test "the shipped five-hop pack loads and is lint-clean" do
     assert {:ok, pack} = Content.load()
-
-    assert map_size(pack.claims) == 12
-    assert length(pack.documents) == 24
+    assert length(pack.documents) == 36
     assert Content.lint() == %{errors: [], warnings: []}
-
-    assert Content.slots() |> Enum.sort() == [
-             :council_document,
-             :gazetteer,
-             :official_report,
-             :tech_note
-           ]
+    assert Enum.count(pack.documents, &(&1.role == :main)) == 32
+    assert Enum.count(pack.documents, &(&1.role == :decoy)) == 4
   end
 
-  test "Projection.compile_archiveso selects directly from the pack and matches archives_for" do
+  test "every relic and fate selects five local cards and two decoys" do
     pack = Content.default_pack()
 
-    pairs = for topo <- all_topographies(), [slice] <- [raw_slices(topo)], do: {topo, slice}
-
-    assert length(pairs) == 24
-
-    for {topo, slice} <- pairs do
-      assert {:ok, archives} = Content.archives_for(slice, pack)
-
-      assert archives == slice[:archives],
-             "archives differ for #{inspect(Keyword.take(topo, Voy.World.Schema.feature_keys()))}"
+    for relic <- Pathway.relics(), fate <- Schema.fates() do
+      dossier = Witness.render_dossier(101, @branch, relic, fate, @names, pack)
+      assert Enum.count(dossier.documents, &(&1.role == :main)) == 5
+      assert Enum.count(dossier.documents, &(&1.role == :decoy)) == 2
+      refute Enum.any?(dossier.documents, &String.contains?(&1.body, "{{"))
     end
   end
 
-  test "Projection.compile_archiveso reflects custom pack edits without code changes" do
+  test "author edits change Witness output without touching Elixir" do
     pack = Content.load!()
 
-    edited_documents =
-      Enum.map(pack.documents, fn doc ->
-        if doc.id == "doc.official.rain_excuse" do
-          %{doc | body: "【自定通报】{{place.down}}与{{place.up}}于{{date.era2b}}年秋汛"}
+    documents =
+      Enum.map(pack.documents, fn document ->
+        if document.id == "main/hop1/zheng" do
+          %{document | body: "【作者改稿】{{place.down}}仅存此一跳。"}
         else
-          doc
+          document
         end
       end)
 
-    custom_pack = %{pack | documents: edited_documents}
-    topo = baishui_topo()
-    [slice] = raw_slices(topo)
+    dossier =
+      Witness.render_dossier(
+        101,
+        @branch,
+        :ancestral_bronze_zheng,
+        :Fate_Assimilated_NewZhai,
+        @names,
+        %{pack | documents: documents}
+      )
 
-    [projected] =
-      run_all(fn q ->
-        Projection.compile_archiveso(
-          topo,
-          slice[:era1],
-          slice[:era2a],
-          slice[:era2b],
-          slice[:era3],
-          q,
-          custom_pack
-        )
-      end)
-      |> terms()
-
-    assert projected[:official_report][:summary] == "【自定通报】白水坝与野猪箐裂隙于1979年秋汛"
+    assert hd(dossier.documents).body == "【作者改稿】白水坝仅存此一跳。"
   end
 
-  test "the assembled archives keep the two ledgers apart" do
+  test "card selection reports missing and ambiguous cards" do
     pack = Content.load!()
 
-    for topo <- all_topographies(), [slice] <- [raw_slices(topo)] do
-      assert {:ok, archives} = Content.archives_for(slice, pack)
+    criteria = %{
+      role: :main,
+      hop: 1,
+      relic: :ancestral_bronze_zheng,
+      fate: nil,
+      c0_status: nil,
+      decoy_class: nil
+    }
 
-      official = Keyword.fetch!(archives, :official_report)
-      tech = Keyword.fetch!(archives, :tech_note)
+    assert {:ok, _} = Content.card_for(criteria, pack)
+    assert {:error, {:no_document, _}} = Content.card_for(%{criteria | hop: 2}, pack)
 
-      refute official[:claimed_cause] == tech[:true_cause]
-      refute official[:summary] == tech[:note]
-    end
+    {:ok, duplicate} = Content.card_for(criteria, pack)
+
+    assert {:error, {:ambiguous_documents, _, _}} =
+             Content.card_for(criteria, %{pack | documents: [duplicate | pack.documents]})
   end
 
-  test "bodies interpolate placeholders and refuse unknown ones" do
-    tokens = Content.date_tokens()
-
-    assert tokens["date.era2a_zheng"] == "光绪二十年"
-    assert tokens["date.era2a_stele"] == "光绪二十八年"
-    assert tokens["date.era2b_short"] == "79"
-
-    assert Content.render("{{place.down}}", [{"place.down", "白水坝"}]) == "白水坝"
-    assert Content.render("{{date.era2b_short}}年", [{"date.era2b_short", "79"}]) == "79年"
-
-    assert_raise ArgumentError, ~r/unresolved placeholder/, fn ->
-      Content.render("{{place.river}}", [])
-    end
-  end
-
-  test "preview renders player-facing dossiers and template scaffolds slots" do
+  test "preview contains only the five-hop narrative and supports seeds" do
     assert Content.preview_presets() == [
              "baishui",
              "heishui",
@@ -108,139 +81,73 @@ defmodule Voy.World.ContentTest do
              "tingshan"
            ]
 
-    assert {:ok, text} = Content.preview("baishui")
-    assert text =~ "【节点档案预览：baishui（白水坝）】"
-    assert text =~ "① 旧州府残卷：《旧州府抚夷清丈残卷·铜钲案》"
-    assert text =~ "② 垦殖总场官样通报"
-    assert text =~ "③ 技术员手簿批注"
-    assert text =~ "④ 第三纪规约：《场部—议事会联席保命规约》"
+    assert {:ok, text} = Content.preview("baishui", seed: 202)
+    assert text =~ "【五跳微链卷宗（seed=202，含2份同车间干扰单据）】"
+    assert text =~ "真链 Hop 5"
+    refute text =~ "① 旧州府残卷"
+    refute text =~ "② 垦殖总场官样通报"
 
-    assert {:ok, all_text} = Content.preview("all")
-    assert all_text =~ "白水坝"
-    assert all_text =~ "黑水坪"
-    assert all_text =~ "悬棺寨"
-    assert all_text =~ "糯良古寨"
+    assert {:ok, all} = Content.preview("all", seed: 404)
+    assert length(String.split(all, "【五跳微链卷宗（seed=404，含2份同车间干扰单据）】")) == 7
+    assert {:error, _} = Content.preview("baishui", seed: "202")
+  end
 
-    assert {:error, msg} = Content.preview("baishu")
-    assert msg =~ "你是不是想写 \"baishui\""
-
-    assert {:ok, tpl} = Content.template("tech_note")
-    assert tpl =~ "slot: tech_note"
-    assert tpl =~ "{{date.era2b_short}}"
-
-    assert {:error, slot_err} = Content.template("tech_notes")
-    assert slot_err =~ "你是不是想写 \"tech_note\""
+  test "templates use the five-hop card format" do
+    assert {:ok, hop2} = Content.template("hop2")
+    assert hop2 =~ "c0_status: c0_collapsed"
+    assert {:ok, decoy} = Content.template("decoy")
+    assert decoy =~ "decoy_class: material_mismatch"
+    assert {:error, _} = Content.template("tech_note")
   end
 
   describe "the linter catches author mistakes" do
-    test "an unknown front-matter field with closest-value suggestion" do
-      assert error_messages([
-               {:replace, "documents/council/joint_council.md", "governance:", "govenance:"}
-             ])
-             |> Enum.any?(&(&1 =~ "未知字段" and &1 =~ "你是不是想写 \"governance\""))
-    end
-
-    test "an illegal fate value with closest-value suggestion" do
-      assert error_messages([
-               {:replace, "documents/official/rain_excuse.md", "Fate_Assimilated_NewZhai",
-                "Fate_Assimilated_NewZha"}
-             ])
-             |> Enum.any?(&(&1 =~ "fate 里的" and &1 =~ "你是不是想写 \"Fate_Assimilated_NewZhai\""))
-    end
-
-    test "a citation of a claim that does not exist" do
-      assert error_messages([
-               {:replace, "documents/tech/blasting_zheng.md",
-                "claim.c0_removed_and_vulnerable_window_blasting",
-                "claim.c0_removed_and_vulnerable_window"}
-             ])
-             |> Enum.any?(
-               &(&1 =~ "不存在的归因卡" and
-                   &1 =~ "你是不是想写 \"claim.c0_removed_and_vulnerable_window_blasting\"")
-             )
-    end
-
-    test "a citation the lens is forbidden to use" do
-      assert error_messages([
-               {:replace, "documents/tech/blasting_zheng.md",
-                "claim.c0_removed_and_vulnerable_window_blasting", "claim.seasonal_rain_mudslide"}
-             ])
-             |> Enum.any?(&(&1 =~ "不能引用"))
-    end
-
-    test "two documents competing for the same history" do
-      assert error_messages([
-               {:replace, "documents/tech/blasting_zheng.md", "relic: ancestral_bronze_zheng\n",
-                ""},
-               {:replace, "documents/tech/blasting_zheng.md",
-                "gazetteer_case: case_1894_zheng_return_calmed_slide\n", ""}
-             ])
-             |> Enum.any?(&(&1 =~ "适用条件重叠"))
-    end
-
-    test "a notebook pinned to the wrong precedent no longer matches the history" do
-      pack = Content.load!()
-      [slice] = raw_slices(baishui_topo())
-
-      mispinned =
-        Enum.map(pack.documents, fn doc ->
-          if doc.id == "doc.tech.blasting_zheng" do
-            %{doc | gazetteer_cases: [:case_mountain_too_steep_for_tithing]}
-          else
-            doc
-          end
-        end)
-
-      assert {:error, {:no_document, :tech_note, criteria}} =
-               Content.archives_for(slice, %{pack | documents: mispinned})
-
-      assert criteria[:gazetteer_case] == :case_1894_zheng_return_calmed_slide
-    end
-
-    test "a slot with no document for some history" do
-      assert error_messages([{:delete, "documents/council/sealed_zone.md"}])
-             |> Enum.any?(&(&1 =~ "没有任何 council_document 文档适用"))
-    end
-
-    test "an unregistered placeholder with closest-value suggestion" do
-      assert error_messages([
-               {:replace, "documents/gazetteer/zheng_case.md", "{{date.era2a_zheng}}",
-                "{{date.era2a_zhen}}"}
-             ])
-             |> Enum.any?(&(&1 =~ "无法解析的占位符" and &1 =~ "你是不是想写 \"{{date.era2a_zheng}}\""))
-    end
-
-    test "a hardcoded year in the body" do
-      assert error_messages([
-               {:replace, "documents/gazetteer/zheng_case.md", "{{date.era2a_zheng}}", "光绪二十年"}
-             ])
-             |> Enum.any?(&(&1 =~ "不能直接写死年份"))
+    test "unknown fields and illegal vocabulary" do
+      assert error_messages([{:replace, "documents/main/hop1/zheng.md", "hop: 1", "hpo: 1"}])
+             |> Enum.any?(&(&1 =~ "未知字段"))
 
       assert error_messages([
-               {:replace, "documents/tech/blasting_zheng.md", "{{date.era2b_short}}年", "79年"}
+               {:replace, "documents/main/hop4/zheng_assimilated.md", "Fate_Assimilated_NewZhai",
+                "Fate_Nope"}
              ])
+             |> Enum.any?(&(&1 =~ "不合法"))
+    end
+
+    test "missing c0 and a missing required card" do
+      assert error_messages([
+               {:replace, "documents/main/hop2/zheng_collapsed.md", "c0_status: c0_collapsed\n",
+                ""}
+             ])
+             |> Enum.any?(&(&1 =~ "c0_status"))
+
+      assert error_messages([{:delete, "documents/main/hop4/zheng_assimilated.md"}])
+             |> Enum.any?(&(&1 =~ "五跳卡片选择失败"))
+    end
+
+    test "duplicate applicable cards are rejected" do
+      assert error_messages([
+               {:duplicate, "documents/main/hop1/zheng.md", "documents/main/hop1/zheng_copy.md"}
+             ])
+             |> Enum.any?(&(&1 =~ "ambiguous_documents"))
+    end
+
+    test "unknown placeholders and hardcoded years are rejected" do
+      assert error_messages([
+               {:replace, "documents/main/hop1/zheng.md", "{{place.pass}}", "{{place.pas}}"}
+             ])
+             |> Enum.any?(&(&1 =~ "无法解析的占位符"))
+
+      assert error_messages([{:replace, "documents/main/hop1/zheng.md", "光绪年间", "1979年"}])
              |> Enum.any?(&(&1 =~ "不能直接写死年份"))
     end
 
-    test "a document without the front-matter fence" do
-      assert error_messages([
-               {:replace, "documents/gazetteer/zheng_case.md", "---\nslot:", "slot:"}
-             ])
-             |> Enum.any?(&(&1 =~ "必须以 --- 开头"))
-    end
-
-    test "a claims table with an unknown column" do
-      assert error_messages([{:replace, "claims.tsv", "allowed_for", "allowed"}])
-             |> Enum.any?(&(&1 =~ "未知列" and &1 =~ "你是不是想写 \"allowed_for\""))
+    test "a document without the front-matter fence is rejected" do
+      assert error_messages([{:replace, "documents/main/hop1/zheng.md", "---\nhop:", "hop:"}])
+             |> Enum.any?(&(&1 =~ "平铺头部"))
     end
 
     test "Windows line endings and a BOM are accepted" do
-      assert %{errors: []} = lint_with([{:rewrite_crlf, "documents/gazetteer/zheng_case.md"}])
+      assert %{errors: []} = lint_with([{:rewrite_crlf, "documents/main/hop1/zheng.md"}])
     end
-  end
-
-  defp raw_slices(topo) do
-    run_all(fn query -> Chronicle.compile_branch_sliceo(topo, query) end) |> terms()
   end
 
   defp error_messages(mutations) do
@@ -268,8 +175,10 @@ defmodule Voy.World.ContentTest do
     File.write!(path, String.replace(normalized, from, to))
   end
 
-  defp apply_mutation(dest, {:delete, relative}) do
-    File.rm!(Path.join(dest, relative))
+  defp apply_mutation(dest, {:delete, relative}), do: File.rm!(Path.join(dest, relative))
+
+  defp apply_mutation(dest, {:duplicate, source, target}) do
+    File.cp!(Path.join(dest, source), Path.join(dest, target))
   end
 
   defp apply_mutation(dest, {:rewrite_crlf, relative}) do

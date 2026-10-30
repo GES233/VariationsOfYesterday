@@ -51,6 +51,7 @@ defmodule Voy.World.AscribeTest do
     # 2. multiple: the record is complete, the instrument's resolution cannot
     #    separate two pulse identities that differ by less than one tick.
     coarse = evidence_for(@truth, contract, resolution: 4.0)
+
     assert {:multiple, %{candidates: candidates, differing: differing}} =
              Ascribe.explain(coarse, contract: contract)
 
@@ -59,6 +60,7 @@ defmodule Voy.World.AscribeTest do
 
     # 3. incomplete: the field that would have separated them is missing.
     without_lag = Enum.reject(unique, &(&1.field == :surge_lag and &1.lens == :tech_inner))
+
     assert {:incomplete, %{candidates: many, missing: missing}} =
              Ascribe.explain(without_lag, contract: contract)
 
@@ -68,14 +70,20 @@ defmodule Voy.World.AscribeTest do
     # 4. none: a definite recorded value that every hypothesis contradicts.
     contradicted =
       Enum.map(unique, fn record ->
-        if record.lens == :tech_inner and record.field == :surge_lag, do: %{record | value: 12.0}, else: record
+        if record.lens == :tech_inner and record.field == :surge_lag,
+          do: %{record | value: 12.0},
+          else: record
       end)
 
-    assert {:none, %{contradictions: contradictions}} = Ascribe.explain(contradicted, contract: contract)
+    assert {:none, %{contradictions: contradictions}} =
+             Ascribe.explain(contradicted, contract: contract)
+
     assert contradictions != []
   end
 
-  test "a contradiction names the field, the recorded value and the prediction", %{contract: contract} do
+  test "a contradiction names the field, the recorded value and the prediction", %{
+    contract: contract
+  } do
     evidence = evidence_for(@truth, contract)
 
     contradicted =
@@ -145,14 +153,20 @@ defmodule Voy.World.AscribeTest do
     assert :unknown_alternative = Ascribe.refute(evidence, :a_made_up_cause)
   end
 
-  test "the rain explanation survives only once all three of its witnesses are gone", %{contract: contract} do
+  test "the rain explanation survives only once all three of its witnesses are gone", %{
+    contract: contract
+  } do
     evidence = evidence_for(@truth, contract)
     witnesses = [:impact_count, :sign_order, :amplitude]
 
     # Any one of them alone refutes the rain story ...
     for field <- witnesses do
-      kept = Enum.filter(evidence, &(&1.field == field)) ++ Enum.reject(evidence, &(&1.field == field))
-      assert {:excluded, reasons} = Ascribe.refute(kept, :autumn_rain), "#{field} alone must refute"
+      kept =
+        Enum.filter(evidence, &(&1.field == field)) ++ Enum.reject(evidence, &(&1.field == field))
+
+      assert {:excluded, reasons} = Ascribe.refute(kept, :autumn_rain),
+             "#{field} alone must refute"
+
       assert Enum.any?(reasons, &(&1.field == field))
     end
 
@@ -163,9 +177,16 @@ defmodule Voy.World.AscribeTest do
     assert Enum.map(survivors, & &1.field) |> Enum.sort() == Enum.sort(witnesses)
   end
 
-  test "the naive cause-tag classifier is right by accident, and provably so", %{contract: contract} do
+  test "the naive cause-tag classifier is right by accident, and provably so", %{
+    contract: contract
+  } do
     world_a = @truth
-    world_b = %{c0_state: :c0_intact, pulse_kind: :alpha_metal_resonance, safe_phase_window: :late}
+
+    world_b = %{
+      c0_state: :c0_intact,
+      pulse_kind: :alpha_metal_resonance,
+      safe_phase_window: :late
+    }
 
     evidence_a = evidence_for(world_a, contract)
     evidence_b = evidence_for(world_b, contract)
@@ -247,7 +268,8 @@ defmodule Voy.World.AscribeTest do
     assert causes == [:seasonal_rain_mudslide]
   end
 
-  test "minimal_sufficient_sets are genuinely sufficient and minimal, and intersect to minimal_chain", %{contract: contract} do
+  test "minimal_sufficient_sets are genuinely sufficient and minimal, and intersect to minimal_chain",
+       %{contract: contract} do
     evidence = evidence_for(@truth, contract)
     core = Ascribe.minimal_chain(evidence, contract: contract)
     sets = Ascribe.minimal_sufficient_sets(evidence, contract: contract)
@@ -272,7 +294,9 @@ defmodule Voy.World.AscribeTest do
 
         refute match?(
                  {:unique, @truth},
-                 Ascribe.explain(Ascribe.subset_records(evidence, proper_subset), contract: contract)
+                 Ascribe.explain(Ascribe.subset_records(evidence, proper_subset),
+                   contract: contract
+                 )
                ),
                "dropping #{inspect(item)} from #{inspect(s)} should lose uniqueness"
       end
@@ -287,8 +311,14 @@ defmodule Voy.World.AscribeTest do
     assert MapSet.equal?(intersection, MapSet.new(core))
   end
 
-  test "colliding lag pairs in the late window make OldZhai count_of_blows the essential core and span all three lenses", %{contract: contract} do
-    late_res = %{c0_state: :c0_collapsed, pulse_kind: :alpha_metal_resonance, safe_phase_window: :late}
+  test "colliding lag pairs in the late window make OldZhai count_of_blows the essential core and span all three lenses",
+       %{contract: contract} do
+    late_res = %{
+      c0_state: :c0_collapsed,
+      pulse_kind: :alpha_metal_resonance,
+      safe_phase_window: :late
+    }
+
     evidence = evidence_for(late_res, contract)
 
     # On this hypothesis, surge_lag (37.0) collides with alpha_shock/late and

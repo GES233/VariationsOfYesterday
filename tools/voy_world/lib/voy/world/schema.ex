@@ -94,6 +94,7 @@ defmodule Voy.World.Schema do
   defp normalize(_key, value), do: value
 
   def to_public(%ReifiedVar{id: id}), do: %{"_var" => id}
+  def to_public(nil), do: nil
   def to_public([]), do: []
 
   def to_public(term) when is_list(term) do

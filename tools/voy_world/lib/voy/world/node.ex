@@ -16,6 +16,7 @@ defmodule Voy.World.Node do
   def compile(spec_fields, feature_fields) do
     with {:ok, spec} <- normalize_spec(spec_fields),
          :ok <- validate_names(spec),
+         :ok <- require_seed(spec),
          {:ok, candidates} <- solve_normalized(spec, Schema.complete_features(feature_fields)),
          {:ok, records} <- Naming.materialize_all(spec, candidates) do
       {:ok, records}
@@ -188,12 +189,14 @@ defmodule Voy.World.Node do
 
   defp normalize_fate_constraint(_value), do: {:error, :invalid_fate_constraint}
 
-  # An optional world seed. Absent (`nil`) keeps the historical record shape
-  # untouched; an integer additionally mounts the seeded five-hop dossier in
-  # `Voy.World.Naming.materialize/2`.
+  # Semantic solve/reverse queries may omit the seed. Player-facing compile and
+  # materialize calls require it through `require_seed/1` below.
   defp normalize_seed(nil), do: {:ok, nil}
   defp normalize_seed(seed) when is_integer(seed), do: {:ok, seed}
   defp normalize_seed(_seed), do: {:error, :invalid_seed}
+
+  defp require_seed(%{seed: seed}) when is_integer(seed), do: :ok
+  defp require_seed(_spec), do: {:error, :missing_seed}
 
   defp normalize_names(fields) do
     case fetch_field(fields, :names) do

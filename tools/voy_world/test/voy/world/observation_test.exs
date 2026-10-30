@@ -31,7 +31,15 @@ defmodule Voy.World.ObservationTest do
     evidence = Observation.evidence(Observation.observe_all(trace(contract)))
 
     for record <- evidence do
-      assert record.provenance in [:measured, :quantised, :clipped, :categorical, :administrative, :unrecorded]
+      assert record.provenance in [
+               :measured,
+               :quantised,
+               :clipped,
+               :categorical,
+               :administrative,
+               :unrecorded
+             ]
+
       assert is_atom(record.field)
       assert Map.has_key?(record, :value)
     end
@@ -116,6 +124,7 @@ defmodule Voy.World.ObservationTest do
     _ = Observation.evidence(Observation.observe_all(t))
 
     assert :erlang.term_to_binary(t) == before
+
     assert t.hidden == %{
              c0_state: :c0_collapsed,
              pulse_kind: :alpha_shock,
@@ -130,12 +139,21 @@ defmodule Voy.World.ObservationTest do
     assert first == second
   end
 
-  test "the lens set is closed: no institution records outside its declared fields", %{contract: contract} do
+  test "the lens set is closed: no institution records outside its declared fields", %{
+    contract: contract
+  } do
     observed = Observation.observe_all(trace(contract))
 
     declared = %{
       official_hq: [:water_level, :surge_count, :rain_total, :material, :quantity, :cause_tag],
-      tech_inner: [:impact_count, :amplitude, :surge_lag, :surge_direction, :rain_total, :material],
+      tech_inner: [
+        :impact_count,
+        :amplitude,
+        :surge_lag,
+        :surge_direction,
+        :rain_total,
+        :material
+      ],
       old_zhai: [:sign_order, :sign_sequence, :magnitude, :surge_lag, :count_of_blows]
     }
 
@@ -145,7 +163,9 @@ defmodule Voy.World.ObservationTest do
     end
   end
 
-  test "the trace distinguishes a self-sustained limit cycle from the resting basin", %{contract: contract} do
+  test "the trace distinguishes a self-sustained limit cycle from the resting basin", %{
+    contract: contract
+  } do
     collapsed =
       Slice.trace(
         %{c0_state: :c0_collapsed, pulse_kind: :alpha_shock, safe_phase_window: :relative},

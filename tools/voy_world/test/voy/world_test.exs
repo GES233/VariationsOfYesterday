@@ -7,8 +7,8 @@ defmodule Voy.WorldTest do
     assert {:ok, [slice]} = Voy.World.compile_branch(TestFixtures.baishui_topo())
     assert slice["branch_id"] == "branch_01_baishui"
     assert is_map(slice["era3"])
-    assert is_map(slice["archives"])
-    assert Map.has_key?(slice["archives"], "official_report")
+    assert is_map(slice["structures"])
+    refute Map.has_key?(slice, "archives")
     assert JSON.encode!(slice)
   end
 

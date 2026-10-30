@@ -17,7 +17,6 @@ defmodule Voy.World.PathwayTest do
     carved_diversion_stele: "分水石堰"
   }
 
-  @settled_period 39.474324
   @names %{up: "野猪箐", pass: "断碑垭口", down: "白水坝"}
   @branch :branch_01_baishui
 
@@ -170,7 +169,7 @@ defmodule Voy.World.PathwayTest do
 
       broken = %{
         hop5
-        | from: {:modulation_protocol, {:vessel, :main}, :absolute_refractory_window, other_fate}
+        | from: {:modulation_protocol, {:vessel, :main}, :measured_delay_window, other_fate}
       }
 
       assert Pathway.connect_edges([hop1, hop2, hop3, hop4, broken]) == []
@@ -286,22 +285,23 @@ defmodule Voy.World.PathwayTest do
       assert safe_tick_in(hops[4].body) == binding.safe_tick
       assert safe_tick_in(hops[5].body) == binding.safe_tick
 
-      assert binding.safe_tick / @settled_period >= 0.20
-      assert binding.safe_tick / @settled_period <= 0.30
+      assert binding.safe_tick > 0
     end
   end
 
-  test "the safe tap is drawn from the contract's absolute refractory window" do
+  test "every safe tap is an exact delayed measurement for metal resonance" do
     contract = Contract.load!()
-    {low, high} = Map.fetch!(Contract.windows(contract), :absolute)
-    assert {low, high} == {0.2, 0.3}
-
-    assert Witness.safe_ticks() == [8, 9, 10, 11]
+    {:ok, measured} = Contract.safe_ticks(contract, :alpha_metal_resonance)
+    assert measured != []
+    assert Enum.map(measured, & &1.tick) == Witness.safe_ticks()
 
     for {relic, fate} <- pairs(), seed <- [101, 202, 303, 404] do
       binding = Witness.bind(seed, @branch, relic, fate)
-      assert binding.safe_tick in Witness.safe_ticks()
-      assert binding.safe_phase >= low and binding.safe_phase <= high
+      row = Enum.find(measured, &(&1.tick == binding.safe_tick))
+      assert row.outcome == :delayed
+      assert binding.safe_delay == row.delta
+      assert binding.safe_window == row.window
+      assert_in_delta binding.safe_phase, row.phase, 1.0e-12
     end
   end
 
@@ -539,21 +539,22 @@ defmodule Voy.World.PathwayTest do
              Voy.World.Node.normalize_spec(Keyword.put(@ascended_spec, :seed, "42"))
   end
 
-  test "compile_node_dossier mounts a seeded dossier and leaves compile_node/2 untouched" do
+  test "compile_node requires a seed and mounts the sole five-hop narrative" do
+    assert {:error, :missing_seed} = Voy.World.compile_node(@ascended_spec, @ascended_features)
+
     assert {:ok, [seeded]} =
+             Voy.World.compile_node(Keyword.put(@ascended_spec, :seed, 303), @ascended_features)
+
+    assert {:ok, [delegated]} =
              Voy.World.compile_node_dossier(@ascended_spec, @ascended_features, 303)
 
-    assert {:ok, [plain]} = Voy.World.compile_node(@ascended_spec, @ascended_features)
-
-    # Zero regression: the unseeded record has no dossier key and the seeded
-    # record differs from it only by that key.
-    refute Map.has_key?(plain, "dossier")
-    assert Map.delete(seeded, "dossier") == plain
+    assert delegated == seeded
+    refute Map.has_key?(seeded, "archives")
 
     dossier = seeded["dossier"]
     assert dossier["seed"] == 303
-    assert dossier["relic"] == plain["era1"]["guardian_relic"]
-    assert dossier["fate"] == plain["era3"]["fate"]
+    assert dossier["relic"] == seeded["era1"]["guardian_relic"]
+    assert dossier["fate"] == seeded["era3"]["fate"]
     assert length(dossier["documents"]) == 7
     assert length(Enum.filter(dossier["documents"], &(&1["role"] == "main"))) == 5
     assert length(Enum.filter(dossier["documents"], &(&1["role"] == "decoy"))) == 2
@@ -563,21 +564,15 @@ defmodule Voy.World.PathwayTest do
              Voy.World.compile_node_dossier(@ascended_spec, @ascended_features, "303")
   end
 
-  # ==== content preview micro-chain section (design note 05 section 5.1) ==== //
+  # ==== content preview micro-chain section ==== //
 
-  test "preview appends the seeded five-hop dossier after every existing section" do
+  test "preview renders history and the five-hop dossier without global summaries" do
     assert {:ok, text} = Content.preview("baishui", seed: 202)
-
-    # The historical preview is kept verbatim ...
     assert text =~ "【节点档案预览：baishui（白水坝）】"
     assert text =~ "结局：Fate_Assimilated_NewZhai"
-    assert text =~ "① 旧州府残卷"
-    assert text =~ "② 垦殖总场官样通报"
-    assert text =~ "③ 技术员手簿批注"
-    assert text =~ "④ 第三纪规约"
-
-    # ... and the five-hop dossier is appended after it.
     assert text =~ "【五跳微链卷宗（seed=202，含2份同车间干扰单据）】"
+    refute text =~ "① 旧州府残卷"
+    refute text =~ "② 垦殖总场官样通报"
 
     dossier =
       Witness.render_dossier(

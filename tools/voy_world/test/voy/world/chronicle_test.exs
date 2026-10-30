@@ -51,57 +51,62 @@ defmodule Voy.World.ChronicleTest do
            end)
   end
 
-  test "archive prose agrees with relic and gazetteer context" do
+  test "five-hop prose agrees with relic and local historical context" do
     for topo <- TestFixtures.all_topographies(),
         {:ok, slices} <- [Voy.World.compile_branch(topo)],
         slice <- slices do
-      relic = slice["era1"]["guardian_relic"]
-      tech_note = slice["archives"]["tech_note"]["note"]
-      gazetteer_title = slice["archives"]["gazetteer"]["title"]
+      refute Map.has_key?(slice, "archives")
+      relic = slice["era1"]["guardian_relic"] |> String.to_existing_atom()
+      fate = slice["era3"]["fate"] |> String.to_existing_atom()
+
+      dossier =
+        Voy.World.Witness.render_dossier(
+          101,
+          slice["branch_id"],
+          relic,
+          fate,
+          %{up: topo[:up_name], pass: topo[:pass_name], down: topo[:down_name]}
+        )
+
+      hop1 = hd(dossier.documents)
+      hop4 = Enum.at(dossier.documents, 3)
 
       case relic do
-        "carved_diversion_stele" ->
-          refute tech_note =~ "铜钲"
-          refute gazetteer_title =~ "铜钲"
+        :carved_diversion_stele ->
+          refute hop1.body =~ "铜钲"
+          refute hop4.body =~ "铜钲"
 
-        "ancestral_bronze_zheng" ->
-          refute tech_note =~ "不可强堵暗河"
+        :ancestral_bronze_zheng ->
+          refute hop4.body =~ "不可强堵暗河"
       end
-
-      refute inspect(slice) =~ "断碑垭口木架"
     end
   end
 
   test "cross-era reconciliation matches semantic clues instead of prose" do
     results =
       run_all(fn q ->
-        fresh [topo, slice, archives, tech_note, council_doc, era3, gazetteer, official] do
+        fresh [topo, slice, era1, era2a, era2b, era3] do
           membero(topo, TestFixtures.sample_topographies())
           Chronicle.compile_branch_sliceo(topo, slice)
-          propso(slice, era3: era3, archives: archives)
+          propso(topo, down_name: "白水坝")
+          propso(slice, era1: era1, era2a: era2a, era2b: era2b, era3: era3)
+          propso(era1, guardian_relic: :ancestral_bronze_zheng)
+          propso(era2a, gazetteer_precedent: :case_1894_zheng_return_calmed_slide)
+          propso(era2b, disturbance_mode: :periodic_shallow_blasting)
 
-          propso(archives,
-            gazetteer: gazetteer,
-            official_report: official,
-            tech_note: tech_note,
-            council_document: council_doc
+          propso(era3,
+            fate: :Fate_Assimilated_NewZhai,
+            post_withdrawal_polity: :brigade_elder_joint_council
           )
 
-          propso(gazetteer,
-            precedent: :case_1894_zheng_return_calmed_slide,
-            recorded_settlement: "白水坝"
-          )
-
-          propso(official, claimed_cause: :seasonal_rain_mudslide)
-          eq(q, tech_note: tech_note, council_document: council_doc, era3: era3)
+          eq(q, era1: era1, era2a: era2a, era2b: era2b, era3: era3)
         end
       end)
       |> terms()
 
     assert [result] = results
-
-    assert result[:tech_note][:true_cause] == :c0_removed_and_vulnerable_window_blasting
-    assert result[:council_document][:governance] == :brigade_elder_joint_council
+    assert result[:era2a][:gazetteer_precedent] == :case_1894_zheng_return_calmed_slide
+    assert result[:era3][:post_withdrawal_polity] == :brigade_elder_joint_council
     assert result[:era3][:fate] == :Fate_Assimilated_NewZhai
   end
 end

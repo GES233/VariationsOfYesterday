@@ -76,5 +76,6 @@ defmodule Voy.World.Slice do
 
   @doc "Whether the surge beat the rain, which the phenology records as order."
   @spec signs_before_rain?(map()) :: boolean()
-  def signs_before_rain?(%{period: period, shift: shift, rain_lag: rain}), do: period + shift < rain
+  def signs_before_rain?(%{period: period, shift: shift, rain_lag: rain}),
+    do: period + shift < rain
 end

@@ -1,108 +1,90 @@
-# 设计札记 03 — 内容流水线：让人写设定，让机器把设定编成因果
+# 设计札记 03 — 内容流水线：让人写局部证据，让机器拼出因果
 
-> 状态：**已落地**（2026-10-24）。配套实现见 `tools/voy_world/`：`Voy.World.Content`、`Voy.World.Projection`、`content/`、`mix voy.content`（`lint` / `preview` / `template`）、`.github/workflows/voy_world.yml`。
-> 定位：把「谁写什么」定下来，使没有技术背景的作者也能参与世界观生产，同时保证关系引擎（`design-note-02`）的语义不被内容编辑破坏。
+> 状态：**五跳内容包已落地**（2026-10-30 替换旧四卡全局摘要）。实现见 `tools/voy_world/`：`Voy.World.Content`、`Voy.World.Pathway`、`Voy.World.Witness`、`content/` 与 `mix voy.content`。
+> 定位：作者只写局部单据与散文；关系层负责桥接元组，种子层负责物证，检查器负责覆盖与一致性。
 
----
+## 0. 为什么替换旧内容包
 
-## 0. 为什么需要这一层
+旧内容包把清丈旧案、现代收缴、点炮、相位与结局写进同一张「全知摘要」，作者看似只改散文，实际上仍在维护全局因果结论。这与五跳模型的目标冲突：故事不应存在于任何一张卡中，而应由局部证据首尾合一后涌现。
 
-原型阶段内容与规则是长在一起的：文档正文写在 `Projection` 的 `conde` 分支里，归因卡写在同一个函数里，年份写死在句子中。这对一个人维护是高效的，但有两种成本会在交接时兑现：
-
-1. **作者写不了**：改一句话要懂 Elixir、要懂合一、要知道 `nil` 与 `:any` 的区别；
-2. **一致性靠人盯**：同一段历史被两处文本描述，年份、地名、口径很容易漂移，而这类漂移正是「归因清晰」这一验收标准的天敌。
-
-因此把内容从代码里整体搬出，形成**内容包**：作者写卡片与档案，机器把卡片编译成关系。
+因此旧 `claims.tsv`、四类全局档案、`Projection.compile_archiveso` 与 `Causality` 均已退役。`Chronicle` 继续负责地形、四纪历史、结局与结构；`Pathway + Witness + Content` 接管全部玩家叙事。
 
 ## 1. 三层分工
 
 | 层 | 谁 | 碰什么 | 变更 |
 | :--- | :--- | :--- | :--- |
-| 内容 | 作者 | `content/documents/**/*.md`、`content/claims.tsv` | 加文件 / 加一行 |
-| 结构 | 技术维护者 | 年代锚点、纪元链、结局表、地貌词表、规则层 | 改代码，走评审 |
-| 校验 | 机器 | 检查器 + CI | 自动 |
+| 内容 | 作者 | `content/documents/**/*.md` | 新增或修改局部卡片 |
+| 结构 | 技术维护者 | 五跳边、桥接元组、地貌、纪元、结局、物证池、数值契约 | 改代码并评审 |
+| 校验 | 机器 | 内容检查、五跳检查、测试与 CI | 自动 |
 
-边界的一句话：**作者可以增删内容，不能改变结构**。新增一个结局、一个纪元、一种地貌属于结构变更，必须有人改代码——这是有意的约束，因为结构一变，所有历史与档案的适用条件都要重新验证。
+作者可以改文风与局部事实，不能自行增加 hop、古器、结局、干扰类型或安全窗口。这些是结构变更。
 
-## 2. 内容包格式
+## 2. 卡片格式
 
-选型原则：**零新语法、零依赖、diff 干净、Excel 可编辑**。
+每份档案是一张 Markdown 卡：`---` 头部平铺 `key: value`，下面是正文。
 
-- 表格用 **TSV**（`claims.tsv`）：制表符分隔，单元格里可以自由出现逗号与《》，不需要引号规则；
-- 档案用 **Markdown**：`---` 头部平铺 `key: value`，下面是散文正文；
-- 两者都是纯文本，Git 可评审、可回滚。
-
-一份档案：
+主链 Hop 2 示例：
 
 ```
 ---
-slot: tech_note
-lens: tech
-fate: Fate_Assimilated_NewZhai
+hop: 2
+role: main
 relic: ancestral_bronze_zheng
-claim: claim.c0_removed_and_vulnerable_window_blasting
+c0_status: c0_collapsed
+title: 物资回收与代管过磅单
 ---
 
-对照清丈残卷所载拆钟旧案，{{date.era2b_short}}年收缴铜钲再度断绝阻尼（c0=0）；……
+{{place.up}}旧铜器编入批号 {{batch_id}}……
 ```
 
-一张归因卡（`claims.tsv` 一行）：
+干扰卡示例：
 
-| tag | allowed_for | forbidden_for | label |
-| :--- | :--- | :--- | :--- |
-| `claim.seasonal_rain_mudslide` | `official` | `tech,folk` | 秋雨滑坡（官方口径） |
+```
+---
+role: decoy
+relic: ancestral_bronze_zheng
+decoy_class: material_mismatch
+title: 机修车间翻砂配料卡（另册）
+---
 
-`forbidden_for` 就是原来的 `neq` 禁忌，`allowed_for` 就是「谁有资格引用」。两套账本不再由代码约束，而由这张表成立：官方通报引用官方卡，技术手簿引用技术卡，二者必然不同。
+普通生铁浇铸{{decoy_a_vessel_name}}……
+```
 
-## 3. 机器侧要做的三件事
+条件规则：
 
-1. **选择器**：给定一段已编译的历史（`fate`、`relic`、`gazetteer_case`），为每个 `slot` 选出**恰好一份**适用文档。条件留空的维度即通配。
-2. **渲染器**：把 `{{place.down}}`、`{{date.era2a_zheng}}` 换成节点名与时间线写法；日期写法只有三种（纪年、公历、两位 fieldwork 写法），都在 `Timeline` 里。
-3. **检查器**：把所有作者能犯的错变成中文报错，带文件与行号。
+- Hop 1、3：`hop / role / relic / title`；
+- Hop 2：另写 `c0_status`；
+- Hop 4、5：另写 `fate`；
+- 干扰卡：`role: decoy`，写 `relic / decoy_class / title`，不写 hop 或结局。
 
-## 4. 检查清单（当前实现）
+当前每个 `(relic, fate)` 都选择五张主链卡与两张干扰卡，共 12 组组合、36 份作者卡片。
 
-| 检查 | 错误示例 |
-| :--- | :--- |
-| 字段合法性 | `未知字段 "govenance"；可用字段：slot / lens / fate / relic / gazetteer_case / claim / governance / title（你是不是想写 "governance"？）` |
-| 必填字段 | `tech_note 缺少必填字段：claim` |
-| 词表 | `fate 里的 "Fate_Assimilated_NewZha" 不合法；可用：Fate_Assimilated_NewZhai, …（你是不是想写 "Fate_Assimilated_NewZhai"？）` |
-| 引用完整性 | `档案卡 doc.tech.x 引用了不存在的归因卡 "claim.nope"；现有：…` |
-| 口径禁忌 | `tech 口径不能引用 claim.seasonal_rain_mudslide（该卡的 forbidden_for 包含 tech）` |
-| 唯一适用 | `档案卡 doc.tech.a 与 doc.tech.b 的适用条件重叠：同一段历史会同时选中它们` |
-| 覆盖 | `fate=Fate_Assimilated_NewZhai + relic=carved_diversion_stele 没有任何 tech_note 文档适用` |
-| 日期归属 | `无法解析的占位符：{{date.era9}}`；`正文不能直接写死年份 79年，请改用日期占位符：…`；渲染后切片仍由 `Canon` 兜底 |
-| 编码宽容 | CRLF、BOM、注释行、空行都接受 |
+## 3. 机器侧职责
 
-`mix voy.content lint` 打印这些错误；`mix test` 把它们当作断言。
+1. **关系拼接**：`Pathway` 只用 `from/to` 桥接元组拼链；删任一跳即断，材质不符和外运单据不能补链。
+2. **唯一选择**：`Content.card_for/2` 按 hop、角色、古器、结局、c0 与干扰类型选择恰好一张卡；缺卡和多卡都是错误。
+3. **种子物化**：`Witness` 绑定批号、器物和实测推迟刻度，再渲染卡片占位符。
+4. **内容检查**：未知字段、必填缺失、非法词表、未绑定占位符、写死年份、重复适用和覆盖缺口均报中文 `file:line`。
+5. **叙事检查**：`Canon.check_pathways/1` 验证唯一成链、单跳消融、干扰排斥、单卡认知局部性与日期归属。
+
+## 4. 实测安全刻度
+
+安全操作不再由「绝对不应期」标签直接推出。Scala 在 `PhaseResponse` 中逐整数 tick 测量金属共振的真实尖峰响应，写入 `contracts/mandate-slice-v1.json` 的 `safe_ticks`。只有 `Delayed` 结果可进入 `Witness` 候选；`Premature`、`Absorbed` 与其他结果均不可称为安全操作。
+
+因此档案中的第 N 格同时受世界种子与数值契约约束，而不是作者手写的一条口诀。
 
 ## 5. 工作流
 
-- **Git + PR**。作者只改 `content/`；CI（`.github/workflows/voy_world.yml`）跑格式、测试、内容检查，错误贴在 PR 里，作者在本机不需要装 Elixir。
-- **评审分工**：技术维护者看结构与词表；编辑看文风、口径、时代质感；检查器看引用与唯一性。三者互不替代。
-- **作者辅助命令**：
-  - `mix voy.content preview [baishui|heishui|xuanguan|nuoliang|all]`：把玩家在节点中会读到的结构描述与四份档案按顺序打印出来，不跑游戏即可校文风；
-  - `mix voy.content template <gazetteer|official_report|tech_note|council_document>`：输出对应槽位的 Markdown 档案卡骨架与可用词表注释；
-  - 错误信息内置基于编辑距离的「你是不是想写 `...`？」最接近合法值建议。
+```sh
+mix voy.content lint
+mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all] [--seed N]
+mix voy.content template <hop1|hop2|hop3|hop4|hop5|decoy>
+```
 
-## 6. 与既有结构的关系
+作者只改 `content/`；CI 运行格式、测试与内容检查。技术维护者评审结构，编辑评审文风与单卡认知边界，机器检查关系与覆盖，三者互不替代。
 
-- `design-draft-01` §1 的动力学结构不变；内容包只影响 §4 叙事层的产出。
-- `design-note-02` 的关系引擎不变：内容包提供**事实与文本**，由 `Voy.World.Projection` 翻译成关系约束参与正向编译与反向线索考据。
-- 内容包的生产物最终进入 `Voy.World.Export` 的 bundle（`schema_version`），JVM 侧只读导出物，不读 TSV/MD。
+## 6. 与导出及 JVM 的关系
 
-## 7. 迁移状态
+`Voy.World.Export` 当前为 **schema v2**。节点以 `dossier` 取代旧 `archives`，携带 seed、binding、五张主链卡和两张干扰卡，并校验其与历史中的 relic/fate 一致。JVM 只读导出物，不直接读取 Markdown。
 
-| 步骤 | 内容 | 状态 |
-| :--- | :--- | :--- |
-| 1 | 内容包格式 + 加载器 + 检查器 | ✅ 完成 |
-| 2 | 现有 4 类档案 + 8 张归因卡无损迁入，与规则层逐字节一致 | ✅ 完成 |
-| 3 | 规则层改为直接读内容包（`Projection` 变通用选择器，`Texts` 中的重复档案条目退役，聚落结构描述外提至 `Texts` 并统一 `{{...}}` 占位符） | ✅ 完成 |
-| 4 | `Canon` 增加包级检查（`Canon.check_content/1` 联动 `Content.lint`，切片检查同时覆盖档案与结构文本中的年份与地名） | ✅ 完成 |
-| 5 | 体验层：`mix voy.content preview`、`mix voy.content template`、最接近合法值建议、正文写死年份拦截 | ✅ 完成 |
-
-## 8. 边界与后续演进说明
-
-1. **聚落结构描述与运行时透镜留在 `Voy.World.Texts`**：`structure_*`（挂在位置而非文书上）与 `lens_*`（运行时三口径短程因果解释）均已外提至 `Voy.World.Texts` 并统一使用 `{{...}}` 占位符，使 `Projection` 与 `Causality` 规则代码保持零散文内联；
-2. **日期锚点留在 `Voy.World.Timeline`**：年代属于结构，作者不应随手增删；若将来需要按世界种子偏移年代，只改 `Timeline` 即可全局重渲染；
-3. **归因卡 tag 原子化**：`claim.*` 经 `Content.tag_atom/1` 转成原子进入 Elixir 内部字段；经 `Voy.World.Export` 导出到 JVM 时统一序列化为字符串 id。
+`Ascribe / Observation / Facts` 仍负责数值证据反演与运行时预测结算，不属于被退役的全局叙事模型。

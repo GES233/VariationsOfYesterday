@@ -44,13 +44,15 @@ object SliceContract:
   val dt: Double = 0.02
 
   final case class WindowRow(window: PhaseWindow, trial: Trial)
+  final case class SafeTick(tick: Int, phase: Double, delta: Double, window: String)
   final case class KindRow(
       kind: PulseKind,
       role: String,
       fire: Option[(Double, Double)],
       delay: Option[(Double, Double)],
       absorb: Option[(Double, Double)],
-      table: Seq[WindowRow]
+      table: Seq[WindowRow],
+      safeTicks: Seq[SafeTick]
   )
   final case class PeriodRow(dt: Double, measured: Double)
   final case class RegimeSample(stress: Double, activity: Double, regime: Regime)
@@ -194,13 +196,20 @@ object SliceContract:
       val table = PhaseWindow.values.toSeq.map { w =>
         WindowRow(w, PhaseResponse.trial(osc, snapshot, dt, period, w.mid, k, control))
       }
+      val safeTicks = PhaseResponse.tickTrials(osc, snapshot, dt, period, k).flatMap { case (tick, trial) =>
+        trial.delta.filter(_ => trial.outcome == PulseOutcome.Delayed).map { delta =>
+          val window = PhaseWindow.values.find(_.contains(trial.phase)).map(_.wire).getOrElse("other")
+          SafeTick(tick, trial.phase, delta, window)
+        }
+      }
       KindRow(
         kind = k,
         role = if k == PulseKind.AlphaShockWeak then "control" else "world",
         fire = PhaseResponse.span(trials, PulseOutcome.Premature),
         delay = PhaseResponse.span(trials, PulseOutcome.Delayed),
         absorb = PhaseResponse.span(trials, PulseOutcome.Absorbed),
-        table = table
+        table = table,
+        safeTicks = safeTicks
       )
     }
 
@@ -442,6 +451,17 @@ object SliceContract:
               "delta" -> optNum(r.trial.delta),
               "v_peak" -> Num(r.trial.vPeak),
               "v_min" -> Num(r.trial.vMin)
+            )
+          )
+        }),
+        "safe_ticks" -> Arr(k.safeTicks.map { r =>
+          Obj(
+            Seq(
+              "tick" -> Num(r.tick.toDouble),
+              "phase" -> Num(r.phase),
+              "outcome" -> Str(PulseOutcome.Delayed.toString),
+              "delta" -> Num(r.delta),
+              "window" -> Str(r.window)
             )
           )
         })

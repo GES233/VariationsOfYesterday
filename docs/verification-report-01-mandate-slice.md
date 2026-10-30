@@ -9,8 +9,8 @@
 ```
 # JDK 21（本机默认 JAVA_HOME 指向 zulu25 会让 Gradle 在配置阶段就失败）
 export JAVA_HOME=<jdk21>
-./gradlew test          # Scala 侧，51 用例
-cd tools/voy_world && mix test   # Elixir 侧，121 用例
+./gradlew test          # Scala 侧，53 用例（52 执行、1 跳过）
+cd tools/voy_world && mix test   # Elixir 侧，138 用例
 ```
 
 ---
@@ -190,14 +190,14 @@ cd tools/voy_world && mix test   # Elixir 侧，121 用例
 
 ## G. 跨栈测试、反例与负结果
 
-**测试清单**（`./gradlew test` = 50 用例 / 0 失败 / 1 跳过：`GridBenchmarkSpec` 需 `VOY_BENCH`）
+**测试清单**（`./gradlew test` = 52 执行 / 0 失败 / 1 跳过：`GridBenchmarkSpec` 需 `VOY_BENCH`；总计 53）
 
 | Spec | 覆盖 |
 |---|---|
 | `MandateReadoutSpec` 5 | 周期相位有分数、静息域只给类别、单次激变判为瞬态、burnout 由动力学（`burnout_a`）而非应力截断判定、**"应力分区把正在尖峰的格子叫烧毁"**这条被显式测出 |
-| `PhaseResponseSpec` 9 | 周期步长收敛、奇异极限参考**不复现**（负结果）、Hopf 精确式、声明剂量全域不点火、相对窗中点=推迟、点火阈值 > 声明剂量、**过阈≠尖峰（反例）**、`dt/2` 不变性、相位 tracker 收敛 |
+| `PhaseResponseSpec` 11 | 周期步长收敛、奇异极限参考**不复现**（负结果）、Hopf 精确式、声明剂量全域不点火、相对窗中点=推迟、点火阈值 > 声明剂量、**过阈≠尖峰（反例）**、`dt/2` 不变性、相位 tracker 收敛、占空比反转与逐 tick 实测推迟候选 |
 | `SliceReplaySpec` 6 | 同一事件流回放逐位一致、事件先于其 tick 生效、越界事件确定性丢弃、`c0` 两态的可观测差异（74 vs 1 次撞框）、链上可组合性判据 |
-| `SliceContractSpec` 9 | 检入契约 == 本次测量渲染（逐字节）、周期收敛、解析边界、阈值与声明剂量的关系、三个声明窗中点判据、claims 由测量生成、`c0` 指纹、链判据、分区采样 |
+| `SliceContractSpec` 10 | 检入契约 == 本次测量渲染（逐字节）、周期收敛、解析边界、阈值与声明剂量的关系、三个声明窗中点判据、claims 由测量生成、`c0` 指纹、链判据、分区采样、金属共振安全刻度 |
 | Elixir 37 新增 | 契约版本/结构校验、Profile 与测量对表、三方观测的保留/丢失/不可写回、四类结果、24/24 闭环、消融与最小链、替代病因排除、朴素规则对照、分辨率-可辨识性、`Facts` 记录-结算 |
 
 **负结果与反例（都不是"通过"，是"当前成立/不成立"的结论）**

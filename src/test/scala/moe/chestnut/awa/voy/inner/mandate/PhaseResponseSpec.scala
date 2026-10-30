@@ -187,3 +187,11 @@ class PhaseResponseSpec:
     val trialOnset = PhaseResponse.trial(oscOnset, snapOnset, dt, periodOnset, 0.50, PulseKind.AlphaShock, controlOnset)
     assertTrue(trialSat.delta.exists(_ > 0.0), s"saturated mid-cycle must delay, got ${trialSat.delta}")
     assertTrue(trialOnset.delta.exists(_ < 0.0), s"onset mid-cycle must advance, got ${trialOnset.delta}")
+
+  @Test def `integer-tick dossier candidates are measured delayed operations`(): Unit =
+    val rows = PhaseResponse.tickTrials(osc, snapshot, dt, period, PulseKind.MetalResonance)
+    val delayed = rows.filter { case (_, trial) => trial.outcome == PulseOutcome.Delayed }
+    assertTrue(delayed.nonEmpty, "the metal-resonance dossier needs at least one measured delayed tick")
+    assertTrue(rows.size == Math.ceil(period).toInt - 1)
+    for (_, trial) <- delayed do
+      assertTrue(trial.delta.exists(_ > 0.05 * period), s"delayed tick must clear the outcome threshold: $trial")

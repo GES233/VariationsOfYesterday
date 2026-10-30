@@ -1,5 +1,5 @@
 defmodule Voy.World.Naming do
-  @moduledoc "Late binding of display names and text/structure projections to semantic candidates."
+  @moduledoc "Late binding of names, structures, and the seeded five-hop dossier."
 
   use Voy.Kanren
 
@@ -28,18 +28,14 @@ defmodule Voy.World.Naming do
     era3 = Keyword.fetch!(history, :era3)
     named_topo = named_topography(spec, topo)
 
-    projections =
+    structures =
       run_all(fn q ->
-        fresh [structures, archives] do
-          Projection.compile_structureso(named_topo, era1, era2b, era3, structures)
-          Projection.compile_archiveso(named_topo, era1, era2a, era2b, era3, archives)
-          eq(q, structures: structures, archives: archives)
-        end
+        Projection.compile_structureso(named_topo, era1, era2b, era3, q)
       end)
       |> terms()
 
-    case projections do
-      [projection] ->
+    case structures do
+      [structure_set] ->
         {:ok,
          [
            node_id: spec.node_id,
@@ -51,31 +47,21 @@ defmodule Voy.World.Naming do
            era2a: era2a,
            era2b: era2b,
            era3: era3,
-           structures: Keyword.fetch!(projection, :structures),
-           archives: Keyword.fetch!(projection, :archives)
-         ] ++ dossier(spec, era1, era3)}
+           structures: structure_set,
+           dossier:
+             Witness.render_dossier(
+               spec.seed,
+               spec.branch_id,
+               Keyword.fetch!(era1, :guardian_relic),
+               Keyword.fetch!(era3, :fate),
+               spec.names
+             )
+         ]}
 
       _ ->
         {:error, :projection_failed}
     end
   end
-
-  # A seed is opt-in: without one the record is byte-for-byte the historical
-  # keyword list, so the golden cases and `world_cases.json` cannot drift.
-  defp dossier(%{seed: seed} = spec, era1, era3) when is_integer(seed) do
-    [
-      dossier:
-        Witness.render_dossier(
-          seed,
-          spec.branch_id,
-          Keyword.fetch!(era1, :guardian_relic),
-          Keyword.fetch!(era3, :fate),
-          spec.names
-        )
-    ]
-  end
-
-  defp dossier(_spec, _era1, _era3), do: []
 
   defp named_topography(spec, topo) do
     [

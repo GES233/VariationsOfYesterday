@@ -116,3 +116,11 @@ class SliceContractSpec:
     assertEquals(Regime.Strained, byPoint((0.45, 0.0)))
     assertEquals(Regime.Oscillating, byPoint((0.50, 0.40)))
     assertEquals(Regime.Burnout, byPoint((0.99, 0.90)))
+
+  @Test def `safe ticks are exact delayed measurements for the ritual pulse`(): Unit =
+    val metal = data.kind(PulseKind.MetalResonance.wire).get
+    assertTrue(metal.safeTicks.nonEmpty, "the dossier cannot claim a safe operation from an empty set")
+    assertEquals(metal.safeTicks.map(_.tick).distinct.size, metal.safeTicks.size)
+    for row <- metal.safeTicks do
+      assertEquals(row.tick.toDouble / data.period, row.phase, 1e-12)
+      assertTrue(row.delta > 0.05 * data.period, s"tick ${row.tick} must be a genuine delay")

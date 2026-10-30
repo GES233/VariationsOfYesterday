@@ -202,12 +202,12 @@ defmodule Voy.World.Chronicle do
           eq(post_withdrawal_polity, :brigade_elder_joint_council),
           eq(fate_category, :Fate_Assimilated_NewZhai),
           eq(resulting_regime, :Oscillating),
-          eq(target_phase_rule, :must_strike_at_AbsoluteRefractory),
+          eq(target_phase_rule, :delayed_at_MeasuredPulseWindow),
           eq(emergent_practice,
             social_structure: "场部干事记工分、老保管员（旧头人后裔）掌听山令旗的『场部—议事会』双轨制",
             costume: "印有垦殖场字样的褪色劳保服，外披老寨火塘麻带",
             instrument: "隘口木架悬挂、缠满红绸的东方红-54铸铁气缸体",
-            liturgy: "待林中虫鸣骤停（20%-30%死寂回吸窗），按《交接班安全生产条例》列队唱名三声、重锤击缸"
+            liturgy: "按观测手簿标定的实测推迟格，依《交接班安全生产条例》列队唱名并击缸"
           )
         ]
 
@@ -306,12 +306,11 @@ defmodule Voy.World.Chronicle do
   end
 
   def compile_branch_sliceo(topo, slice) do
-    fresh [branch_id, history, era1, era2a, era2b, era3, structures, archives] do
+    fresh [branch_id, history, era1, era2a, era2b, era3, structures] do
       propso(topo, branch_id: branch_id)
       history_through_era3o(topo, history)
       propso(history, era1: era1, era2a: era2a, era2b: era2b, era3: era3)
       Projection.compile_structureso(topo, era1, era2b, era3, structures)
-      Projection.compile_archiveso(topo, era1, era2a, era2b, era3, archives)
 
       eq(slice,
         branch_id: branch_id,
@@ -320,8 +319,7 @@ defmodule Voy.World.Chronicle do
         era2a: era2a,
         era2b: era2b,
         era3: era3,
-        structures: structures,
-        archives: archives
+        structures: structures
       )
     end
   end

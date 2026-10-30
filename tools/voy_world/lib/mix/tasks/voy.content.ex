@@ -6,15 +6,12 @@ defmodule Mix.Tasks.Voy.Content do
 
       mix voy.content lint
       mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all] [--seed N]
-      mix voy.content template <gazetteer|official_report|tech_note|council_document>
+      mix voy.content template <hop1|hop2|hop3|hop4|hop5|decoy>
 
-    * `lint` checks the pack and prints author-facing issues (`file:line` plus
-      closest-value hints). Errors block a merge; warnings do not.
-    * `preview` compiles the preset node(s) and prints the player-facing
-      structures and archives in reading order so writers can review voice and
-      continuity without running the game. `--seed N` selects the world seed
-      the appended five-hop micro-chain dossier is bound to (default 101).
-    * `template` prints a blank Markdown document card for the chosen slot.
+    * `lint` checks five-hop card coverage, applicability, and prose.
+    * `preview` prints history, structures, and the seeded five-hop dossier;
+      there are no legacy global archive summaries. Default seed: 101.
+    * `template` prints a blank local-evidence or decoy card.
   """
 
   use Mix.Task
@@ -52,7 +49,7 @@ defmodule Mix.Tasks.Voy.Content do
       "用法：\n" <>
         "  mix voy.content lint\n" <>
         "  mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all] [--seed N]\n" <>
-        "  mix voy.content template <gazetteer|official_report|tech_note|council_document>"
+        "  mix voy.content template <hop1|hop2|hop3|hop4|hop5|decoy>"
     )
   end
 

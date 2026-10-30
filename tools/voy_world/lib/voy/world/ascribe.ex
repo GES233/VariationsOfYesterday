@@ -98,7 +98,7 @@ defmodule Voy.World.Ascribe do
     pulses = Contract.world_pulses(contract)
 
     fresh [c0, kind, window] do
-      eq(h_kw, [c0_state: c0, pulse_kind: kind, safe_phase_window: window])
+      eq(h_kw, c0_state: c0, pulse_kind: kind, safe_phase_window: window)
       membero(c0, [:c0_collapsed, :c0_intact])
       membero(kind, pulses)
       membero(window, [:absolute, :relative, :late])
@@ -226,7 +226,8 @@ defmodule Voy.World.Ascribe do
         if losing != [] do
           {:incomplete, %{candidates: candidates, missing: Enum.sort(losing)}}
         else
-          {:multiple, %{candidates: candidates, differing: differing(candidates, contract, resolution)}}
+          {:multiple,
+           %{candidates: candidates, differing: differing(candidates, contract, resolution)}}
         end
     end
   end
@@ -275,12 +276,19 @@ defmodule Voy.World.Ascribe do
     end
   end
 
-  defp agree(value, predicted, tolerance, observation, field) when is_number(value) and is_number(predicted) do
+  defp agree(value, predicted, tolerance, observation, field)
+       when is_number(value) and is_number(predicted) do
     if abs(value - predicted) <= tolerance do
       :match
     else
       {:contradiction,
-       %{lens: observation.lens, field: field, recorded: value, predicted: predicted, tolerance: tolerance}}
+       %{
+         lens: observation.lens,
+         field: field,
+         recorded: value,
+         predicted: predicted,
+         tolerance: tolerance
+       }}
     end
   end
 
@@ -292,12 +300,15 @@ defmodule Voy.World.Ascribe do
   end
 
   defp missing_fields(evidence) do
-    recorded = evidence |> Enum.filter(&(&1.value != :unrecorded)) |> Enum.map(& &1.field) |> MapSet.new()
+    recorded =
+      evidence |> Enum.filter(&(&1.value != :unrecorded)) |> Enum.map(& &1.field) |> MapSet.new()
+
     Enum.reject(Observation.required_fields(), &MapSet.member?(recorded, &1))
   end
 
   defp differing(candidates, contract, resolution) do
-    predicted = Enum.map(candidates, &{&1, predict(&1, contract: contract, resolution: resolution)})
+    predicted =
+      Enum.map(candidates, &{&1, predict(&1, contract: contract, resolution: resolution)})
 
     keys =
       predicted
@@ -478,7 +489,8 @@ defmodule Voy.World.Ascribe do
   of the alternative's predictions, or `{:not_excluded, [survivors]}`. An
   alternative that cannot be excluded is a real result, not a bug.
   """
-  @spec refute([map()], atom()) :: {:excluded, [map()]} | {:not_excluded, [map()]} | :unknown_alternative
+  @spec refute([map()], atom()) ::
+          {:excluded, [map()]} | {:not_excluded, [map()]} | :unknown_alternative
   def refute(evidence, alternative) do
     case Map.fetch(alternatives(), alternative) do
       :error ->
@@ -495,7 +507,10 @@ defmodule Voy.World.Ascribe do
           end
 
         if reasons == [] do
-          survivors = for %{field: field, value: expected} <- predictions, do: %{field: field, expected: expected}
+          survivors =
+            for %{field: field, value: expected} <- predictions,
+                do: %{field: field, expected: expected}
+
           {:not_excluded, survivors}
         else
           {:excluded, reasons}
@@ -538,8 +553,12 @@ defmodule Voy.World.Ascribe do
   @spec official_only([map()]) :: {:unique, map()} | tuple()
   def official_only(evidence) do
     case Enum.find(evidence, &(&1.field == :cause_tag and &1.value == :seasonal_rain_mudslide)) do
-      nil -> {:incomplete, %{candidates: [], missing: [:cause_tag]}}
-      _record -> {:unique, %{c0_state: :c0_collapsed, pulse_kind: :alpha_shock, safe_phase_window: :relative}}
+      nil ->
+        {:incomplete, %{candidates: [], missing: [:cause_tag]}}
+
+      _record ->
+        {:unique,
+         %{c0_state: :c0_collapsed, pulse_kind: :alpha_shock, safe_phase_window: :relative}}
     end
   end
 end

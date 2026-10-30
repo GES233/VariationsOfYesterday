@@ -1,121 +1,55 @@
 # Voy World
 
-A dependency-free Elixir prototype of the Variations of Yesterday relational world model. It is a design and verification tool, not a runtime dependency of the Minecraft mod.
+《旧日变奏曲》的零外部依赖 Elixir 关系世界模型，用于设计验证与导出，不是 Minecraft 模组的运行时依赖。
 
-## Layout
+## 当前架构
 
-- `Voy.Kanren`: microKanren kernel, disequality constraints, open attributes, and thin DSL.
-- `Voy.World.Canon`: linter for a compiled canon (names, dates, attribution split, uniqueness).
-- `Voy.World.Causality`: causal stages, observations, ritual synthesis, and narrative lenses.
-- `Voy.World.Chronicle`: the shared forward/reverse branch-history relation.
-- `Voy.World.Content`: the authoring pack loader, linter, and archive assembly.
-- `Voy.World.Export`: versioned JSON bundle (`schema_version`) for one or more nodes.
-- `Voy.World.Facts`: ordered, append-only log of observations, actions, predictions and settlements.
-- `Voy.World.Node`: stable node identities, rule sets, fate constraints, and name-independent semantic solving.
-- `Voy.World.Naming`: late display-name binding and structure/archive materialization.
-- `Voy.World.Profile`: numeric stock (lag bands, phase windows, dose ranges, regime cut points).
-- `Voy.World.Projection`: structure and archive projections.
-- `Voy.World.Texts`: every document, decree and explanation as data, rendered from the timeline.
-- `Voy.World.Timeline`: dated anchors and the date forms prose is allowed to use.
-- `Voy.World`: JSON-safe branch and node entry points.
+- `Voy.Kanren`：microKanren 内核、开放属性、不等约束与 DSL。
+- `Voy.World.Chronicle`：保留地形、四纪历史、六种结局与结构的正反向编译。
+- `Voy.World.Pathway`：五跳局部证据关系；每张卡只记录一条边，完整故事靠桥接元组合一。
+- `Voy.World.Witness`：按 `(seed, branch_id, relic, fate)` 绑定批号、工业载体和实测推迟刻度。
+- `Voy.World.Content`：五跳 Markdown 内容包的唯一散文来源；旧四份全知档案与 `claims.tsv` 已退役。
+- `Voy.World.Ascribe / Observation / Contract`：数值轨迹、三方观测、证据反演与 Scala 实测契约。
+- `Voy.World.Facts`：观测、行动、预测、结算的追加式运行时事实日志。
+- `Voy.World.Node / Naming`：稳定节点身份、语义求解、名称与五跳卷宗物化。
+- `Voy.World.Export`：确定性 JSON bundle；当前 `schema_version = 2`，节点以 `dossier` 取代旧 `archives`。
+- `Voy.World.Canon`：历史、结构、五跳成链、断链、干扰排除、认知局部性和日期检查。
 
-## Contracts (M1)
+旧 `Voy.World.Causality` 全局三段因果、全局透镜文本与旧相位转移表已删除，不再与五跳模型并存。
 
-Three boundary objects carry the port. They are additive: none of them changes a
-rule, and the existing relations keep working unchanged.
+## 五跳叙事
 
-1. **`Voy.World.Profile`** owns the numbers the symbolic layer is allowed to
-   name. A measured lag is mapped onto a declared band (`:tau_immediate`,
-   `:tau_5`, `:tau_10`) instead of a rule comparing floats; declared gaps stay
-   out of band; `describe/1` renders the whole stock as JSON. Swapping the stock
-   moves the same measurement into another band without touching a rule, and
-   `regime/3` is the reference partition the JVM `MandateReadout` must
-   reproduce.
-2. **`Voy.World.Export`** is the wire format: `schema_version`, `rule_set`,
-   the stock that produced the canon, and normalized node records (structures
-   as `site`/`description`, tagged tuples as `tag`/`value`). Deterministic, no
-   timestamps, validated against a JSON round-trip so atoms and tuples cannot
-   leak into the contract.
-3. **`Voy.World.Facts`** is the time axis: entries carry a tick, a site, an
-   actor and open attributes; `caused_by`/`evidence` build chains; predictions
-   must carry a `claim` and a `due_tick` and stay `pending/1` until a
-   settlement with `outcome: :held | :failed | :partial` closes them.
+每个 `(relic, fate)` 组合固定生成五张主链卡和两张干扰卡：
 
-```sh
-mix run examples/contracts_demo.exs
+```text
+旧志先例 → 收缴/代管单 → 车间配料卡 → 野外观测手簿 → 现行条规
 ```
 
-## Prose and dates as data (M2a)
+`Pathway.connect_edges/1` 只按 `from/to` 元组拼接，不读结局标签。删去任一跳都会断链；材质不符与材料外运两类干扰无法补链。
 
-The rules carry no prose of their own: they render it. `Voy.World.Texts` holds
-the code-side templates (`structure_*` for place-attached site descriptions and
-`lens_*` for the runtime three-lens causal explanations), and
-`Voy.World.Timeline` owns the dated anchors and the three forms prose may use
-(Gregorian, two-digit field notation, reign form). Both `Voy.World.Texts` and
-`Voy.World.Content` share the `{{name}}` placeholder syntax; rendering a date is
-the only way a year can reach a player-facing string, and rendering refuses to
-leave a placeholder unbound.
+安全操作刻度不是从声明相位窗猜出的。Scala `PhaseResponse` 对每个整数 tick 实测脉冲响应，只有结果为 `Delayed` 的刻度才进入 `Witness` 的种子候选集。
 
-`Voy.World.Canon` then lints the result:
+## 作者内容包
 
-- the timeline, code-side templates, authoring content pack, and fate reachability
-  are all coherent (`check_timeline/0`, `check_texts/0`, `check_content/1`,
-  `check_fates/0`);
-- structures and documents name the same sites as the topography;
-- every year written into prose belongs to the timeline, in whichever form;
-- each history carries a corroborating document (the gazetteer precedent the
-  field notebook cites) and a contradicting one (the official report never
-  adopts the truth's cause tag);
-- a complete topography compiles to exactly one history, so reverse queries are
-  unambiguous.
+作者只编辑 `content/`：
 
-`Canon.check_corpus/1` runs all of it over a list of topographies and reports
-`:ok` / `:unsupported` / issues per shape, which is what the test suite does for
-all 48 feature combinations (24 supported, 24 with an upstream geology the
-disturbance table never pairs, 0 inconsistent). `Canon.check_archives/1`
-separates the two failure modes: a shape the rule layer pairs but the content
-pack cannot dress is reported as an uncovered archive set, not as a missing
-history.
-
-## Authoring pack (M2b)
-
-Writers, including non-technical ones, edit `content/` only:
-
-```
-content/claims.tsv             one row per causal claim (who may cite it)
-content/documents/**/*.md      one file per document (slot, applicability, prose)
-content/README.md              the writer's guide (Chinese)
+```text
+content/documents/main/hop1..5/   五类主链卡
+content/documents/decoy/          干扰卡
+content/README.md                 中文写作说明
 ```
 
-`Voy.World.Content` loads and validates the pack; `Voy.World.Projection`
-translates the loaded pack into relational goals so both forward history
-compilation and reverse clue-reconciliation queries select directly from
-`content/` without duplicate code-side archive templates.
-
-A document may pin the precedent it cites (`gazetteer_case`). That turns "the
-field notebook quotes the case the gazetteer recorded" from an author's promise
-into a selection constraint: a notebook pinned to the wrong precedent simply
-matches no history, and the shape stops compiling instead of shipping a
-contradiction.
-
-`mix voy.content` provides the writer workflow:
+`Content` 检查全部 12 个 `(relic, fate)` 组合的卡片覆盖与唯一选择，并检查字段、词表、占位符、写死年份和编码。`Witness` 直接渲染这些 Markdown，作者不需要修改 Elixir。
 
 ```sh
 mix voy.content lint
-mix voy.content preview [baishui|heishui|xuanguan|nuoliang|all]
-mix voy.content template <gazetteer|official_report|tech_note|council_document>
+mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all] [--seed N]
+mix voy.content template <hop1|hop2|hop3|hop4|hop5|decoy>
 ```
 
-`mix voy.content lint` prints author-facing errors (Chinese, `file:line`, legal
-values, and closest-value suggestions); `mix test` treats them as assertions.
-CI (`.github/workflows/voy_world.yml`) runs formatting, the suite, and the pack
-lint on every pull request, so the author's compiler is the PR itself. The
-design record lives in `docs/design-note-03-authoring-pipeline.md`.
+## Node 与 Export
 
-
-## Node API
-
-A node specification separates stable identity, generation constraints, and display names:
+语义求解可以不传 seed；玩家向编译、物化和导出必须传整数 seed：
 
 ```elixir
 spec = [
@@ -123,6 +57,7 @@ spec = [
   branch_id: "branch_rift",
   rule_set: :default_branch_v1,
   fate_constraint: {:require, :Fate_Ascended_SpatialRift},
+  seed: 101,
   names: [node: "黑水支沟", up: "鬼哭漏斗", pass: "断碑垭口", down: "悬棺寨"]
 ]
 
@@ -130,45 +65,9 @@ spec = [
 {:ok, record} = Voy.World.materialize_node(spec, hd(candidates))
 ```
 
-`solve_node/2` also accepts partial topography constraints. `compile_node/2` compiles a complete named node directly, while `reverse_node/1` returns unnamed semantic candidates with stable site IDs. Fate constraints support `:any`, `{:require, fate}`, and `{:one_of, fates}`. The original branch API remains available for compatibility and golden-case verification.
+`Export.export_branch(topo, seed: 101)` 输出 v2 bundle，包含历史、结构、Profile 和完整 `dossier`。bundle 校验 seed、relic/fate 一致性、五张主链卡、两张干扰卡及 JSON round-trip。
 
-## Diagrams
-
-The current topography, history, fate, and solver relations are illustrated in:
-
-- [Landform to Chronicle](docs/diagrams/01_landform_to_chronicle.png)
-- [Fate-to-landform candidate matrix](docs/diagrams/02_fate_to_landform_matrix.png)
-- [Bidirectional microKanren solving](docs/diagrams/03_microkanren_bidirectional_solver.png)
-- [Topography → fate causal matrix](docs/diagrams/04_topography_matrix.png) — which combinations
-  compile, why 24 do not, and which knob sets the ending
-- [Six fates, one skeleton](docs/diagrams/05_fate_profiles.png) — the same source → pass → settlement
-  profile for every ending, with the compiled descriptions
-- [Landform glossary, upper half](docs/diagrams/06a_landform_glossary.png) — what each source, pass and
-  settlement atom looks like on a map, and what it must look like once worldgen is wired
-- [Landform glossary, lower half](docs/diagrams/06b_subsurface_glossary.png) — the three upstream
-  geologies and the two accessibilities, which set the pulse and decide whether `c0` survives
-- [Branch anatomy](docs/diagrams/07_branch_anatomy.png) — one branch (白水坝) with all five field
-  values marked on a single plan plus its cross-section
-
-Figures 01–03 predate design note 04 and still draw the old terrain ⟺ access coupling; 04–07 are
-generated from the compiler's current answer. 06a/06b/07 are drawn from the atom vocabulary by hand
-(they are diagrams, not worldgen), but 07 reads its branch and its compiled outcome from the export.
-
-Regenerate them with Python, matplotlib, and an installed CJK font:
-
-```sh
-python examples/render_landform_diagrams.py
-
-mix run examples/export_topography_cases.exs   # asks the rule layer about all 48 combinations
-python examples/render_topography_atlas.py     # 04 and 05, drawn from that answer
-python examples/render_feature_glossary.py     # 06a / 06b / 07
-```
-
-`render_topography_atlas.py` refuses to draw unless the exported data still has 12 distinct
-(geology pair, pass, access) worlds and the downstream terrain still changes nothing, so the
-picture cannot silently drift away from `Chronicle`.
-
-## Run
+## 验证与演示
 
 ```sh
 mix test
@@ -177,4 +76,13 @@ mix run examples/sandbox.exs
 mix run examples/contracts_demo.exs
 ```
 
-The ExUnit suite covers the six sandbox deductions, all 48 topography feature combinations, forward/reverse round-trips, language-neutral semantic golden cases in `test/fixtures/world_cases.json`, the three M1 contracts (stock coverage of the frozen rule vocabulary, export schema and JSON round-trip, fact-log ordering and prediction settlement), the M2a canon linter (names, dates, attribution split, uniqueness), and the M2b content pack (parsing, lint failures, and byte-identical parity with the rules).
+测试覆盖 48 种地形组合（24 可生成、24 不支持）、五跳正反向合一、单跳消融、干扰排除、种子隔离、实测安全刻度、内容检查、Export v2 和事实日志。`test/fixtures/world_cases.json` 同时保存历史语义与种子物证 golden cases。
+
+地貌图仍可用以下工具再生成；图 01–03 是早期概念图，04–07 才反映当前地形编译结果：
+
+```sh
+python examples/render_landform_diagrams.py
+mix run examples/export_topography_cases.exs
+python examples/render_topography_atlas.py
+python examples/render_feature_glossary.py
+```

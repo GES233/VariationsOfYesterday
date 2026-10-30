@@ -77,6 +77,6 @@ down_terrain = mid_terrace    ⟺  cliff_isolated           ⟺  挂靠林场孤
 
 ## 6. 对 JVM 迁移的影响
 
-- `schema_version` 仍是 **1**，但它的**语义面变大了**：6 个结局、6 种政体、24 种可生成地形。迁移应以本次冻结的 24 格为准（`test/fixtures/world_cases.json` 的 reverse 段已扩为六结局 × 四地形）。
-- 若在迁移**之后**再补地理三通道，应当升到 v2；若在此之前补，仍可留在 v1 里一次性对齐。
-- 结局到 `Profile.regime/3` 的映射没有新增分区：慢性渗漏落 `Strained`，虚警耐受落 `Calm`。JVM 侧的 `MandateReadout` 只需复刻这四个分区，不必扩词表。
+- 本札记冻结的历史语义仍是 6 个结局、6 种政体、24 种可生成地形；后续五跳替换没有改变这一边界。
+- 玩家叙事导出已因五跳替换升级为 **schema v2**：`dossier` 取代旧 `archives`，安全刻度读取逐 tick 实测契约。若再补地理三通道，应另升语义版本，不与本次叙事迁移混写。
+- 结局到 `Profile.regime/3` 的映射没有新增分区：慢性渗漏落 `Strained`，虚警耐受落 `Calm`。Scala 已有 `MandateReadout` 与 `PhaseTracker`，四分区之外还须区分静息域、周期、瞬态与方程级无周期状态。

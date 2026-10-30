@@ -1,7 +1,7 @@
 # 设计札记 02 — 动力学四相 × Kanren 关系引擎：多世界观透镜与「式盘」因果推导
 
-> 状态：**概念发散与原型验证札记**（2026-10，配套 Elixir Mix 包见 `tools/voy_world/`）。
-> 定位：在不触碰 `design-draft-01-living-world.md` §1 动力学冻结结构的前提下，探索如何以极简关系型编程（microKanren / cKanren）作为**符号桥接层**，将 `MandateReadout` 的离散相位枚举、地势有向拓扑、多套互异的世界观口径（老寨/官样文章/技术内参/退化新寨）以及玩法 Goals 统合进同一套不冲突的逻辑文法。
+> 状态：**历史概念稿；全局叙事部分已由札记 05 替换**（2026-10-30）。本文中的 `Causality` 全局三段链、全知透镜与旧相位转移表已退役，不再代表现行代码。
+> 现行边界：`Chronicle` 保留地形与历史骨架，`Pathway + Witness + Content` 以五跳局部证据接管叙事；`Ascribe / Observation / Facts` 保留数值证据与运行时结算。动力学冻结结构不因叙事替换而改变。
 
 ---
 
@@ -150,7 +150,7 @@ mix run examples/sandbox.exs
 
 ### 4.2 后续向 Scala 3（`inner/`）迁移的工程要点
 当规则与查询语义稳定后，将 `Voy.Kanren` 与 `Voy.World` 分别迁入 `src/main/scala/moe/chestnut/awa/voy/inner/kanren/` 与 `inner/world/`；两侧均保持零外部运行时依赖，并以 `tools/voy_world/test/fixtures/world_cases.json` 及双向 round-trip 用例作为移植基准：
-1. **代数数据类型直接对接**：设计草案 §1.3 已定义 `StressRegime` 与 `ExcitablePhase`，但 Scala 侧尚无 `MandateReadout.scala`；迁移时先实现该读数契约，再让 `Term` 与其中枚举对接，无需经过字符串转换；
+1. **代数数据类型直接对接**：Scala 已实现 `MandateReadout.scala` 与 `PhaseTracker`，提供 Regime、四相及无周期语义；迁移时让 `Term` 与这些枚举直接对接，无需经过字符串转换；
 2. **Stream 与 Goal 表达**：Elixir 的 `{:mature, h, t}` / `{:immature, f}` 直接映射为 Scala 3 的 `enum KStream[+A]`；`fresh` 配合 Scala 3 尾随闭包语法（`fresh: a => fresh: b => ...`），无需移植 Elixir 表面宏；
 3. **触发时机与性能隔离**：Kanren 求解器**绝不在每 tick 积分循环内调用**，仅在以下低频离散时刻触发：
    - 世界/Node 首次激活生成本地化档案与聚落初始历史时；

@@ -1,7 +1,7 @@
 # 设计札记 05 — mediKanren 局部微链与种子物证绑定
 
-> 状态：**已落地**（2026-10-30）。配套实现见 `tools/voy_world/lib/voy/world/pathway.ex`、`tools/voy_world/lib/voy/world/witness.ex` 与 `tools/voy_world/test/voy/world/pathway_test.exs`（ExUnit 146 cases 全绿）。
-> 硬边界：**更深入，而不是更大**——不扩充 24 种可生成地形与 6 种结局的边界，不破坏现有 `mix test`（121 → 146 cases）与 `./gradlew test`（51 cases）。
+> 状态：**五跳已替换全局叙事**（2026-10-30）。`Pathway + Witness + Content` 是唯一玩家叙事管线；旧 `Causality`、四份全知档案与 `archives` 导出已退役，`Chronicle` 仅保留地形与历史骨架。Export 当前为 schema v2。
+> 硬边界：**更深入，而不是更大**——不扩充 24 种可生成地形与 6 种结局的边界。安全刻度改为读取 Scala 逐 tick 实测的 `Delayed` 结果，不再从声明相位窗猜测。
 
 ---
 
@@ -58,8 +58,8 @@
 | **Hop 1** | `:gazetteer_excerpt` | `{:relic, :ancestral_bronze_zheng, :acoustic_damping}` | `:removal_provokes_omen` | `{:precedent_omen, :fish_scale_ripple_and_slide, {:tau_ breaths, 3}}` | 清丈局收铜钲 → 涧水起鱼鳞碎纹、山崩掩署；发还铜钲叩击（三息余音）乃止 |
 | **Hop 2** | `:requisition_slip` | `{:precedent_omen, :fish_scale_ripple_and_slide, {:tau_breaths, 3}}` | `:requisitioned_as_scrap` | `{:scrap_batch, batch_tag, :high_tin_bronze, {:tau_breaths, 3}}` | 79年垦殖改组，无视旧志征兆，将寨门旧铜器按废有色金属过磅收缴，编入批号 `batch_tag` |
 | **Hop 3** | `:workshop_card` | `{:scrap_batch, batch_tag, :high_tin_bronze, {:tau_breaths, 3}}` | `:cast_into_industrial_vessel` | `{:industrial_vessel, vessel_tag, :bronze_alloy_casting, {:tau_breaths, 3}}` | 机修车间将 `batch_tag` 高锡青铜掺入生铁翻砂，铸成农机备件 `vessel_tag`，探伤实测保留三息（1.5s）谐振余音 |
-| **Hop 4** | `:field_notebook` | `{:industrial_vessel, vessel_tag, :bronze_alloy_casting, {:tau_breaths, 3}}` | `:duty_cycle_inversion_diagnosed` | `{:modulation_protocol, vessel_tag, :absolute_refractory_window, fate}` | 拆器后高台闷雷期从起振区 `28.1%` 膨胀至饱和区 `60.6%`（占空比反转）；中段（`φ=0.50`）点炮反致平台阻滞 `+15.62`，唯有在刚落静默段（`φ∈[0.20,0.30]`）激发 `τ=1.5s` 谐振可推迟尖峰 |
-| **Hop 5** | `:council_ordinance` | `{:modulation_protocol, vessel_tag, :absolute_refractory_window, fate}` | `:enacted_as_survival_ritual` | `{:emergent_ritual, fate, vessel_tag, :spike_delayed_or_stabilized}` | 留守议事会立死规：穿劳保服盯簧片落定格，持锤叩击红绸悬挂之 `vessel_tag` 九下，维系残存山谷 |
+| **Hop 4** | `:field_notebook` | `{:industrial_vessel, vessel_tag, :bronze_alloy_casting, {:tau_breaths, 3}}` | `:duty_cycle_inversion_diagnosed` | `{:modulation_protocol, vessel_tag, :measured_delay_window, fate}` | 拆器后高台闷雷期从起振区 `28.1%` 膨胀至饱和区 `60.6%`（占空比反转）；中段（`φ=0.50`）点炮反致平台阻滞 `+15.62`；在契约实测为推迟的第 N 格激发谐振可推迟尖峰 |
+| **Hop 5** | `:council_ordinance` | `{:modulation_protocol, vessel_tag, :measured_delay_window, fate}` | `:enacted_as_survival_ritual` | `{:emergent_ritual, fate, vessel_tag, :spike_delayed_or_stabilized}` | 留守议事会立死规：穿劳保服盯簧片落定格，持锤叩击红绸悬挂之 `vessel_tag` 三下，维系残存山谷 |
 
 #### 主链 B：喀斯特水工微链（`relic == :carved_diversion_stele`，溶洞隘口）
 
@@ -68,8 +68,8 @@
 | **Hop 1** | `:gazetteer_excerpt` | `{:relic, :carved_diversion_stele, :karst_siphon_relief}` | `:removal_provokes_omen` | `{:precedent_omen, :sinkhole_backflow_and_flood, {:siphon_head_m, 12}}` | 清丈局毁分水石堰辟官田 → 暗河倒灌吞没仓廒；复立石堰按古槽分洪乃止 |
 | **Hop 2** | `:requisition_slip` | `{:precedent_omen, :sinkhole_backflow_and_flood, {:siphon_head_m, 12}}` | `:requisitioned_as_scrap` | `{:scrap_batch, batch_tag, :grooved_limestone_ashlar, {:siphon_head_m, 12}}` | 79年改组，将刻槽石堰条石按基建石料征用，编入石料调拨批号 `batch_tag` |
 | **Hop 3** | `:workshop_card` | `{:scrap_batch, batch_tag, :grooved_limestone_ashlar, {:siphon_head_m, 12}}` | `:cast_into_industrial_vessel` | `{:industrial_vessel, vessel_tag, :siphon_weir_lining, {:siphon_head_m, 12}}` | 基建队贪图省工，直接用 `batch_tag` 带弧槽条石砌筑水泵房溢流设施 `vessel_tag`，无意间复刻了 12 米水头虹吸曲率 |
-| **Hop 4** | `:field_notebook` | `{:industrial_vessel, vessel_tag, :siphon_weir_lining, {:siphon_head_m, 12}}` | `:duty_cycle_inversion_diagnosed` | `{:modulation_protocol, vessel_tag, :absolute_refractory_window, fate}` | 毁堰后溶洞承压高台期由 `28.1%` 膨胀至 `60.6%`；中段爆破反致暗河憋压阻滞 `+15.62`，唯在水位计满格刚退之静默窗开启 `vessel_tag` 虹吸闸门可泄压推迟尖峰 |
-| **Hop 5** | `:council_ordinance` | `{:modulation_protocol, vessel_tag, :absolute_refractory_window, fate}` | `:enacted_as_survival_ritual` | `{:emergent_ritual, fate, vessel_tag, :spike_delayed_or_stabilized}` | 留守议事会立死规：按交接班点名，在验山匣静默格拉起挂红绸之 `vessel_tag` 铸铁闸板九寸，放暗河回头水 |
+| **Hop 4** | `:field_notebook` | `{:industrial_vessel, vessel_tag, :siphon_weir_lining, {:siphon_head_m, 12}}` | `:duty_cycle_inversion_diagnosed` | `{:modulation_protocol, vessel_tag, :measured_delay_window, fate}` | 毁堰后溶洞承压高台期由 `28.1%` 膨胀至 `60.6%`；中段爆破反致暗河憋压阻滞 `+15.62`；在契约实测为推迟的第 N 格开启 `vessel_tag` 虹吸闸门可泄压推迟尖峰 |
+| **Hop 5** | `:council_ordinance` | `{:modulation_protocol, vessel_tag, :measured_delay_window, fate}` | `:enacted_as_survival_ritual` | `{:emergent_ritual, fate, vessel_tag, :spike_delayed_or_stabilized}` | 留守议事会立死规：按交接班点名，在验山匣读数格拉起挂红绸之 `vessel_tag` 铸铁闸板九寸，放暗河回头水 |
 
 ### 2.3 干扰边（Decoy Edges）与 Kanren 过滤
 
@@ -125,7 +125,7 @@ Pathway.connect_edges(edges) :: [%{start: term(), finish: term(), vessel: term()
   - 默认锚定 `contracts/mandate-slice-v1.json` 真值：
     - 起振区周期 `onset_period = 43.7`、高台期占比 `28.1%`（约 `12.3` 刻）、中点响应 `-17.38`（提前引爆）；
     - 饱和区周期 `settled_period = 39.5`、高台期占比 `60.6%`（约 `23.9` 刻）、中点响应 `+15.62`（平台阻滞）；
-    - 绝对静默窗安全刻度：按种子在 `[8, 9, 10, 11]`（落在 `φ ∈ [0.20, 0.28]` 区间内）中确定性选取 `safe_tick`，保证不同存档连安全敲击格数都不同，但仍严格处于绝对不应期 `20%–30%` 物理窗口内！
+    - 实测推迟刻度：Scala 对每个整数 tick 测量 `alpha_metal_resonance`，契约只把结果为 `Delayed` 的条目写入 `safe_ticks`；`Witness` 再按种子从中选取 `safe_tick`。不再预设 `[8, 9, 10, 11]` 或把绝对窗标签当作有效性证明。
 
 ### 3.2 原生态单跳档案渲染（严守「单卡只知一跳」铁律）
 
@@ -219,3 +219,15 @@ Pathway.connect_edges(edges) :: [%{start: term(), finish: term(), vessel: term()
 4. **右侧下栏：车间实物指认与相位拨盘验证（The Obra Dinn Verdict）**：
    - 展示车间/山口里的 **3 件候选实物**（1 件真载体 `vessel_name (vessel_code)`、1 件生铁/毛石干扰载体 `decoy_a_vessel_name (decoy_a_vessel_code)`、1 堆外运废料回单 `decoy_b_batch`）+ **1 个周期刻度拨盘（Tick 1..39，标出起振区 `28.1%` 旧黄历误区与饱和区 `60.6%` 占空比反转陷阱 `φ=0.50`）**；
    - 玩家选定「目标实物」与「操作刻度第 N 格」后点击 **【执行勘定 / 叩击验证】**，系统核对是否命中当前 seed 的 `(binding.vessel_code, binding.safe_tick)` 并给出动力学反馈说明。
+
+---
+
+## 6. 替换完成后的现行边界（2026-10-30）
+
+§5 是阶段性合流规格，现已进一步收敛为完整替换：
+
+- `Causality`、旧四份全知档案、`claims.tsv`、旧相位转移表与 `archives` 导出全部退役，不再作为兼容层维护；
+- `Chronicle` 继续输出地形、四纪历史、结局和结构，不输出叙事档案；`Node` 的语义求解可无 seed，玩家向编译与导出必须有 seed；
+- 五跳散文全部迁入 `content/documents/`，`Witness` 不再保存重复模板；每个 `(relic, fate)` 由内容包提供五张主链卡与两张干扰卡；
+- `Export` 升级为 schema v2，以必需的 `dossier` 取代 `archives`，并校验 seed、relic/fate、卡片数量与 hop/role；
+- `Ascribe / Observation / Facts` 保留，分别承担数值证据反演与运行时结算，不属于旧全局叙事。

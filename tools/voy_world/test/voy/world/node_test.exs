@@ -101,10 +101,11 @@ defmodule Voy.World.NodeTest do
 
     assert {:ok, [recompiled]} = Voy.World.compile_node(node_spec(), features)
     assert recompiled == record
-    assert record["archives"]["tech_note"]["true_cause"] == "excitation_zenith_spatial_exile"
+    assert record["dossier"]["fate"] == "Fate_Ascended_SpatialRift"
+    refute Map.has_key?(record, "archives")
   end
 
-  test "display names do not alter historical or causal semantics" do
+  test "display names do not alter historical or pathway semantics" do
     other_names = [node: "异名支沟", up: "无名源头", pass: "无名隘口", down: "无名聚落"]
 
     assert {:ok, [left]} = Voy.World.compile_node(node_spec(), @ascended_features)
@@ -116,11 +117,9 @@ defmodule Voy.World.NodeTest do
       assert left[era] == right[era]
     end
 
-    assert left["archives"]["official_report"]["claimed_cause"] ==
-             right["archives"]["official_report"]["claimed_cause"]
-
-    assert left["archives"]["tech_note"]["true_cause"] ==
-             right["archives"]["tech_note"]["true_cause"]
+    assert left["dossier"]["relic"] == right["dossier"]["relic"]
+    assert left["dossier"]["fate"] == right["dossier"]["fate"]
+    assert left["dossier"]["binding"]["safe_tick"] == right["dossier"]["binding"]["safe_tick"]
   end
 
   test "node specifications validate fate sets, rule sets, names, and incompatible goals" do
@@ -168,6 +167,7 @@ defmodule Voy.World.NodeTest do
         branch_id: "branch_rift",
         rule_set: :default_branch_v1,
         fate_constraint: {:require, :Fate_Ascended_SpatialRift},
+        seed: 101,
         names: [node: "黑水支沟", up: "鬼哭漏斗", pass: "断碑垭口", down: "悬棺寨"]
       ],
       overrides

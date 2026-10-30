@@ -15,8 +15,8 @@ defmodule Voy.World.Contract do
     * a rule may only cite numbers that exist here, through the accessors in
       this module -- never a literal copied out of a document;
     * where the design documents and the measurement disagree,
-      `claims/1` carries the disagreement as data. `Voy.World.Dynamics` is
-      kept in step with the same source.
+      `claims/1` carries the disagreement as data. `Voy.World.Witness` may
+      only name a safe tick whose measured outcome here is `Delayed`.
 
   Nothing here simulates anything. The oracle is a lookup table of what the
   ODE integrator in the other language actually did.
@@ -320,6 +320,33 @@ defmodule Voy.World.Contract do
     end
   end
 
+  @doc """
+  Exact integer ticks at which this pulse measurably delayed the next genuine
+  surge. A dossier may only choose from this list; a declared phase window by
+  itself is not evidence that an operation works.
+  """
+  @spec safe_ticks(t(), atom()) :: {:ok, [map()]} | :error
+  def safe_ticks(%__MODULE__{data: data}, kind) do
+    wire = Enum.find_value(@pulses, fn {wire, atom} -> if atom == kind, do: wire end)
+
+    case Enum.find(data["oracle"]["kinds"], &(&1["pulse"] == wire)) do
+      nil ->
+        :error
+
+      row ->
+        {:ok,
+         Enum.map(row["safe_ticks"], fn tick ->
+           %{
+             tick: tick["tick"],
+             phase: tick["phase"],
+             outcome: Map.fetch!(@outcomes, tick["outcome"]),
+             delta: tick["delta"],
+             window: Map.get(@windows, tick["window"], :other)
+           }
+         end)}
+    end
+  end
+
   @doc "Pulse identities that belong to the story content (not measurement controls)."
   @spec world_pulses(t()) :: [atom()]
   def world_pulses(%__MODULE__{} = contract) do
@@ -463,4 +490,3 @@ defmodule Voy.World.Contract do
     %{regime: regime, windows: windows, ok?: regime == [] and windows == []}
   end
 end
-

@@ -72,7 +72,7 @@ defmodule Voy.World.Pathway do
   alias Voy.World.Schema
 
   @max_depth 5
-  @window :absolute_refractory_window
+  @window :measured_delay_window
   @ritual_outcome :spike_delayed_or_stabilized
   @shipped_out :shipped_out_to_provincial_smelter
 

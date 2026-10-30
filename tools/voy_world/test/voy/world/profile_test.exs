@@ -2,7 +2,7 @@ defmodule Voy.World.ProfileTest do
   use ExUnit.Case, async: true
   use Voy.Kanren
 
-  alias Voy.World.{Causality, Dynamics, Profile}
+  alias Voy.World.{Contract, Dynamics, Profile}
 
   test "the default stock reproduces the frozen lag vocabulary" do
     profile = Profile.default()
@@ -36,34 +36,9 @@ defmodule Voy.World.ProfileTest do
 
     assert {:ok, :tau_5} = Profile.lag_band(default, 5.0)
     assert {:ok, :tau_10} = Profile.lag_band(shifted, 5.0)
-
-    # Same rule table, different stock, different selected branch.
-    assert {:ok, tau_5_states} = next_states(:tau_5)
-    assert :premature_excitation_spike in tau_5_states
-
-    assert {:ok, tau_10_states} = next_states(:tau_10)
-    refute :premature_excitation_spike in tau_10_states
   end
 
-  test "the rule tables may not name a band the stock does not declare" do
-    declared =
-      Profile.default()
-      |> Profile.tau_bands()
-      |> Map.keys()
-      |> MapSet.new()
-
-    used =
-      run_all(fn query ->
-        fresh [c0, regime, phase, pulse, next, lag] do
-          Dynamics.phase_transitiono(c0, regime, phase, pulse, next, lag)
-          eq(query, lag)
-        end
-      end)
-      |> terms()
-      |> MapSet.new()
-
-    assert used == declared
-
+  test "every measured story pulse has a declared dose range" do
     doses = Profile.default() |> Profile.doses()
 
     pulses =
@@ -75,19 +50,8 @@ defmodule Voy.World.ProfileTest do
       end)
       |> terms()
 
-    artifact_pulses =
-      run_all(fn query ->
-        fresh [org, c0, actor, role, item, pulse] do
-          Causality.artifact_actiono(org, c0, actor, role, item)
-          propso(item, pulse: pulse)
-          eq(query, pulse)
-        end
-      end)
-      |> terms()
-
-    for pulse <- pulses ++ artifact_pulses do
-      assert Map.has_key?(doses, pulse), "stock declares no dose range for #{inspect(pulse)}"
-    end
+    contract = Contract.load!()
+    assert Enum.all?(pulses ++ Contract.world_pulses(contract), &Map.has_key?(doses, &1))
 
     profile = Profile.default()
     assert Profile.within_dose?(profile, :alpha_shock, 5.0)
@@ -169,22 +133,5 @@ defmodule Voy.World.ProfileTest do
 
     assert {:error, {:not_a_profile, :nope}} = Profile.validate(:nope)
     assert {:error, {:not_a_profile_map, :nope}} = Profile.from_map(:nope)
-  end
-
-  defp next_states(lag) do
-    states =
-      run_all(fn query ->
-        fresh [c0, regime, phase, pulse, next] do
-          Dynamics.phase_transitiono(c0, regime, phase, pulse, next, lag)
-          eq(query, next)
-        end
-      end)
-      |> terms()
-      |> Enum.uniq()
-
-    case states do
-      [] -> :error
-      states -> {:ok, states}
-    end
   end
 end

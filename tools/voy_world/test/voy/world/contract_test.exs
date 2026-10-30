@@ -7,7 +7,9 @@ defmodule Voy.World.ContractTest do
     {:ok, contract: Contract.load!()}
   end
 
-  test "the checked-in contract loads, is versioned and is structurally complete", %{contract: contract} do
+  test "the checked-in contract loads, is versioned and is structurally complete", %{
+    contract: contract
+  } do
     assert contract.data["contract"] == "voy.mandate.slice"
     assert contract.data["version"] == 1
     assert is_binary(Contract.source_digest(contract))
@@ -37,7 +39,9 @@ defmodule Voy.World.ContractTest do
     assert Contract.period(contract) > 20.0
   end
 
-  test "the Hopf point is the exact trace condition and not the draft number", %{contract: contract} do
+  test "the Hopf point is the exact trace condition and not the draft number", %{
+    contract: contract
+  } do
     %{a_c: a_c, s_c: s_c} = Contract.hopf(contract)
     assert_in_delta a_c, 0.434975, 1.0e-5
     assert_in_delta s_c, 0.7 - a_c, 1.0e-9
@@ -46,7 +50,9 @@ defmodule Voy.World.ContractTest do
     refute_in_delta a_c, 0.467, 0.01
   end
 
-  test "the singular-limit period is published as a non-confirming reference", %{contract: contract} do
+  test "the singular-limit period is published as a non-confirming reference", %{
+    contract: contract
+  } do
     %{period: reference} = Contract.relaxation(contract)
     measured = Contract.period(contract)
     assert abs(measured - reference) / measured > 0.30
@@ -78,7 +84,9 @@ defmodule Voy.World.ContractTest do
     assert {:ok, %{outcome: :delayed}} = Contract.outcome(contract, :alpha_shock, :relative)
   end
 
-  test "the c0 footprints differ by two orders of magnitude in impact count", %{contract: contract} do
+  test "the c0 footprints differ by two orders of magnitude in impact count", %{
+    contract: contract
+  } do
     assert {:ok, collapsed} = Contract.c0_truth(contract, :c0_collapsed)
     assert {:ok, intact} = Contract.c0_truth(contract, :c0_intact)
     assert collapsed.impacts > 20
@@ -93,6 +101,22 @@ defmodule Voy.World.ContractTest do
     assert {:ok, %{shape: :triple}} = Contract.pulse(contract, :alpha_metal_resonance)
     assert {:ok, %{shape: :inverted}} = Contract.pulse(contract, :OverwhelmingNegativeSuppression)
     assert :error = Contract.pulse(contract, :not_a_pulse)
+  end
+
+  test "safe ticks are exact delayed measurements, not declared-window guesses", %{
+    contract: contract
+  } do
+    assert {:ok, rows} = Contract.safe_ticks(contract, :alpha_metal_resonance)
+    assert rows != []
+
+    for row <- rows do
+      assert is_integer(row.tick) and row.tick > 0
+      assert row.outcome == :delayed
+      assert row.delta > 0.0
+      assert row.window in [:absolute, :relative, :late, :other]
+    end
+
+    assert :error = Contract.safe_ticks(contract, :not_a_pulse)
   end
 
   test "the measurement control is not part of the story's pulses", %{contract: contract} do
@@ -134,7 +158,9 @@ defmodule Voy.World.ContractTest do
     end
   end
 
-  test "duty-cycle inversion and settled period are recorded in the contract", %{contract: contract} do
+  test "duty-cycle inversion and settled period are recorded in the contract", %{
+    contract: contract
+  } do
     sat = Contract.oscillator(contract)
     onset = Contract.onset_comparison(contract)
 

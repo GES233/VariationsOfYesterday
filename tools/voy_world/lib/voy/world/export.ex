@@ -19,9 +19,9 @@ defmodule Voy.World.Export do
 
   use Voy.Kanren
 
-  alias Voy.World.{Chronicle, Node, Profile, Schema}
+  alias Voy.World.{Chronicle, Node, Profile, Schema, Witness}
 
-  @schema_version 1
+  @schema_version 2
 
   @node_keys [
     "node_id",
@@ -32,7 +32,7 @@ defmodule Voy.World.Export do
     "topography",
     "history",
     "structures",
-    "archives"
+    "dossier"
   ]
 
   @site_keys ["up", "pass", "down"]
@@ -43,7 +43,6 @@ defmodule Voy.World.Export do
     {"downstream", :downstream_site}
   ]
   @era_keys ["era1", "era2a", "era2b", "era3"]
-  @archive_keys ["gazetteer", "official_report", "tech_note", "council_document"]
 
   @doc "Wire-format version stamped into every bundle."
   @spec schema_version() :: pos_integer()
@@ -96,14 +95,18 @@ defmodule Voy.World.Export do
     profile = Keyword.get(opts, :profile, Profile.default())
 
     with {:ok, profile} <- ensure_profile(profile),
+         {:ok, seed} <- require_seed(opts),
          {:ok, topo} <- topology(topo_fields) do
       slices =
         run_all(fn query -> Chronicle.compile_branch_sliceo(topo, query) end)
         |> terms()
 
       case slices do
-        [] -> {:error, classify_branch(topo)}
-        slices -> slices |> Enum.map(&branch_record(topo, &1, opts)) |> build_bundle(profile)
+        [] ->
+          {:error, classify_branch(topo)}
+
+        slices ->
+          slices |> Enum.map(&branch_record(topo, &1, opts, seed)) |> build_bundle(profile)
       end
     end
   end
@@ -201,6 +204,14 @@ defmodule Voy.World.Export do
 
   defp ensure_profile(other), do: {:error, {:invalid_profile, other}}
 
+  defp require_seed(opts) do
+    case Keyword.get(opts, :seed) do
+      seed when is_integer(seed) -> {:ok, seed}
+      nil -> {:error, :missing_seed}
+      seed -> {:error, {:invalid_seed, seed}}
+    end
+  end
+
   # Feature tables are raised on, not returned as errors; the export API
   # reports them instead so a caller cannot crash a world-generation pass.
   defp compile_node(spec_fields, features) do
@@ -249,27 +260,30 @@ defmodule Voy.World.Export do
       "topography" => topo,
       "history" => history(record),
       "structures" => Keyword.fetch!(record, :structures),
-      "archives" => Keyword.fetch!(record, :archives)
+      "dossier" => Keyword.fetch!(record, :dossier)
     })
   end
 
-  defp branch_record(topo, slice, opts) do
+  defp branch_record(topo, slice, opts, seed) do
     branch_id = to_string(topo[:branch_id])
     node_id = Keyword.get(opts, :node_id, branch_id) |> to_string()
+    display_names = names(topo, node_id)
+    relic = Keyword.fetch!(slice, :era1)[:guardian_relic]
+    fate = Keyword.fetch!(slice, :era3)[:fate]
 
     normalize(%{
       "node_id" => node_id,
       "branch_id" => branch_id,
       "rule_set" => Keyword.get(opts, :rule_set, :default_branch_v1) |> to_string(),
       "sites" => sites(topo, branch_id),
-      "names" => names(topo, node_id),
+      "names" => display_names,
       "topography" => topo,
       "history" =>
         Map.new(@era_keys, fn era ->
           {era, Keyword.fetch!(slice, String.to_existing_atom(era))}
         end),
       "structures" => Keyword.fetch!(slice, :structures),
-      "archives" => Keyword.fetch!(slice, :archives)
+      "dossier" => Witness.render_dossier(seed, branch_id, relic, fate, display_names)
     })
   end
 
@@ -348,6 +362,7 @@ defmodule Voy.World.Export do
     value |> Tuple.to_list() |> normalize_term()
   end
 
+  defp normalize_term(nil), do: nil
   defp normalize_term(value) when is_atom(value), do: Atom.to_string(value)
   defp normalize_term(value), do: value
 
@@ -427,7 +442,7 @@ defmodule Voy.World.Export do
          :ok <- check_names(node),
          :ok <- check_structures(node),
          :ok <- check_history(node),
-         :ok <- check_archives(node) do
+         :ok <- check_dossier(node) do
       :ok
     end
   end
@@ -499,15 +514,26 @@ defmodule Voy.World.Export do
 
   defp check_history(node), do: {:error, {:invalid_bundle, {:history, node["history"]}}}
 
-  defp check_archives(%{"archives" => archives}) when is_map(archives) do
-    missing = Enum.reject(@archive_keys, &Map.has_key?(archives, &1))
+  defp check_dossier(%{"dossier" => dossier, "history" => history}) when is_map(dossier) do
+    documents = dossier["documents"]
+    main = if is_list(documents), do: Enum.filter(documents, &(&1["role"] == "main")), else: []
+    decoys = if is_list(documents), do: Enum.filter(documents, &(&1["role"] == "decoy")), else: []
+    binding = dossier["binding"]
 
-    if missing == [],
-      do: :ok,
-      else: {:error, {:invalid_bundle, {:missing_archives, missing}}}
+    valid? =
+      is_integer(dossier["seed"]) and
+        dossier["relic"] == get_in(history, ["era1", "guardian_relic"]) and
+        dossier["fate"] == get_in(history, ["era3", "fate"]) and
+        is_map(binding) and is_integer(binding["safe_tick"]) and
+        is_number(binding["safe_delay"]) and is_number(binding["safe_phase"]) and
+        is_list(documents) and length(documents) == 7 and
+        Enum.map(main, & &1["hop"]) == [1, 2, 3, 4, 5] and length(decoys) == 2 and
+        Enum.all?(documents, &(is_binary(&1["title"]) and is_binary(&1["body"])))
+
+    if valid?, do: :ok, else: {:error, {:invalid_bundle, {:dossier, :shape_or_history_mismatch}}}
   end
 
-  defp check_archives(node), do: {:error, {:invalid_bundle, {:archives, node["archives"]}}}
+  defp check_dossier(node), do: {:error, {:invalid_bundle, {:dossier, node["dossier"]}}}
 
   defp check_string(map, key) do
     case Map.fetch(map, key) do

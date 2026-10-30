@@ -26,7 +26,7 @@ defmodule Voy.World.ContractsDemo do
     IO.puts("lag 7.5 -> #{inspect(Profile.lag_band(profile, 7.5))} (declared gap)")
 
     banner("export", "one branch as a versioned bundle")
-    {:ok, bundle} = Export.export_branch(@topography)
+    {:ok, bundle} = Export.export_branch(@topography, seed: 101)
     :ok = Export.validate(bundle)
     {:ok, json} = Export.to_json(bundle)
 

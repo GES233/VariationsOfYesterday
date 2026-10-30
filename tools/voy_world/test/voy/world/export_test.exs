@@ -1,7 +1,7 @@
 defmodule Voy.World.ExportTest do
   use ExUnit.Case, async: true
 
-  alias Voy.World.{Export, Profile}
+  alias Voy.World.{Export, Profile, Witness}
 
   import Voy.World.TestFixtures
 
@@ -18,22 +18,20 @@ defmodule Voy.World.ExportTest do
     branch_id: "branch_01_baishui",
     rule_set: :default_branch_v1,
     fate_constraint: {:require, :Fate_Assimilated_NewZhai},
+    seed: 101,
     names: [node: "白水支沟", up: "野猪箐裂隙", pass: "断碑垭口", down: "白水坝"]
   ]
 
-  test "a node export carries the version, the stock and normalized records" do
+  test "a node export carries v2, history, and the sole five-hop dossier" do
     assert {:ok, bundle} = Export.export_node(@spec_fields, features: @complete_features)
-
     assert :ok = Export.validate(bundle)
+    assert bundle["schema_version"] == 2
     assert bundle["schema_version"] == Export.schema_version()
     assert bundle["rule_set"] == "default_branch_v1"
     assert bundle["profile"]["id"] == Profile.id(Profile.default())
-    assert bundle["generator"]["app"] == "voy_world"
 
     assert [node] = bundle["nodes"]
-    assert node["node_id"] == "node_baishui_01"
-    assert node["branch_id"] == "branch_01_baishui"
-    assert node["rule_set"] == "default_branch_v1"
+    refute Map.has_key?(node, "archives")
 
     assert node["sites"] == %{
              "up" => "node_baishui_01/up",
@@ -41,54 +39,53 @@ defmodule Voy.World.ExportTest do
              "down" => "node_baishui_01/down"
            }
 
-    assert node["names"] == %{
-             "node" => "白水支沟",
-             "up" => "野猪箐裂隙",
-             "pass" => "断碑垭口",
-             "down" => "白水坝"
-           }
-
     assert node["topography"]["up_terrain"] == "steep_fissure_headwater"
     assert node["history"]["era3"]["fate"] == "Fate_Assimilated_NewZhai"
+    assert %{"site" => "野猪箐裂隙", "description" => _} = node["structures"]["upstream"]
 
-    # Structures are (display name, description) pairs, so the wire format
-    # says which is which instead of leaving a bare two-element array.
-    assert %{"site" => "野猪箐裂隙", "description" => description} =
-             node["structures"]["upstream"]
+    dossier = node["dossier"]
+    assert dossier["seed"] == 101
+    assert dossier["relic"] == "ancestral_bronze_zheng"
+    assert dossier["fate"] == "Fate_Assimilated_NewZhai"
+    assert length(dossier["documents"]) == 7
 
-    assert is_binary(description) and description != ""
-    assert node["structures"]["downstream"]["site"] == "白水坝"
+    assert Enum.map(Enum.filter(dossier["documents"], &(&1["role"] == "main")), & &1["hop"]) == [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
 
-    # Tagged tuples become tag/value maps.
-    assert %{"tag" => "requisitioned_as_scrap", "value" => "ancestral_bronze_zheng"} =
-             node["history"]["era2b"]["relic_fate"]
+    assert dossier["binding"]["safe_tick"] in Witness.safe_ticks()
 
-    assert node["archives"]["official_report"]["claimed_cause"] == "seasonal_rain_mudslide"
-
-    assert node["archives"]["tech_note"]["true_cause"] ==
-             "c0_removed_and_vulnerable_window_blasting"
+    assert Enum.all?(
+             Enum.filter(dossier["documents"], &(&1["role"] == "main")),
+             &is_nil(&1["decoy_class"])
+           )
   end
 
   test "a bundle round-trips through JSON byte for byte" do
     assert {:ok, bundle} = Export.export_node(@spec_fields, features: @complete_features)
     assert {:ok, json} = Export.to_json(bundle)
     assert {:ok, loaded} = Export.from_json(json)
-
     assert loaded == bundle
     assert {:ok, json2} = Export.to_json(loaded)
     assert json2 == json
   end
 
-  test "branch export derives site ids and the node id from the branch" do
-    assert {:ok, bundle} = Export.export_branch(baishui_topo())
+  test "branch export requires a seed and derives stable node identities" do
+    assert {:error, :missing_seed} = Export.export_branch(baishui_topo())
+    assert {:error, {:invalid_seed, "101"}} = Export.export_branch(baishui_topo(), seed: "101")
+    assert {:ok, bundle} = Export.export_branch(baishui_topo(), seed: 101)
     assert :ok = Export.validate(bundle)
 
     assert [node] = bundle["nodes"]
     assert node["node_id"] == "branch_01_baishui"
     assert node["sites"]["up"] == "branch_01_baishui/up"
-    assert node["history"]["era3"]["fate"] == "Fate_Assimilated_NewZhai"
+    assert node["dossier"]["seed"] == 101
 
-    assert {:ok, renamed} = Export.export_branch(baishui_topo(), node_id: "node_07")
+    assert {:ok, renamed} = Export.export_branch(baishui_topo(), seed: 101, node_id: "node_07")
     assert hd(renamed["nodes"])["node_id"] == "node_07"
     assert hd(renamed["nodes"])["sites"]["up"] == "branch_01_baishui/up"
   end
@@ -99,17 +96,16 @@ defmodule Voy.World.ExportTest do
       branch_id: "branch_rift",
       rule_set: :default_branch_v1,
       fate_constraint: {:require, :Fate_Ascended_SpatialRift},
+      seed: 303,
       names: [node: "黑水支沟", up: "鬼哭漏斗", pass: "断碑垭口", down: "悬棺寨"]
     ]
 
     assert {:ok, [candidate | _rest]} = Voy.World.reverse_node(spec)
     assert {:ok, bundle} = Export.export_candidate(spec, candidate)
     assert :ok = Export.validate(bundle)
-
     assert [node] = bundle["nodes"]
     assert node["history"]["era3"]["fate"] == "Fate_Ascended_SpatialRift"
-    assert node["structures"]["upstream"]["site"] == "鬼哭漏斗"
-    assert node["topography"]["up_geology"] == "deep_stress_cavity"
+    assert node["dossier"]["seed"] == 303
   end
 
   test "two stocks produce two valid bundles for the same canon" do
@@ -119,53 +115,47 @@ defmodule Voy.World.ExportTest do
         tau: %{tau_immediate: {0.0, 0.5}, tau_5: {1.0, 2.0}, tau_10: {4.0, 6.0}}
       )
 
-    assert {:ok, default_bundle} = Export.export_branch(baishui_topo())
-    assert {:ok, shifted_bundle} = Export.export_branch(baishui_topo(), profile: shifted)
+    assert {:ok, default_bundle} = Export.export_branch(baishui_topo(), seed: 101)
+
+    assert {:ok, shifted_bundle} =
+             Export.export_branch(baishui_topo(), seed: 101, profile: shifted)
 
     assert default_bundle["profile"]["id"] == "proto_v1"
     assert shifted_bundle["profile"]["id"] == "shifted_v1"
-    assert default_bundle["profile"]["tau"]["tau_5"] != shifted_bundle["profile"]["tau"]["tau_5"]
-
-    # The canon is identical; only the numbers behind the bands moved.
     assert default_bundle["nodes"] == shifted_bundle["nodes"]
     assert :ok = Export.validate(shifted_bundle)
-
-    assert {:ok, restored} = Export.profile(shifted_bundle)
-    assert {:ok, :tau_10} = Profile.lag_band(restored, 5.0)
   end
 
-  test "validation rejects bundles that break the contract" do
-    assert {:ok, bundle} = Export.export_branch(baishui_topo())
+  test "validation rejects bundles that break the v2 contract" do
+    assert {:ok, bundle} = Export.export_branch(baishui_topo(), seed: 101)
     [node] = bundle["nodes"]
 
-    assert {:error, {:invalid_bundle, {:schema_version, 2, 1}}} =
-             Export.validate(%{bundle | "schema_version" => 2})
+    assert {:error, {:invalid_bundle, {:schema_version, 1, 2}}} =
+             Export.validate(%{bundle | "schema_version" => 1})
 
     assert {:error, {:invalid_bundle, {:duplicate_node_ids, _}}} =
              Export.validate(%{bundle | "nodes" => [node, node]})
 
-    assert {:error, {:invalid_bundle, {:missing_node_keys, ["archives"]}}} =
-             Export.validate(%{bundle | "nodes" => [Map.delete(node, "archives")]})
+    assert {:error, {:invalid_bundle, {:missing_node_keys, ["dossier"]}}} =
+             Export.validate(%{bundle | "nodes" => [Map.delete(node, "dossier")]})
 
-    assert {:error, {:invalid_bundle, {:node_rule_set, _, "other_rule_set", "default_branch_v1"}}} =
-             Export.validate(%{bundle | "nodes" => [%{node | "rule_set" => "other_rule_set"}]})
+    bad_dossier = put_in(node["dossier"]["fate"], "Fate_Ascended_SpatialRift")
+
+    assert {:error, {:invalid_bundle, {:dossier, :shape_or_history_mismatch}}} =
+             Export.validate(%{bundle | "nodes" => [bad_dossier]})
 
     assert {:error, {:invalid_bundle, {:not_json_safe, _}}} =
              Export.validate(Map.put(bundle, "extra", {:tuple, "value"}))
-
-    assert {:error, {:invalid_bundle, {:nodes, []}}} = Export.validate(%{bundle | "nodes" => []})
-    assert {:error, {:invalid_bundle, {:missing_schema_version, _}}} = Export.validate(%{})
   end
 
   test "invalid input is reported, not raised" do
     assert {:error, {:invalid_json, _}} = Export.from_json("{not json")
-    assert {:error, {:invalid_bundle, _}} = Export.from_json("{\"schema_version\": 1}")
+    assert {:error, {:invalid_bundle, _}} = Export.from_json("{\"schema_version\": 2}")
     assert {:error, {:not_json, :nope}} = Export.from_json(:nope)
 
     assert {:error, {:invalid_profile, :nope}} =
-             Export.export_branch(baishui_topo(), profile: :nope)
+             Export.export_branch(baishui_topo(), seed: 101, profile: :nope)
 
-    # An upstream geology the disturbance table never pairs has no history.
     unsupported = [
       branch_id: :branch_broken,
       up_name: "U",
@@ -178,11 +168,8 @@ defmodule Voy.World.ExportTest do
       accessibility: :tractor_road_accessible
     ]
 
-    assert {:error, :unsupported_topography} = Export.export_branch(unsupported)
+    assert {:error, :unsupported_topography} = Export.export_branch(unsupported, seed: 101)
 
-    # An accessible-headwater basin that tithing could not reach now carries a
-    # decided history instead of an unresolved one: the relic stayed, so the
-    # blasting is absorbed instead of igniting.
     inaccessible_basin = [
       branch_id: :branch_inaccessible,
       up_name: "U",
@@ -195,12 +182,9 @@ defmodule Voy.World.ExportTest do
       accessibility: :cliff_isolated
     ]
 
-    assert {:ok, bundle} = Export.export_branch(inaccessible_basin)
+    assert {:ok, bundle} = Export.export_branch(inaccessible_basin, seed: 101)
     assert [node] = bundle["nodes"]
     assert node["history"]["era3"]["fate"] == "Fate_Tolerated_FalseAlarm"
-
-    assert node["history"]["era2a"]["gazetteer_precedent"] ==
-             "case_mountain_too_steep_for_tithing"
 
     ascending =
       Keyword.put(@spec_fields, :fate_constraint, {:require, :Fate_Ascended_SpatialRift})

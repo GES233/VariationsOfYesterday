@@ -347,6 +347,22 @@ object PhaseResponse:
       trial(osc, snapshot, dt, period, phase, kind, control)
     }
 
+  /** Classify the pulse at every integer simulation-time tick in one cycle.
+    * Unlike a declared window midpoint, these are the exact operations a
+    * seeded dossier may name.
+    */
+  def tickTrials(
+      osc: Oscillator,
+      snapshot: MandateCurrent,
+      dt: Double,
+      period: Double,
+      kind: PulseKind
+  ): Seq[(Int, Trial)] =
+    val control = controlSpike(osc, snapshot, dt)
+    (1 until Math.ceil(period).toInt).map { tick =>
+      tick -> trial(osc, snapshot, dt, period, tick.toDouble / period, kind, control)
+    }
+
   /** Smallest and largest cycle fraction whose outcome matches. */
   def span(trials: Seq[Trial], outcome: PulseOutcome): Option[(Double, Double)] =
     val hits = trials.filter(_.outcome == outcome).map(_.phase).sorted

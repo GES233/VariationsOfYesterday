@@ -1,4 +1,18 @@
 {
+  "dossier": {
+    "seed": 101,
+    "branch_id": "branch_01_baishui",
+    "relic": "ancestral_bronze_zheng",
+    "fate": "Fate_Assimilated_NewZhai",
+    "expected": {
+      "batch_id": "边森回字（79）第19号",
+      "vessel_name": "195型柴油机平衡飞轮盘",
+      "vessel_code": "翻-79-12-丁",
+      "safe_tick": 17,
+      "safe_phase": 0.430707,
+      "safe_delay": 6.36
+    }
+  },
   "forward": [
     {
       "topography": {

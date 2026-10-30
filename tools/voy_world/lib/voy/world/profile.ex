@@ -146,9 +146,9 @@ defmodule Voy.World.Profile do
 
   This partition is a *definition*, not a dynamics claim: the measured
   contract shows the cell still spiking at `s = 1.0` while this partition
-  calls that state `:Burnout`. Whether a cycle exists is decided by
-  `Voy.World.Dynamics.cycle?/1` and the contract's recovery offset, never by
-  the label this function returns.
+  calls that state `:Burnout`. Whether a cycle exists is decided on the JVM
+  by `Readout.oscillating/2` and `PhaseTracker`, using the contract's recovery
+  offset, never by the label this function returns.
   """
   @spec regime(t(), number(), number()) :: regime()
   def regime(%__MODULE__{stress: cut}, stress, activity) do

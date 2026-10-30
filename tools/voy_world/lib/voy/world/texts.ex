@@ -1,17 +1,11 @@
 defmodule Voy.World.Texts do
   @moduledoc """
-  Code-side prose as data: structure descriptions and runtime causal lens
-  narratives live here, keyed by a stable name, with their dates bound to
+  Code-side structure prose as data, with dates bound to
   `Voy.World.Timeline` instead of typed into the sentence.
 
-  Archive documents have migrated to the authoring pack under `content/` and
-  are loaded by `Voy.World.Content`. This module retains only the templates
-  owned by the rule layer:
-
-    * place-attached structure descriptions (`structure_*`), rendered by
-      `Voy.World.Projection.compile_structureso/5`;
-    * runtime three-lens causal explanations (`lens_*`), rendered by
-      `Voy.World.Causality`.
+  Player documents live in the five-hop authoring pack under `content/`; this
+  module retains only place-attached structure descriptions (`structure_*`),
+  rendered by `Voy.World.Projection.compile_structureso/5`.
 
   Placeholders use the same `{{name}}` syntax as `Voy.World.Content`; bindings
   are declarative (`{:short_year, anchor}`, `{:reign_date, reign, anchor}`,
@@ -64,28 +58,6 @@ defmodule Voy.World.Texts do
       downstream: "绝壁听山孤寨：悬空木寮与逐次记录的簧片监听匣",
       pass_zheng: "完好如初的镇山铜钲亭与刻满逐次记痕的验山垂架",
       pass_stele: "完好如初的石雕分水堰与刻满逐次记痕的验山垂架"
-    },
-    lens_rain: %{
-      bindings: %{"date.flood_month" => {:month_numeral, :flood_month}},
-      text: "{{date.flood_month}}月连日秋雨导致上游常规岩层疲劳滑坡（系自然损耗，与排险爆破无关）"
-    },
-    lens_blasting: %{
-      bindings: %{"date.era2b_short" => {:short_year, :era2b_reclamation}},
-      text:
-        "此前下游聚落恢复变慢（临界慢化 Strained），{{date.era2b_short}}年收走铜钲后阻尼归零（c0=0）；" <>
-          "302队点炮正撞在簧片蜂鸣段（易损窗），5刻后推过失稳点"
-    },
-    lens_mountain_god: %{
-      bindings: %{},
-      text:
-        "涧水起鱼鳞碎纹、雀鸟惊飞乃山脉倒换气！四队拆了寨门铜钲断香火，" <>
-          "勘探队又在换气口动火药致山神翻身"
-    },
-    lens_secondary_ignition: %{
-      bindings: %{},
-      text:
-        "谷地明明已陷入周期性自激振荡（Oscillating），302队在回潮易损窗追加爆破，" <>
-          "把原本40刻后的尖峰直接提前引爆"
     }
   }
 

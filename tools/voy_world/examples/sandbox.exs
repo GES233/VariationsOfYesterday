@@ -1,28 +1,25 @@
 defmodule Voy.World.Sandbox do
-  import Voy.Kanren.Core
-  import Voy.Kanren.DSL
-
-  alias Voy.World.{Causality, Chronicle, Schema}
+  alias Voy.World.{Ascribe, Observation, Pathway, Schema, Slice, Witness}
 
   def run do
-    banner("推演一：溯因断案", "由下游提前起峰反推作业者、相位与传导路径")
-    show(abduction())
+    banner("推演一：五跳合一", "由五份局部单据恢复唯一证据链")
+    show(pathway())
 
-    banner("推演二：一案三表", "同一事故事实经不同世界观透镜投影")
-    show(lenses())
+    banner("推演二：干扰排除", "材质不符与外运单据不能补成故事")
+    show(decoy_rejection())
 
-    banner("推演三：邪典仪式合成", "只指定推迟尖峰，不预设行动者")
-    show(ritual_synthesis())
+    banner("推演三：种子物证", "同一历史在不同存档使用不同批号、载体与实测勘定格")
+    show(seeded_witnesses())
 
-    banner("推演四：四纪历史正向编译", "由三条支沟地形生成历史、结构与档案")
+    banner("推演四：四纪历史正向编译", "由三条支沟地形生成历史与结构")
     show(forward_histories())
 
     banner("推演五：从结局反推地形", "目标：飞升空间畸变点")
     {:ok, slices} = Voy.World.reverse_worldgen(:Fate_Ascended_SpatialRift)
     show(slices)
 
-    banner("推演六：跨时代考据", "旧方志先例 + 官样通报共同约束真相")
-    show(reconciliation())
+    banner("推演六：数值证据反演", "三方观测字段在声明候选空间内唯一恢复隐藏解释")
+    show(numeric_abduction())
   end
 
   def topographies do
@@ -63,68 +60,44 @@ defmodule Voy.World.Sandbox do
     ]
   end
 
-  defp abduction do
-    run_all(fn q ->
-      fresh [initial, propagation, outcome] do
-        Causality.causal_stageso(initial, propagation, outcome)
+  defp pathway do
+    {:ok, %{chain: chain}} =
+      Pathway.compile_chain(:ancestral_bronze_zheng, :Fate_Assimilated_NewZhai)
 
-        propso(outcome,
-          settlement: :baishui_flat,
-          outcome: :premature_excitation_spike
-        )
-
-        eq(q, initial: initial, propagation: propagation, outcome: outcome)
-      end
-    end)
-    |> terms()
+    Pathway.connect_edges(chain)
   end
 
-  defp lenses do
-    run_all(fn q ->
-      fresh [initial, propagation, outcome, lens] do
-        Causality.causal_stageso(initial, propagation, outcome)
+  defp decoy_rejection do
+    {:ok, %{chain: chain, decoys: decoys}} =
+      Pathway.compile_chain(:ancestral_bronze_zheng, :Fate_Assimilated_NewZhai)
 
-        propso(outcome,
-          settlement: :baishui_flat,
-          outcome: :premature_excitation_spike
-        )
-
-        Causality.lens_projectiono(lens, initial, propagation, outcome, q)
-      end
-    end)
-    |> terms()
+    %{
+      mixed_documents: Pathway.connect_edges(chain ++ decoys),
+      decoys_alone: Pathway.connect_edges(decoys),
+      ablated: Pathway.connect_edges(tl(chain))
+    }
   end
 
-  defp ritual_synthesis do
-    run_all(fn q ->
-      fresh [initial, propagation, outcome, actor, site, phase, nat_sign, inst_sign, item] do
-        Causality.causal_stageso(initial, propagation, outcome)
-
-        propso(initial,
-          actor: actor,
-          action_site: site,
-          phase: phase,
-          natural_sign: nat_sign,
-          instrument_sign: inst_sign,
-          action_item: item
+  defp seeded_witnesses do
+    for seed <- [101, 202] do
+      dossier =
+        Witness.render_dossier(
+          seed,
+          :branch_01_baishui,
+          :ancestral_bronze_zheng,
+          :Fate_Assimilated_NewZhai,
+          %{up: "野猪箐", pass: "断碑垭口", down: "白水坝"}
         )
 
-        propso(outcome,
-          settlement: :baishui_flat,
-          outcome: :spike_delayed_by_8_6
-        )
-
-        eq(q,
-          actor: actor,
-          site: site,
-          phase: phase,
-          natural_sign: nat_sign,
-          instrument_sign: inst_sign,
-          item: item
-        )
-      end
-    end)
-    |> terms()
+      Map.take(dossier.binding, [
+        :seed,
+        :batch_id,
+        :vessel_name,
+        :safe_tick,
+        :safe_phase,
+        :safe_delay
+      ])
+    end
   end
 
   defp forward_histories do
@@ -134,35 +107,17 @@ defmodule Voy.World.Sandbox do
     end)
   end
 
-  defp reconciliation do
-    run_all(fn q ->
-      fresh [topo, slice, archives, tech_note, council_doc, era3, gazetteer, official] do
-        membero(topo, topographies())
-        Chronicle.compile_branch_sliceo(topo, slice)
-        propso(slice, era3: era3, archives: archives)
+  defp numeric_abduction do
+    contract = Voy.World.Contract.load!()
+    hidden = %{c0_state: :c0_collapsed, pulse_kind: :alpha_shock, safe_phase_window: :relative}
 
-        propso(archives,
-          gazetteer: gazetteer,
-          official_report: official,
-          tech_note: tech_note,
-          council_document: council_doc
-        )
+    evidence =
+      hidden
+      |> Slice.trace(contract)
+      |> Observation.observe_all()
+      |> Observation.evidence()
 
-        propso(gazetteer,
-          precedent: :case_1894_zheng_return_calmed_slide,
-          recorded_settlement: "白水坝"
-        )
-
-        propso(official, claimed_cause: :seasonal_rain_mudslide)
-
-        eq(q,
-          recovered_truth: tech_note,
-          current_council_rules: council_doc,
-          current_regime: era3
-        )
-      end
-    end)
-    |> terms()
+    Ascribe.explain(evidence, contract: contract)
   end
 
   defp banner(title, subtitle) do

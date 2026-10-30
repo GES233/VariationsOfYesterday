@@ -45,8 +45,8 @@ defmodule Voy.World do
   public records, whose `dossier` key is
   `Voy.World.Witness.render_dossier(seed, branch_id, relic, fate, names)`.
 
-  A call without a seed is deliberately *not* this function:
-  `compile_node/2` keeps returning exactly the historical record shape.
+  This is only a convenience delegate: `compile_node/2` likewise requires a
+  seed because the five-hop dossier is the sole player-facing narrative.
   """
   @spec compile_node_dossier(Keyword.t() | map(), Keyword.t() | map(), integer()) ::
           {:ok, [map()]} | {:error, term()}
@@ -58,7 +58,8 @@ defmodule Voy.World do
     error in [KeyError, ArgumentError] -> {:error, {:invalid_features, Exception.message(error)}}
   end
 
-  def compile_node_dossier(_spec_fields, _feature_fields, seed), do: {:error, {:invalid_seed, seed}}
+  def compile_node_dossier(_spec_fields, _feature_fields, seed),
+    do: {:error, {:invalid_seed, seed}}
 
   defp with_seed(fields, seed) when is_list(fields), do: Keyword.put(fields, :seed, seed)
   defp with_seed(fields, seed) when is_map(fields), do: Map.put(fields, :seed, seed)

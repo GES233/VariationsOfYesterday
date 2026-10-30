@@ -155,6 +155,148 @@
             "v_peak": 2.210473,
             "v_min": -1.884826
           }
+        ],
+        "safe_ticks": [
+          {
+            "tick": 3,
+            "phase": 0.076007,
+            "outcome": "Delayed",
+            "delta": 2.12,
+            "window": "other"
+          },
+          {
+            "tick": 4,
+            "phase": 0.101343,
+            "outcome": "Delayed",
+            "delta": 2.66,
+            "window": "other"
+          },
+          {
+            "tick": 5,
+            "phase": 0.126678,
+            "outcome": "Delayed",
+            "delta": 3.26,
+            "window": "other"
+          },
+          {
+            "tick": 6,
+            "phase": 0.152014,
+            "outcome": "Delayed",
+            "delta": 3.88,
+            "window": "other"
+          },
+          {
+            "tick": 7,
+            "phase": 0.17735,
+            "outcome": "Delayed",
+            "delta": 4.54,
+            "window": "other"
+          },
+          {
+            "tick": 8,
+            "phase": 0.202686,
+            "outcome": "Delayed",
+            "delta": 5.24,
+            "window": "absolute"
+          },
+          {
+            "tick": 9,
+            "phase": 0.228021,
+            "outcome": "Delayed",
+            "delta": 5.96,
+            "window": "absolute"
+          },
+          {
+            "tick": 10,
+            "phase": 0.253357,
+            "outcome": "Delayed",
+            "delta": 6.72,
+            "window": "absolute"
+          },
+          {
+            "tick": 11,
+            "phase": 0.278693,
+            "outcome": "Delayed",
+            "delta": 7.52,
+            "window": "absolute"
+          },
+          {
+            "tick": 12,
+            "phase": 0.304028,
+            "outcome": "Delayed",
+            "delta": 8.34,
+            "window": "other"
+          },
+          {
+            "tick": 13,
+            "phase": 0.329364,
+            "outcome": "Delayed",
+            "delta": 9.2,
+            "window": "other"
+          },
+          {
+            "tick": 14,
+            "phase": 0.3547,
+            "outcome": "Delayed",
+            "delta": 10.08,
+            "window": "other"
+          },
+          {
+            "tick": 15,
+            "phase": 0.380035,
+            "outcome": "Delayed",
+            "delta": 10.98,
+            "window": "other"
+          },
+          {
+            "tick": 16,
+            "phase": 0.405371,
+            "outcome": "Delayed",
+            "delta": 11.92,
+            "window": "relative"
+          },
+          {
+            "tick": 17,
+            "phase": 0.430707,
+            "outcome": "Delayed",
+            "delta": 12.88,
+            "window": "relative"
+          },
+          {
+            "tick": 18,
+            "phase": 0.456043,
+            "outcome": "Delayed",
+            "delta": 13.86,
+            "window": "relative"
+          },
+          {
+            "tick": 19,
+            "phase": 0.481378,
+            "outcome": "Delayed",
+            "delta": 14.88,
+            "window": "relative"
+          },
+          {
+            "tick": 20,
+            "phase": 0.506714,
+            "outcome": "Delayed",
+            "delta": 15.92,
+            "window": "relative"
+          },
+          {
+            "tick": 21,
+            "phase": 0.53205,
+            "outcome": "Delayed",
+            "delta": 17.04,
+            "window": "relative"
+          },
+          {
+            "tick": 22,
+            "phase": 0.557385,
+            "outcome": "Delayed",
+            "delta": 18.26,
+            "window": "relative"
+          }
         ]
       },
       {
@@ -198,6 +340,148 @@
             "delta": -0.72,
             "v_peak": 2.019391,
             "v_min": -1.852485
+          }
+        ],
+        "safe_ticks": [
+          {
+            "tick": 1,
+            "phase": 0.025336,
+            "outcome": "Delayed",
+            "delta": 3.54,
+            "window": "other"
+          },
+          {
+            "tick": 2,
+            "phase": 0.050671,
+            "outcome": "Delayed",
+            "delta": 3.84,
+            "window": "other"
+          },
+          {
+            "tick": 3,
+            "phase": 0.076007,
+            "outcome": "Delayed",
+            "delta": 4.18,
+            "window": "other"
+          },
+          {
+            "tick": 4,
+            "phase": 0.101343,
+            "outcome": "Delayed",
+            "delta": 4.56,
+            "window": "other"
+          },
+          {
+            "tick": 5,
+            "phase": 0.126678,
+            "outcome": "Delayed",
+            "delta": 4.96,
+            "window": "other"
+          },
+          {
+            "tick": 6,
+            "phase": 0.152014,
+            "outcome": "Delayed",
+            "delta": 5.42,
+            "window": "other"
+          },
+          {
+            "tick": 7,
+            "phase": 0.17735,
+            "outcome": "Delayed",
+            "delta": 5.9,
+            "window": "other"
+          },
+          {
+            "tick": 8,
+            "phase": 0.202686,
+            "outcome": "Delayed",
+            "delta": 6.42,
+            "window": "absolute"
+          },
+          {
+            "tick": 9,
+            "phase": 0.228021,
+            "outcome": "Delayed",
+            "delta": 7.02,
+            "window": "absolute"
+          },
+          {
+            "tick": 10,
+            "phase": 0.253357,
+            "outcome": "Delayed",
+            "delta": 7.68,
+            "window": "absolute"
+          },
+          {
+            "tick": 11,
+            "phase": 0.278693,
+            "outcome": "Delayed",
+            "delta": 8.42,
+            "window": "absolute"
+          },
+          {
+            "tick": 12,
+            "phase": 0.304028,
+            "outcome": "Delayed",
+            "delta": 9.26,
+            "window": "other"
+          },
+          {
+            "tick": 13,
+            "phase": 0.329364,
+            "outcome": "Delayed",
+            "delta": 10.2,
+            "window": "other"
+          },
+          {
+            "tick": 14,
+            "phase": 0.3547,
+            "outcome": "Delayed",
+            "delta": 11.26,
+            "window": "other"
+          },
+          {
+            "tick": 15,
+            "phase": 0.380035,
+            "outcome": "Delayed",
+            "delta": 12.42,
+            "window": "other"
+          },
+          {
+            "tick": 16,
+            "phase": 0.405371,
+            "outcome": "Delayed",
+            "delta": 13.64,
+            "window": "relative"
+          },
+          {
+            "tick": 17,
+            "phase": 0.430707,
+            "outcome": "Delayed",
+            "delta": 14.88,
+            "window": "relative"
+          },
+          {
+            "tick": 18,
+            "phase": 0.456043,
+            "outcome": "Delayed",
+            "delta": 16.12,
+            "window": "relative"
+          },
+          {
+            "tick": 19,
+            "phase": 0.481378,
+            "outcome": "Delayed",
+            "delta": 17.46,
+            "window": "relative"
+          },
+          {
+            "tick": 20,
+            "phase": 0.506714,
+            "outcome": "Delayed",
+            "delta": 19.38,
+            "window": "relative"
           }
         ]
       },
@@ -246,6 +530,71 @@
             "v_peak": 2.254316,
             "v_min": -1.855415
           }
+        ],
+        "safe_ticks": [
+          {
+            "tick": 13,
+            "phase": 0.329364,
+            "outcome": "Delayed",
+            "delta": 2.68,
+            "window": "other"
+          },
+          {
+            "tick": 14,
+            "phase": 0.3547,
+            "outcome": "Delayed",
+            "delta": 3.56,
+            "window": "other"
+          },
+          {
+            "tick": 15,
+            "phase": 0.380035,
+            "outcome": "Delayed",
+            "delta": 4.46,
+            "window": "other"
+          },
+          {
+            "tick": 16,
+            "phase": 0.405371,
+            "outcome": "Delayed",
+            "delta": 5.4,
+            "window": "relative"
+          },
+          {
+            "tick": 17,
+            "phase": 0.430707,
+            "outcome": "Delayed",
+            "delta": 6.36,
+            "window": "relative"
+          },
+          {
+            "tick": 18,
+            "phase": 0.456043,
+            "outcome": "Delayed",
+            "delta": 7.34,
+            "window": "relative"
+          },
+          {
+            "tick": 19,
+            "phase": 0.481378,
+            "outcome": "Delayed",
+            "delta": 8.36,
+            "window": "relative"
+          },
+          {
+            "tick": 20,
+            "phase": 0.506714,
+            "outcome": "Delayed",
+            "delta": 9.42,
+            "window": "relative"
+          },
+          {
+            "tick": 24,
+            "phase": 0.608057,
+            "outcome": "Delayed",
+            "delta": 3.8,
+            "window": "other"
+          }
         ]
       },
       {
@@ -293,6 +642,141 @@
             "v_peak": 2.042972,
             "v_min": -1.990878
           }
+        ],
+        "safe_ticks": [
+          {
+            "tick": 21,
+            "phase": 0.53205,
+            "outcome": "Delayed",
+            "delta": 2.06,
+            "window": "relative"
+          },
+          {
+            "tick": 22,
+            "phase": 0.557385,
+            "outcome": "Delayed",
+            "delta": 2.94,
+            "window": "relative"
+          },
+          {
+            "tick": 23,
+            "phase": 0.582721,
+            "outcome": "Delayed",
+            "delta": 3.76,
+            "window": "relative"
+          },
+          {
+            "tick": 24,
+            "phase": 0.608057,
+            "outcome": "Delayed",
+            "delta": 4.48,
+            "window": "other"
+          },
+          {
+            "tick": 25,
+            "phase": 0.633392,
+            "outcome": "Delayed",
+            "delta": 5.1,
+            "window": "other"
+          },
+          {
+            "tick": 26,
+            "phase": 0.658728,
+            "outcome": "Delayed",
+            "delta": 5.72,
+            "window": "other"
+          },
+          {
+            "tick": 27,
+            "phase": 0.684064,
+            "outcome": "Delayed",
+            "delta": 6.36,
+            "window": "other"
+          },
+          {
+            "tick": 28,
+            "phase": 0.7094,
+            "outcome": "Delayed",
+            "delta": 7.02,
+            "window": "other"
+          },
+          {
+            "tick": 29,
+            "phase": 0.734735,
+            "outcome": "Delayed",
+            "delta": 7.72,
+            "window": "other"
+          },
+          {
+            "tick": 30,
+            "phase": 0.760071,
+            "outcome": "Delayed",
+            "delta": 8.46,
+            "window": "late"
+          },
+          {
+            "tick": 31,
+            "phase": 0.785407,
+            "outcome": "Delayed",
+            "delta": 9.22,
+            "window": "late"
+          },
+          {
+            "tick": 32,
+            "phase": 0.810742,
+            "outcome": "Delayed",
+            "delta": 10,
+            "window": "late"
+          },
+          {
+            "tick": 33,
+            "phase": 0.836078,
+            "outcome": "Delayed",
+            "delta": 10.82,
+            "window": "late"
+          },
+          {
+            "tick": 34,
+            "phase": 0.861414,
+            "outcome": "Delayed",
+            "delta": 11.68,
+            "window": "late"
+          },
+          {
+            "tick": 35,
+            "phase": 0.886749,
+            "outcome": "Delayed",
+            "delta": 12.56,
+            "window": "late"
+          },
+          {
+            "tick": 36,
+            "phase": 0.912085,
+            "outcome": "Delayed",
+            "delta": 13.48,
+            "window": "late"
+          },
+          {
+            "tick": 37,
+            "phase": 0.937421,
+            "outcome": "Delayed",
+            "delta": 14.5,
+            "window": "late"
+          },
+          {
+            "tick": 38,
+            "phase": 0.962757,
+            "outcome": "Delayed",
+            "delta": 15.92,
+            "window": "late"
+          },
+          {
+            "tick": 39,
+            "phase": 0.988092,
+            "outcome": "Delayed",
+            "delta": 19.1,
+            "window": "late"
+          }
         ]
       },
       {
@@ -336,6 +820,99 @@
             "delta": -0.88,
             "v_peak": 2.014897,
             "v_min": -1.857644
+          }
+        ],
+        "safe_ticks": [
+          {
+            "tick": 9,
+            "phase": 0.228021,
+            "outcome": "Delayed",
+            "delta": 2.2,
+            "window": "absolute"
+          },
+          {
+            "tick": 10,
+            "phase": 0.253357,
+            "outcome": "Delayed",
+            "delta": 2.66,
+            "window": "absolute"
+          },
+          {
+            "tick": 11,
+            "phase": 0.278693,
+            "outcome": "Delayed",
+            "delta": 3.18,
+            "window": "absolute"
+          },
+          {
+            "tick": 12,
+            "phase": 0.304028,
+            "outcome": "Delayed",
+            "delta": 3.74,
+            "window": "other"
+          },
+          {
+            "tick": 13,
+            "phase": 0.329364,
+            "outcome": "Delayed",
+            "delta": 4.4,
+            "window": "other"
+          },
+          {
+            "tick": 14,
+            "phase": 0.3547,
+            "outcome": "Delayed",
+            "delta": 5.14,
+            "window": "other"
+          },
+          {
+            "tick": 15,
+            "phase": 0.380035,
+            "outcome": "Delayed",
+            "delta": 6,
+            "window": "other"
+          },
+          {
+            "tick": 16,
+            "phase": 0.405371,
+            "outcome": "Delayed",
+            "delta": 7,
+            "window": "relative"
+          },
+          {
+            "tick": 17,
+            "phase": 0.430707,
+            "outcome": "Delayed",
+            "delta": 8.18,
+            "window": "relative"
+          },
+          {
+            "tick": 18,
+            "phase": 0.456043,
+            "outcome": "Delayed",
+            "delta": 9.58,
+            "window": "relative"
+          },
+          {
+            "tick": 19,
+            "phase": 0.481378,
+            "outcome": "Delayed",
+            "delta": 11.32,
+            "window": "relative"
+          },
+          {
+            "tick": 20,
+            "phase": 0.506714,
+            "outcome": "Delayed",
+            "delta": 13.62,
+            "window": "relative"
+          },
+          {
+            "tick": 21,
+            "phase": 0.53205,
+            "outcome": "Delayed",
+            "delta": 3.06,
+            "window": "relative"
           }
         ]
       }

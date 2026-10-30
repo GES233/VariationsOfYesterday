@@ -42,7 +42,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
   - `VariationsOfYesterday.scala` — 模组主入口（`ModInitializer`），注册 Mandate Engine 的生命周期与 tick 事件
   - `MandateRuntime.scala` — Minecraft ↔ Mandate 的游戏侧桥：持有 ActorSystem 生命周期、tick gate（无玩家不投递）、快照发布（`stateAt` 供 HUD 读）、动作回包队列
   - `inner/` — 模组核心内部逻辑（不依赖 Minecraft API 的部分尽量放这里）：
-    - `mandate/` — Mandate Engine：`MandateState`（FitzHugh–Nagumo 快子系统 + 土地应力慢子系统：状态 `dissonance/entrench/stress/activity`，参数 `MandateParam`/`StressParam`，外部输入通道 `disturbance/calming/baselineCalming/impulse`（后两者为快变量冲击通道：`impulse` 常数保持，`firePulse`/`synapseTau` 为 α 突触脉冲内核，闭式更新不占 RK4 状态维））、`MandateAgent`（Pekko typed actor：tick 事件驱动积分、发布不可变快照）、`MandateGrid`（格子场）
+    - `mandate/` — Mandate Engine：`MandateState`（FHN 快子系统 + 土地应力慢子系统）、`MandateAgent`（Pekko typed actor）、`MandateGrid`（格子场）、`MandateReadout`（Regime/Phase 与无周期语义）、`PhaseResponse`（受控相位响应）、`SliceReplay` 与 `SliceContract`（事件回放和跨栈数值契约；含逐 tick 实测安全刻度）
     - `event/` — 事件协议：`EventDTO` sealed trait 及事件消息（**通道语义**：`TickArrived` + `StressInject`/`SetDisturbance`/`SetCalming`/`SetBaselineCalming`/`HoldImpulse`/`FirePulse`；世界语义 → 通道事件的 1:N 映射在 Minecraft 侧做，见协议头注释）
     - `action/` — 动作协议：`MandateActionProtocol` sealed trait 及动作消息
     - `plant/` — 植物 DTO（占位）
@@ -52,9 +52,9 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 - `src/main/java` / `src/client/java` — Mixin（目前是模板自带的 `ExampleMixin` / `ExampleClientMixin`）
 - `src/main/resources/fabric.mod.json` — 模组清单（入口点、mixin 配置、依赖）；版本号由 `processResources` 注入
 - `src/main/resources/variations-of-yesterday.mixins.json` 与 `src/client/resources/variations-of-yesterday.client.mixins.json` — Mixin 配置
-- `src/test/scala/` — 测试代码（现有 `inner/mandate/` 下 5 个 Spec，清单见下文「测试」一节）
-- `docs/` — 中文设计文档；当前有效的是 `docs/design-draft-01-living-world.md`（动力学/地势/聚落/ARG；0.1 结构已冻结，纵切片范围与验收见 §8）、`docs/design-note-02-kanren-worldview-engine.md`（动力学四相 × Kanren 关系引擎：多世界观透镜、式盘因果推导与五阶制度发展史编译器）、`docs/design-note-03-authoring-pipeline.md`（内容流水线：作者层格式、校验清单、Git+PR 工作流与迁移状态）与 `docs/design-note-04-quiet-fates-and-access-decoupling.md`（可达性解耦与两种「未爆发的结局」：24/48 可生成、6 结局、先例锚定与 `Canon.check_archives/1`）
-- `tools/voy_world/` — 开发与设定验证用独立 Elixir Mix 包（不进 jar）：`Voy.Kanren` 关系内核、`Voy.World` 世界模型与六个沙盘推演；含 48 种地形组合分类测试和 JVM 迁移用 JSON golden cases
+- `src/test/scala/` — 测试代码（`inner/mandate/` 下 10 个 Spec，清单见下文「测试」一节）
+- `docs/` — 中文设计文档：主草案 `design-draft-01-living-world.md`；札记 02 是历史概念稿；札记 03/05 描述现行五跳内容与叙事管线；札记 04 冻结 24/48 可生成地形与 6 结局的历史语义。
+- `tools/voy_world/` — 独立 Elixir Mix 包（不进 jar）：`Voy.Kanren` 关系内核；`Chronicle` 负责地形与历史，`Pathway + Witness + Content` 负责唯一五跳叙事，`Ascribe / Observation / Facts` 负责数值证据与结算，`Export` 为 schema v2；含 48 种地形分类和 JSON golden cases。
 - `run/` — 本地开发运行的游戏目录（存档、日志、配置），不要提交修改
 
 ## 开发约定
@@ -69,9 +69,9 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 ## 测试
 
 - 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
-- 已有测试：`inner/mandate/MandateStateSpec`（复现设计草案 §1.1 的数值结论：阈值点火、自持、滞后熄灭、宽容区）、`inner/mandate/PhaseModulationSpec`（§1.1.4 相位调制：矩形与 α 突触脉冲两个形态——易损窗口点火、不应期吸收/推迟、恢复晚期吸收、静息单次激发回落、α 内核形状）、`inner/mandate/MandateGridSpec`（格子场守恒/平流/点火波前）、`inner/mandate/PrototypeHotspotSpec`、`inner/mandate/MandateAgentSpec`（actor 接线契约：tick 事件驱动确定性积分、每 tick 一份快照、无 tick 不积分）。核心模拟逻辑（`inner/`、`helpers/`）不依赖 Minecraft，可直接纯单测覆盖。
-- Elixir 世界模型原型：在 `tools/voy_world/` 运行 `mix test`（ExUnit），`mix voy.content lint` 校验内容包，`mix run examples/sandbox.exs` 执行六个沙盘推演；`test/fixtures/world_cases.json` 是后续 JVM 移植复用的语义 golden cases。
-- **内容包（作者层）**：`tools/voy_world/content/` 是交给写作者的纯文本内容（`claims.tsv` 归因卡 + `documents/**/*.md` 档案卡，写法见其 `README.md`），由 `Voy.World.Content` 加载校验并直接供 `Voy.World.Projection` 关系层选择渲染（规则侧不再重复保存档案散文）；`mix voy.content` 提供 `lint`（报中文错误与最接近合法值建议）、`preview`（预览节点全套档案）与 `template`（生成空卡片模板），CI（`.github/workflows/voy_world.yml`）在 PR 上执行；作者不改 `lib/`。
+- 已有测试：`MandateStateSpec`、`PhaseModulationSpec`、`MandateGridSpec`、`PrototypeHotspotSpec`、`MandateAgentSpec`，以及 `MandateReadoutSpec`、`PhaseResponseSpec`、`SliceReplaySpec`、`SliceContractSpec`、`GridBenchmarkSpec`。核心模拟逻辑不依赖 Minecraft；契约测试同时锁定逐 tick 实测推迟刻度，五跳卷宗只能从中选择安全操作。
+- Elixir 世界模型原型：在 `tools/voy_world/` 运行 `mix test`、`mix voy.content lint`、`mix run examples/sandbox.exs`；`test/fixtures/world_cases.json` 保存历史语义与种子物证 golden cases。
+- **内容包（作者层）**：`tools/voy_world/content/documents/**/*.md` 是唯一叙事散文来源（五张主链卡 + 两张干扰卡；写法见其 `README.md`）。`Voy.World.Content` 负责唯一选择与校验，`Witness` 负责种子物化；旧 `claims.tsv`、四份全知档案与 `Causality` 已退役。`mix voy.content` 提供 `lint`、`preview [--seed N]` 与 `template <hop1..5|decoy>`；作者不改 `lib/`。
 - **本机环境注意**：JDK 路径等环境信息因设备而异，不入库；见仓库根目录 `ref/` 目录下的本地说明（该目录被 git 忽略，各设备自行维护）。
 - Fabric/Minecraft 集成无法简单单测，验证集成行为请使用 `./gradlew runClient` 手动运行游戏。
 
