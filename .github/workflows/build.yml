@@ -23,6 +23,12 @@ jobs:
         run: chmod +x ./gradlew
       - name: build
         run: ./gradlew build
+      - name: explain contract drift
+        if: failure()
+        run: |
+          ./gradlew test --tests "*SliceContractSpec*" -Dvoy.contract.write=true --console=plain || true
+          echo '--- contracts/mandate-slice-v1.json diff on this runner ---'
+          git --no-pager diff -- contracts/mandate-slice-v1.json || true
       - name: capture build artifacts
         uses: actions/upload-artifact@v4
         with:

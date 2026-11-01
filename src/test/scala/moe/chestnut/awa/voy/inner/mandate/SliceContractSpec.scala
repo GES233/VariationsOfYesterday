@@ -28,12 +28,20 @@ class SliceContractSpec:
       SliceContract.write(rendered)
       println(s"[contract] rewrote ${SliceContract.contractPath}")
     val checked = SliceContract.checkedIn()
-    assertEquals(
-      checked,
-      rendered,
-      s"contracts/mandate-slice-v1.json does not match the measurement; " +
-        "regenerate deliberately with gradlew test -Dvoy.contract.write=true"
-    )
+    if checked != rendered then
+      val checkedLines = checked.split("\n", -1)
+      val renderedLines = rendered.split("\n", -1)
+      val differing = (0 until Math.max(checkedLines.length, renderedLines.length)).flatMap { i =>
+        val want = if i < checkedLines.length then checkedLines(i) else "<missing line>"
+        val got = if i < renderedLines.length then renderedLines(i) else "<missing line>"
+        if want == got then None else Some(s"line ${i + 1}:\n  checked : $want\n  rendered: $got")
+      }
+      fail(
+        s"contracts/mandate-slice-v1.json does not match the measurement " +
+          s"(${differing.size} differing lines); " +
+          "regenerate deliberately with gradlew test -Dvoy.contract.write=true\n" +
+          differing.take(12).mkString("\n")
+      )
 
   @Test def `the period is step-converged and the control spike is stable`(): Unit =
     assertTrue(data.period > 20.0 && data.period < 80.0, s"period ${data.period}")
