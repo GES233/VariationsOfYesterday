@@ -496,10 +496,12 @@ object SliceContract:
     )
     val md = MessageDigest.getInstance("SHA-256")
     files.foreach { relative =>
-      // Hash the repository-relative path, never the resolved absolute one:
-      // the contract must render identically wherever the checkout lives.
+      // Hash the repository-relative path and the LF-normalised source text:
+      // neither the resolved absolute path nor the checkout's line endings may
+      // leak into the digest, or the golden only renders on one machine.
       md.update(relative.getBytes("UTF-8"))
-      md.update(Files.readAllBytes(repoRoot.resolve(relative)))
+      val text = new String(Files.readAllBytes(repoRoot.resolve(relative)), "UTF-8")
+      md.update(text.replace("\r\n", "\n").getBytes("UTF-8"))
     }
     val hex = new StringBuilder
     md.digest().foreach(b => hex.append(String.format("%02x", Integer.valueOf(b & 0xff))))

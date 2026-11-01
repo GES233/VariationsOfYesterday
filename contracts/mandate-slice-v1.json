@@ -6,7 +6,7 @@
       "src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateState.scala",
       "src/main/scala/moe/chestnut/awa/voy/helpers/ODESolver.scala"
     ],
-    "numeric_source_digest": "734d5be53bcbb318e32bf703a105d486b4563954938e2cc99e19474b1904ce54",
+    "numeric_source_digest": "3393cfe3e1f0dd961764f0349a4d4a447bd5245b56e15610210c6bc84942c59c",
     "state0": {
       "dissonance": -1.2,
       "entrench": -0.6,
