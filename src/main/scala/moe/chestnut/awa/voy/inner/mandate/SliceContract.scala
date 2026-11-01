@@ -496,7 +496,9 @@ object SliceContract:
     )
     val md = MessageDigest.getInstance("SHA-256")
     files.foreach { relative =>
-      md.update(repoRoot.resolve(relative).toString.getBytes("UTF-8"))
+      // Hash the repository-relative path, never the resolved absolute one:
+      // the contract must render identically wherever the checkout lives.
+      md.update(relative.getBytes("UTF-8"))
       md.update(Files.readAllBytes(repoRoot.resolve(relative)))
     }
     val hex = new StringBuilder
