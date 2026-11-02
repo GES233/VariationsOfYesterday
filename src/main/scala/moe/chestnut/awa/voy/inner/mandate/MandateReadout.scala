@@ -133,7 +133,55 @@ object Readout:
     else if fraction < p.fireWindowLo then PhaseLabel.AbsoluteRefractory
     else if fraction <= p.fireWindowHi then PhaseLabel.RelativeRefractory
     else PhaseLabel.Resting
+
+  /** Whether a cell's maintenance source (`c0`, design draft §7.8) is
+    * currently sheltering the cell from Overworld stagnation (`沉滞`).
+    *
+    * Shelter requires an active `c0` baseline (`baselineCalming >= minC0`)
+    * AND that the cell is neither burnt out nor in the middle of a spike
+    * excursion (`|v| >= spikeLevel`, the periodic failure window of §7.8).
+    */
+  def isMaintained(
+      readout: CellReadout,
+      minC0: Double = 0.01,
+      p: ReadoutParam = ReadoutParam()
+  ): Boolean =
+    readout.baselineCalming >= minC0 &&
+      readout.regime != Regime.Burnout &&
+      Math.abs(readout.current.dissonance) < p.spikeLevel
+
+  /** Convert a cycle fraction `[0, 1)` into the 20-division dial index
+    * `0..19` used by the field notebook and contract tick trials.
+    */
+  def dialTick(phase: PhaseReading, divisions: Int = 20): Option[Int] =
+    phase match
+      case PhaseReading.Cycle(_, fraction) =>
+        val normalized = ((fraction % 1.0) + 1.0) % 1.0
+        Some(Math.min(divisions - 1, Math.floor(normalized * divisions).toInt))
+      case _ => None
 end Readout
+
+/** Combined semantic snapshot of one lattice cell published to the game
+  * side: continuous state, slow-variable regime, fast-variable phase reading,
+  * and current `c0` maintenance level.
+  */
+final case class CellReadout(
+    current: MandateCurrent,
+    regime: Regime,
+    phase: PhaseReading,
+    baselineCalming: Double = 0.0
+):
+  def isMaintained: Boolean = Readout.isMaintained(this)
+  def dialTick: Option[Int] = Readout.dialTick(phase)
+
+object CellReadout:
+  val zero: CellReadout = CellReadout(
+    current = MandateCurrent(0.0, 0.0, 0.0, 0.0),
+    regime = Regime.Calm,
+    phase = PhaseReading.Basin(PhaseLabel.Resting),
+    baselineCalming = 0.0
+  )
+
 
 /** Running phase reference for one cell.
   *

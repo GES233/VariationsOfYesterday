@@ -3,7 +3,7 @@ package moe.chestnut.awa.voy.inner.mandate
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
-import moe.chestnut.awa.voy.inner.action.MandateActionProtocol
+import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 
 /** The mandate engine actor: owns the lattice and integrates it on tick
@@ -19,9 +19,10 @@ import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
   * @param snapshotSink called after each integration step with an immutable
   *   state map (grid-local coordinates); production wiring republishes it
   *   as a volatile snapshot, tests capture it directly.
-  * @param actionSink receives outbound actions (presentation commands,
-  *   notifications); no action producers exist yet, the channel is part of
-  *   the interface contract.
+  * @param actionSink receives outbound actions (spike notifications, regime
+  *   transitions) produced during integration.
+  * @param readoutSink receives the semantic `CellReadout` projection per cell
+  *   after each integration step.
   */
 object MandateAgent:
   /** Apply one channel event to the lattice.
@@ -49,20 +50,55 @@ object MandateAgent:
   def apply(
       grid: MandateGrid,
       snapshotSink: Map[CellCoord, MandateCurrent] => Unit,
-      actionSink: MandateActionProtocol => Unit = (_ => ())
+      actionSink: MandateActionProtocol => Unit = (_ => ()),
+      readoutSink: Map[CellCoord, CellReadout] => Unit = (_ => ())
   ): Behavior[EventDTO] =
     Behaviors.setup { context =>
       context.log.info("Mandate engine actor started.")
+      val readoutParam = ReadoutParam()
+      var simTime: Double = 0.0
+      val trackers: Map[CellCoord, PhaseTracker] = grid.cells.map { case (coord, cell) =>
+        coord -> new PhaseTracker(readoutParam, cell.param, cell.stressParam.coupling)
+      }
+      var prevRegimes: Map[CellCoord, Regime] = grid.cells.map { case (coord, cell) =>
+        coord -> Readout.regime(cell.getState, readoutParam)
+      }
+      var inSpike: Set[CellCoord] = Set.empty
+
       Behaviors.receiveMessage {
         // tickRate is reserved for the step-coarsening ("weathering")
         // mechanism (§1.4) and intentionally ignored for now.
         case EventMsg.TickArrived(dt, _) =>
           grid.step(dt)
-          snapshotSink(
-            grid.cells.iterator.map { case (coord, cell) =>
-              coord -> cell.getState
-            }.toMap
-          )
+          simTime += dt
+
+          val currentBuilder = Map.newBuilder[CellCoord, MandateCurrent]
+          val readoutBuilder = Map.newBuilder[CellCoord, CellReadout]
+
+          grid.cells.foreach { case (coord, cell) =>
+            val cur = cell.getState
+            currentBuilder += (coord -> cur)
+
+            val phase = trackers(coord).observe(simTime, cur)
+            val regime = Readout.regime(cur, readoutParam)
+            readoutBuilder += (coord -> CellReadout(cur, regime, phase, cell.baselineCalming))
+
+            val spikingNow = Math.abs(cur.dissonance) >= readoutParam.spikeLevel
+            if spikingNow && !inSpike.contains(coord) then
+              inSpike += coord
+              actionSink(ActionMsgPool.CellSpikeTriggered(coord, cur, regime))
+            else if !spikingNow && inSpike.contains(coord) then
+              inSpike -= coord
+
+            prevRegimes.get(coord).foreach { oldRegime =>
+              if oldRegime != regime then
+                prevRegimes = prevRegimes.updated(coord, regime)
+                actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, regime, phase))
+            }
+          }
+
+          snapshotSink(currentBuilder.result())
+          readoutSink(readoutBuilder.result())
           Behaviors.same
         case other =>
           // Channel events apply to a single cell; events addressed outside
@@ -73,4 +109,5 @@ object MandateAgent:
           Behaviors.same
       }
     }
+
 

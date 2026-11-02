@@ -123,3 +123,32 @@ class MandateAgentSpec:
       1e-12,
       "events addressed outside the lattice must not leak into live cells"
     )
+
+  @Test def publishesCellReadoutAndEmitsOutboundActions(): Unit =
+    val readouts =
+      new AtomicReference[Map[CellCoord, CellReadout]](Map.empty)
+    val actions = new java.util.concurrent.ConcurrentLinkedQueue[
+      moe.chestnut.awa.voy.inner.action.MandateActionProtocol
+    ]()
+    val latch = new CountDownLatch(2)
+    val agent = testKit.spawn(
+      MandateAgent(
+        singleCellGrid(mkCell(0.0)),
+        _ => (),
+        actions.add(_),
+        r => { readouts.set(r); latch.countDown() }
+      )
+    )
+
+    agent ! EventMsg.SetBaselineCalming(origin, 0.03)
+    agent ! EventMsg.StressInject(origin, 0.50)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    agent ! EventMsg.FirePulse(origin, 25.0)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+    val r = readouts.get()(origin)
+    assertEquals(0.03, r.baselineCalming, 1e-12)
+    assertEquals(Regime.Strained, r.regime)
+    assertFalse(actions.isEmpty, "regime transition from Calm to Strained should emit an outbound action")
+

@@ -107,3 +107,32 @@ class MandateReadoutSpec:
       "and yet a limit cycle exists: the stock regime and the phase domain disagree"
     )
     assertTrue(tr.reading(t, cur).isInstanceOf[PhaseReading.Cycle])
+
+  @Test def `c0 shelter maintenance and 20-division dial tick semantics`(): Unit =
+    val calmUnmaintained = CellReadout(
+      MandateCurrent(-1.2, -0.6, 0.05, 0.0),
+      Regime.Calm,
+      PhaseReading.Basin(PhaseLabel.Resting),
+      baselineCalming = 0.0
+    )
+    assertFalse(calmUnmaintained.isMaintained, "no c0 baseline -> stagnant")
+
+    val calmMaintained = calmUnmaintained.copy(baselineCalming = 0.03)
+    assertTrue(calmMaintained.isMaintained, "intact c0 in calm state -> sheltered")
+
+    val spikingMaintained = calmMaintained.copy(
+      current = MandateCurrent(1.9, 0.2, 0.6, 0.5),
+      regime = Regime.Oscillating,
+      phase = PhaseReading.Cycle(PhaseLabel.Excitation, 0.05)
+    )
+    assertFalse(spikingMaintained.isMaintained, "spike excursion temporarily suspends c0 shelter")
+
+    val refractoryCycle = calmMaintained.copy(
+      current = MandateCurrent(0.5, 0.8, 0.6, 0.5),
+      regime = Regime.Oscillating,
+      phase = PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory, 0.25)
+    )
+    assertTrue(refractoryCycle.isMaintained, "between spikes, c0 shelter holds")
+    assertEquals(Some(5), refractoryCycle.dialTick, "0.25 of 20 divisions is tick 5")
+    assertEquals(None, calmMaintained.dialTick, "resting basin has no cycle dial tick")
+

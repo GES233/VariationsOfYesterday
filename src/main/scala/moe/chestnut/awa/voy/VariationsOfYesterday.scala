@@ -16,6 +16,8 @@ object VariationsOfYesterday extends ModInitializer:
     ServerLifecycleEvents.SERVER_STARTING.register(_ => MandateRuntime.start())
     ServerLifecycleEvents.SERVER_STOPPED.register(_ => MandateRuntime.stop())
     ServerTickEvents.END_SERVER_TICK.register(MandateRuntime.onTick(_))
+    MandateOverworld.register()
+
 
   override def onInitialize(): Unit =
     logger.info("Initializing Variations of Yesterday...")
