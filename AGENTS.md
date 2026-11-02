@@ -68,7 +68,7 @@ Loom 配置了 **splitEnvironmentSourceSets**（`main` / `client` 分离），�
 
 ## 测试
 
-- 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor testkit，测试代码放在 `src/test/scala`。
+- 测试框架：JUnit Platform（`useJUnitPlatform()`，JUnit Jupiter 依赖已声明）+ Pekko typed actor TestKit，测试代码放在 `src/test/scala`。
 - 已有测试：`MandateStateSpec`、`PhaseModulationSpec`、`MandateGridSpec`、`PrototypeHotspotSpec`、`MandateAgentSpec`，以及 `MandateReadoutSpec`、`PhaseResponseSpec`、`SliceReplaySpec`、`SliceContractSpec`、`GridBenchmarkSpec`。核心模拟逻辑不依赖 Minecraft；契约测试同时锁定逐 tick 实测推迟刻度，五跳卷宗只能从中选择安全操作。
 - Elixir 世界模型原型：在 `tools/voy_world/` 运行 `mix test`、`mix voy.content lint`、`mix run examples/sandbox.exs`；`test/fixtures/world_cases.json` 保存历史语义与种子物证 golden cases。
 - **内容包（作者层）**：`tools/voy_world/content/documents/**/*.md` 是唯一叙事散文来源（五张主链卡 + 两张干扰卡；写法见其 `README.md`）。`Voy.World.Content` 负责唯一选择与校验，`Witness` 负责种子物化；旧 `claims.tsv`、四份全知档案与 `Causality` 已退役。`mix voy.content` 提供 `lint`、`preview [--seed N]` 与 `template <hop1..5|decoy>`；作者不改 `lib/`。
