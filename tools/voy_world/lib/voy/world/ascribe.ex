@@ -83,7 +83,7 @@ defmodule Voy.World.Ascribe do
   end
 
   @doc """
-  Bureaucratic taboo relation (`neq` / `=/=` firewall, design note 02 §2.2):
+  Bureaucratic taboo relation (`neq` / `=/=` firewall, design note 02 §1):
   `:official_hq` is forbidden from unifying `cause_tag` with mechanical or
   ritual causes, forcing unification onto `:seasonal_rain_mudslide`.
   """

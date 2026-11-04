@@ -29,6 +29,7 @@ mix run examples/contracts_demo.exs
 
 ```sh
 mix run examples/export_topography_cases.exs
+python examples/render_landform_diagrams.py
 python examples/render_topography_atlas.py
 python examples/render_feature_glossary.py
 ```

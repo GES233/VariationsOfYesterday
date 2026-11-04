@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 
 /** The raw event stream and the two facts the slice needs from it (§1.2,
-  * §2.1): replay determinism, and the *condition* under which a phase
+  * §1.3, §1.4): replay determinism, and the *condition* under which a phase
   * composition along the advection chain is legitimate.
   */
 class SliceReplaySpec:

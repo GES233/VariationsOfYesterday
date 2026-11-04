@@ -17,7 +17,7 @@ defmodule Voy.World.TextsTest do
     assert Timeline.chinese_numeral(28) == "二十八"
   end
 
-  test "structure templates render cleanly" do
+  test "structure descriptions render cleanly" do
     assert Texts.validate() == :ok
     assert Texts.render!(:structure_assimilated, :upstream) == "302队废弃爆破钻探台（常驻脉冲源）"
     assert Texts.render!(:structure_assimilated, :pass_zheng) == "峡谷隘口·原铜钲基座改挂红绸东方红气缸体的木架 + 验山垂架"

@@ -3,7 +3,7 @@ package moe.chestnut.awa.voy.inner.mandate
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.{Test, TestInstance}
 
-/** Phase-response measurements and their failure boundaries (§1.1.4).
+/** Phase-response measurements and their failure boundaries (§1.2).
   *
   * Everything here is a *measurement* with an independent check attached:
   * step convergence, an analytic reference where one exists, and at least

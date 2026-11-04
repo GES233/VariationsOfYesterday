@@ -157,7 +157,7 @@ defmodule Voy.World.Observation do
   老寨 (OldZhai): the keeper's phenology.
 
   No numbers at all. Diurnal granularity, the four-phase sign vocabulary of
-  §1.3, and a transmission rule: a sign that does not repeat within the
+  §1.4, and a transmission rule: a sign that does not repeat within the
   season is not written down, but the *order* of what did repeat is. The
   keeper cannot date anything, and cannot tell a premature surge from a
   delayed one -- but he can tell whether the mountain answered before or

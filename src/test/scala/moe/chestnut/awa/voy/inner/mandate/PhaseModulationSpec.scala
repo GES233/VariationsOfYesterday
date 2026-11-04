@@ -3,7 +3,7 @@ package moe.chestnut.awa.voy.inner.mandate
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-/** Phase-modulation regression gate (design draft section 1.1.4).
+/** Phase-modulation regression gate (design draft §1.2).
   *
   * Impulses on the fast variable (ritual bells, modulator devices) are
   * phase-sensitive: inside the vulnerable window (~40-60% of the inter-surge

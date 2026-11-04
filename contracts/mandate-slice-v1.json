@@ -6,7 +6,7 @@
       "src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateState.scala",
       "src/main/scala/moe/chestnut/awa/voy/helpers/ODESolver.scala"
     ],
-    "numeric_source_digest": "3393cfe3e1f0dd961764f0349a4d4a447bd5245b56e15610210c6bc84942c59c",
+    "numeric_source_digest": "386dbd724b945e29a1cf93ddc3ef148154fada2e5a436478834eabc6e4131f9e",
     "state0": {
       "dissonance": -1.2,
       "entrench": -0.6,
@@ -999,25 +999,25 @@
     "claims": [
       {
         "id": "hopf.a_c",
-        "draft": "a_c = 0.467, s_c = 0.233 (§1.1.1)",
+        "draft": "a_c = 0.467, s_c = 0.233 (§1.1)",
         "measured": "0.434975 / 0.265025 from the exact trace condition",
         "verdict": "refuted"
       },
       {
         "id": "prc.vulnerable_window_fires",
-        "draft": "a pulse landing at 40-60% of the cycle fires a premature full surge (§1.1.4)",
+        "draft": "a pulse landing at 40-60% of the cycle fires a premature full surge (§1.2)",
         "measured": "measured outcome for alpha_shock at the relative window midpoint: Delayed",
         "verdict": "refuted"
       },
       {
         "id": "prc.absolute_window_delays",
-        "draft": "a pulse landing at 20-30% of the cycle delays the next surge (§1.1.4)",
+        "draft": "a pulse landing at 20-30% of the cycle delays the next surge (§1.2)",
         "measured": "measured outcome for alpha_shock at the absolute window midpoint: Delayed",
         "verdict": "supported"
       },
       {
         "id": "prc.window_structure_exists",
-        "draft": "the phase response has a fire window somewhere in the cycle (§1.1.4)",
+        "draft": "the phase response has a fire window somewhere in the cycle (§1.2)",
         "measured": "a premature window exists for at least one declared pulse",
         "verdict": "supported"
       },

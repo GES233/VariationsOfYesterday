@@ -1,6 +1,6 @@
 package moe.chestnut.awa.voy.inner.mandate
 
-/** Semantic readout of the continuous state (design draft §1.3).
+/** Semantic readout of the continuous state (design draft §1.4).
   *
   * This is the *only* place where continuous `(v, w, s, q)` becomes the
   * discrete vocabulary the relational layer is allowed to name. It exists
@@ -20,7 +20,7 @@ package moe.chestnut.awa.voy.inner.mandate
 enum Regime:
   case Calm, Strained, Oscillating, Burnout
 
-/** The four-phase vocabulary of the action-potential analogy (§1.3). */
+/** The four-phase vocabulary of the action-potential analogy (§1.4). */
 enum PhaseLabel:
   case Resting, Excitation, AbsoluteRefractory, RelativeRefractory
 
@@ -95,7 +95,7 @@ object Readout:
     * With the frozen parameters this is `a = -0.4666...`, i.e. `s = 1.1666`
     * — *outside* `stressMax = 1.0`. The clamp therefore guarantees the
     * slice cannot reach burnout through the ordinary channels, which is
-    * exactly what §1.1.2.5 claims.
+    * exactly what §1.2 claims.
     */
   def burnoutA(fast: MandateParam): Double =
     fast.beta * (1.0 - 1.0 / 3.0) - 1.0
@@ -134,12 +134,12 @@ object Readout:
     else if fraction <= p.fireWindowHi then PhaseLabel.RelativeRefractory
     else PhaseLabel.Resting
 
-  /** Whether a cell's maintenance source (`c0`, design draft §7.8) is
+  /** Whether a cell's maintenance source (`c0`, design draft §3.2) is
     * currently sheltering the cell from Overworld stagnation (`沉滞`).
     *
     * Shelter requires an active `c0` baseline (`baselineCalming >= minC0`)
     * AND that the cell is neither burnt out nor in the middle of a spike
-    * excursion (`|v| >= spikeLevel`, the periodic failure window of §7.8).
+    * excursion (`|v| >= spikeLevel`, the periodic failure window of §3.2).
     */
   def isMaintained(
       readout: CellReadout,

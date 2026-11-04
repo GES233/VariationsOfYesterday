@@ -518,7 +518,7 @@ defmodule Voy.World.PathwayTest do
     end
   end
 
-  # ==== canon static checker (design note 05 section 5.1) ==== //
+  # ==== canon static checker (design note 05 §3) ==== //
 
   test "Canon.check_pathways accepts every declared pair and seed" do
     assert Canon.check_pathways() == :ok
@@ -526,7 +526,7 @@ defmodule Voy.World.PathwayTest do
     assert Canon.check_pathways([]) == :ok
   end
 
-  # ==== seeded node dossier (design note 05 section 5.1) ==== //
+  # ==== seeded node dossier (design note 05 §1) ==== //
 
   test "normalize_spec treats the seed as optional and rejects non-integers" do
     assert {:ok, spec} = Voy.World.Node.normalize_spec(@ascended_spec)

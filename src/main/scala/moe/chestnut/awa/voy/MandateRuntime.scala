@@ -34,7 +34,7 @@ object MandateRuntime:
 
   /** Fixed simulation step per game tick: 20 tps x 0.05 = 1 time unit per
     * game second. Provisional mapping pending calibration against the
-    * "first catastrophe at 3-5 play hours" target (§1.1.3, §7 item 5).
+    * "first catastrophe at 3-5 play hours" target (§7 pending item 3).
     */
   private val TickDt = 0.05
 

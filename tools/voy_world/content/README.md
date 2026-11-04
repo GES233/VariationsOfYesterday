@@ -4,7 +4,7 @@
 
 ## 目录与卡片头部规则
 
-| 路径 | 角色與跳数 | 必填头部字段（`---` 包围） |
+| 路径 | 角色与跳数 | 必填头部字段（`---` 包围） |
 | :--- | :--- | :--- |
 | `main/hop1/*.md` | 旧志先例（Hop 1） | `hop: 1`, `role: main`, `relic`, `title` |
 | `main/hop2/*.md` | 收缴/代管单（Hop 2） | `hop: 2`, `role: main`, `relic`, `c0_status`, `title` |

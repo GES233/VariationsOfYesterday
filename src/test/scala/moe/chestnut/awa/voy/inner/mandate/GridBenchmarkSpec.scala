@@ -15,7 +15,7 @@ import scala.collection.mutable.ArrayBuffer
   *
   * Scenario under discussion: 20 nodes x 5-7 settlements per node, each
   * settlement up to a 100x100 cell grid (~1.2M cells total — 120x the
-  * 10k-cell worldwide target of design draft section 1.2). Measures
+  * ~10k-cell full-world lattice budget). Measures
   * per-tick integration cost plus the actor's per-tick immutable snapshot
   * publication against the 50 ms tick budget. Results are printed and
   * appended to build/voy-benchmark.txt.
@@ -68,7 +68,7 @@ class GridBenchmarkSpec:
     assumeTrue(sys.env.contains("VOY_BENCH"), "opt-in benchmark: set VOY_BENCH=1 to run")
 
     val scenarios = Seq(
-      // ~12k cells: around the worldwide 10k-cell design target (§1.2)
+      // ~12k cells: around the ~10k-cell full-world lattice budget
       ("design-target 20x6x(10x10)", mkWorld(20, 6, 10), 200),
       // ~100k cells: ten times the design target
       ("10x-over       20x6x(29x29)", mkWorld(20, 6, 29), 50),

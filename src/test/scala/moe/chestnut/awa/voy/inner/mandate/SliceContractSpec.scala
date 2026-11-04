@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.{Test, TestInstance}
 
 /** The cross-stack contract: what it claims, and what it must refuse to
-  * claim (§1.1, §1.1.4, §2.1).
+  * claim (§1.1, §1.2, §1.3).
   *
   * Three things are checked here and nothing else:
   *

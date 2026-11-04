@@ -3,7 +3,7 @@ import os
 import sys
 from PIL import Image, ImageDraw, ImageFont
 
-OUT_DIR = "./assets"
+OUT_DIR = "./tools/icon_misc/assets"
 
 
 def fmt(val):

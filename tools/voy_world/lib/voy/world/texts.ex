@@ -82,7 +82,7 @@ defmodule Voy.World.Texts do
     end
   end
 
-  @doc "Check that every structure template field is non-empty and free of unresolved placeholders."
+  @doc "Check that every structure description is non-empty and free of unresolved placeholders."
   @spec validate() :: :ok | {:error, [term()]}
   def validate do
     issues =

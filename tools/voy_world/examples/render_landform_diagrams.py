@@ -171,7 +171,7 @@ def landform_figure():
     arrow(ax, (63, 32.5), (66.5, 32.5))
     box(
         ax, 67, 25.5, 29, 14,
-        "第三纪结果\n\nFate_Assimilated_NewZhai\nfinal_regime = Oscillating\n\n随后 Projection 才派生：\n遗迹位置、方志、官方通报、技术员批注",
+        "第三纪结果\n\nFate_Assimilated_NewZhai\nfinal_regime = Oscillating\n\n随后 Projection 才派生：\n遗迹位置与三处结构描述",
         fc=PURPLE, fontsize=9.4,
     )
     ax.text(
@@ -181,7 +181,7 @@ def landform_figure():
     )
     ax.text(
         4, 17.3,
-        "地貌 → 历史的代码：chronicle.ex:8 / 44 / 87 / 181；地貌字段：schema.ex:17；遗迹与档案：projection.ex:6 / 107",
+        "地貌 → 历史的代码：chronicle.ex；地貌字段：schema.ex；遗迹结构：projection.ex",
         fontsize=9.7, color=MUTED, va="top",
     )
     box(
@@ -264,7 +264,7 @@ def fate_matrix_figure():
     )
     ax.text(
         2, 2.2,
-        "总计 48：24 个完整解 + 24 个 unsupported_topography（源头地质未被扰动表配对）；unresolved_history 现为 0。反向查询返回候选集，不保证只有唯一地貌。",
+        "总计 48：24 个完整解 + 24 个 unsupported_topography（源头地质未被扰动表配对）。反向查询返回候选集，不保证只有唯一地貌。",
         fontsize=10.7, color=MUTED,
     )
     save(fig, "02_fate_to_landform_matrix.png")

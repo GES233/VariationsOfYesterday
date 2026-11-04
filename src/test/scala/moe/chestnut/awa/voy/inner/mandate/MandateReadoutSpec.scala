@@ -3,7 +3,7 @@ package moe.chestnut.awa.voy.inner.mandate
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-/** Defined-domain behaviour of the readout (design draft §1.3 + §1.1.4).
+/** Defined-domain behaviour of the readout (design draft §1.4 + §1.2).
   *
   * The claim under test: a cycle phase exists only where a limit cycle
   * exists, and every other state gets an explicit non-phase answer. The
@@ -90,7 +90,7 @@ class MandateReadoutSpec:
     )
 
     // Push the coupling up to make the narrative burnout channel real
-    // (§1.1.2.5) and check the readout refuses a phase there.
+    // (§1.2) and check the readout refuses a phase there.
     val st = cell(1.0, coupling = 2.0)
     val (t, cur, tr) = settle(st, 600.0, coupling = 2.0)
     assertEquals(PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle), tr.reading(t, cur))

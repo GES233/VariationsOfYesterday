@@ -14,7 +14,7 @@ import moe.chestnut.awa.voy.inner.mandate.CellCoord
   *    one or MORE channel events; that 1:N mapping lives on the Minecraft
   *    side, so the simulation core stays free of game vocabulary.
   *  - DTOs are pure data (no Minecraft types) so the event stream can be
-  *    logged and replayed for determinism checks (§1.4 loading invariance).
+  *    logged and replayed for determinism checks (§1.4).
   *  - Events carry no timestamp: causality is their position relative to
   *    `TickArrived` events in the mailbox's total order.
   *  - Events carry no dimension id: engines are per-dimension and routing

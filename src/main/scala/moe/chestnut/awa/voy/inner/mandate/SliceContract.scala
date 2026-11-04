@@ -6,7 +6,7 @@ import java.security.MessageDigest
 /** The cycle windows the relational layer is allowed to name.
   *
   * `absolute` and `relative` are the two `Voy.World.Profile` already
-  * declares; `late` is the recovery tail §1.3 and §1.1.4 both describe
+  * declares; `late` is the recovery tail §1.2 and §1.4 both describe
   * ("恢复晚期 ≳65%") but the stock never named. Bounds are the *declared*
   * ones; the measured behaviour at each window's midpoint lives next to
   * them in the contract oracle, and the two are compared rather than
@@ -94,25 +94,25 @@ object SliceContract:
       Seq(
         Claim(
           "hopf.a_c",
-          "a_c = 0.467, s_c = 0.233 (§1.1.1)",
+          "a_c = 0.467, s_c = 0.233 (§1.1)",
           f"$hopfA%.6f / $hopfS%.6f from the exact trace condition",
           if Math.abs(hopfA - 0.467) < 0.005 then "supported" else "refuted"
         ),
         Claim(
           "prc.vulnerable_window_fires",
-          "a pulse landing at 40-60% of the cycle fires a premature full surge (§1.1.4)",
+          "a pulse landing at 40-60% of the cycle fires a premature full surge (§1.2)",
           s"measured outcome for alpha_shock at the relative window midpoint: ${outcomeAt(PhaseWindow.Relative)}",
           if outcomeAt(PhaseWindow.Relative) == "Premature" then "supported" else "refuted"
         ),
         Claim(
           "prc.absolute_window_delays",
-          "a pulse landing at 20-30% of the cycle delays the next surge (§1.1.4)",
+          "a pulse landing at 20-30% of the cycle delays the next surge (§1.2)",
           s"measured outcome for alpha_shock at the absolute window midpoint: ${outcomeAt(PhaseWindow.Absolute)}",
           if outcomeAt(PhaseWindow.Absolute) == "Delayed" then "supported" else "refuted"
         ),
         Claim(
           "prc.window_structure_exists",
-          "the phase response has a fire window somewhere in the cycle (§1.1.4)",
+          "the phase response has a fire window somewhere in the cycle (§1.2)",
           if anyPremature then "a premature window exists for at least one declared pulse"
           else "no declared pulse fires anywhere; the response is monotone in phase",
           if anyPremature then "supported" else "refuted"
@@ -127,7 +127,7 @@ object SliceContract:
       )
 
   /** The two c0 states of the slice: the settlement either kept its
-    * baseline calming or lost it (§1.1.3, §7.8).
+    * baseline calming or lost it (§1.2, §3.2).
     */
   val c0Collapsed: Double = 0.0
   val c0Intact: Double = 0.03

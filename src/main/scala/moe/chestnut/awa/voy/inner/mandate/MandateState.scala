@@ -88,7 +88,7 @@ class MandateState(
 
   /** Alpha-synapse kernel on the fast variable (synaptic-pulse channel for
     * discrete game events: one event = one (area, tau) pulse, see design
-    * draft section 1.1.4). Dual-exponential cascade dz/dt = -z/tau,
+    * draft §1.2). Dual-exponential cascade dz/dt = -z/tau,
     * dp/dt = (z - p)/tau driven by delta firings; integrated in closed
     * form between steps, so it stays outside the RK4 state vector.
     * `firePulse` takes the kernel AREA; the peak lands at t = tau with

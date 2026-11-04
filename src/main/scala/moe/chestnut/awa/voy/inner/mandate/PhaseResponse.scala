@@ -2,7 +2,7 @@ package moe.chestnut.awa.voy.inner.mandate
 
 import scala.collection.mutable.ArrayBuffer
 
-/** One game event as the channel pulse it becomes (§1.1.4).
+/** One game event as the channel pulse it becomes (§1.2).
   *
   * `area` is the α-kernel area the `FirePulse` channel already takes, `tau`
   * the kernel time constant. `taps`/`gap` cover events that are a *ritual
@@ -54,7 +54,7 @@ enum PulseOutcome:
   case Absorbed
 
   /** The excursion left the normal amplitude band (the negative
-    * "suppression" channel, §1.1.4 honest boundary). */
+    * "suppression" channel, §1.2 honest boundary). */
   case Disrupted
 
   /** No genuine excursion inside the observation window. */

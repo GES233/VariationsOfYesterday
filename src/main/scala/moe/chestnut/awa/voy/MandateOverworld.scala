@@ -22,7 +22,7 @@ import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.mandate.*
 
 /** Minimal Overworld reference wiring for the Mandate Engine (design draft
-  * §1.3, §7.8, §8):
+  * §1.1, §1.4, §3.2):
   *
   *  - **World -> Mandate (1:N channel mapping)**:
   *    - Breaking stone / ore blocks injects land stress (`StressInject`)
@@ -42,7 +42,7 @@ import moe.chestnut.awa.voy.inner.mandate.*
   *      audible tremors and ash plumes on the server thread.
   */
 object MandateOverworld:
-  /** Standard c0 level provided by an intact village bell (§1.1.3, SliceContract.c0Intact). */
+  /** Standard c0 level provided by an intact village bell (§1.2, SliceContract.c0Intact). */
   val BellBaselineCalming: Double = 0.03
 
   /** Standard pulse area delivered when ringing a bell (matches SliceContract alpha_shock/resonance scale). */
@@ -100,7 +100,7 @@ object MandateOverworld:
           if dose > 0.0 && MandateRuntime.isLiveChunk(chunkX, chunkZ) then
             MandateRuntime.injectStressAt(chunkX, chunkZ, dose)
             val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-            // Immediate sub-threshold feedback (design draft §1.1.3 & §8.8)
+            // Immediate sub-threshold feedback (design draft §1.2, dual-channel feedback)
             if dose >= 0.04 || readout.regime != Regime.Calm then
               serverWorld.spawnParticles(
                 ParticleTypes.ASH,
@@ -207,7 +207,7 @@ object MandateOverworld:
           0.01
         )
 
-      // Apply Stagnation to nearby vanilla villagers (§7.8)
+      // Apply Stagnation to nearby vanilla villagers (§3.2)
       val box = new Box(
         player.getX - 24.0,
         player.getY - 12.0,
@@ -240,7 +240,7 @@ object MandateOverworld:
         )
       }
     else if readout.regime == Regime.Strained || readout.regime == Regime.Oscillating then
-      // Precursor signal while c0 still holds (§7.8 flickering dashboard)
+      // Precursor signal while c0 still holds (§1.2 critical slowing-down)
       world.spawnParticles(
         ParticleTypes.MYCELIUM,
         player.getX,

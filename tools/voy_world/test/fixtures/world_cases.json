@@ -30,9 +30,7 @@
         "fate": "Fate_Assimilated_NewZhai",
         "regime": "Oscillating",
         "relic": "ancestral_bronze_zheng",
-        "disturbance": "periodic_shallow_blasting",
-        "official_cause": "seasonal_rain_mudslide",
-        "true_cause": "c0_removed_and_vulnerable_window_blasting"
+        "disturbance": "periodic_shallow_blasting"
       }
     },
     {
@@ -51,9 +49,7 @@
         "fate": "Fate_Annihilated_BurnoutZone",
         "regime": "Burnout",
         "relic": "carved_diversion_stele",
-        "disturbance": "overwhelming_reverse_suppression",
-        "official_cause": "planned_relocation_and_mine_closure",
-        "true_cause": "overwhelming_suppression_attractor_burnout"
+        "disturbance": "overwhelming_reverse_suppression"
       }
     },
     {
@@ -72,9 +68,7 @@
         "fate": "Fate_Ancestral_ControlGroup",
         "regime": "Calm",
         "relic": "ancestral_bronze_zheng",
-        "disturbance": "low_level_logging_shock",
-        "official_cause": "backward_folk_custom_pending_reform",
-        "true_cause": "intact_c0_basin_absorption"
+        "disturbance": "low_level_logging_shock"
       }
     }
   ],
