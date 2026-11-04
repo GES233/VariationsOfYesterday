@@ -1,27 +1,27 @@
-# Variations of Yesterday
+# Variations of Yesterday（旧日变奏曲）
 
 [中文说明](README-zh.md)
 
-**Variations of Yesterday** is a Minecraft 1.21.2 (Fabric / Scala 3) mod about a living mountain landscape driven by an excitable dynamical system (**Mandate Engine**) and fragmented 1980s hydrological-engineering / folk-ritual records.
+> _They said the mountain would hold as long as the machines kept running._
+>
+> _They were wrong._
+> _The bronze zheng was taken down from the village the day before yesterday. Before sunset, the smell of dead ash was already seeping up out of the ground._
+>
+> _I don't know what to do next._
 
-## Core Architecture
+> _The echo off the rock is wrong when the pick bites in. And █████ is ringing again._
+>
+> _If you can read this, **DO NOT RING THE BELL BEFORE THE PHASES ALIGN. DO NOT TRUST █████ ON ████. Follow the ditch uphill and block the █████ weir.**_
 
-- **Mandate Engine (`src/main/scala/.../inner/mandate/`)**: Coupled FitzHugh–Nagumo fast subsystem and slow land-stress dynamics with hysteresis, spatial advection-diffusion on a lattice (`MandateGrid`), Pekko typed actor tick-event scheduling (`MandateAgent`), and semantic phase/regime readout (`MandateReadout`).
-- **Overworld Bridge (`MandateRuntime`, `MandateOverworld`)**: Translates player actions (mining, blasting, ringing village bells, diegetic clock/compass inspection) into channel events and applies Overworld stagnation (`沉滞`) when baseline calming (`c0`) collapses.
-- **Relational World Model (`tools/voy_world/`)**: Zero-dependency Elixir + microKanren engine (`Voy.Kanren`) that compiles topography into 4-era histories and 6 fates (`Chronicle`), synthesizes 5-hop local-evidence dossiers with seeded credentials (`Pathway`, `Witness`, `Content`), and performs multi-lens abductive reasoning (`Observation`, `Ascribe`, `Facts`).
+_The ash of stagnation is spreading. The river downstream has already gone murky._
 
-## Quick Start
+_Go and see for yourself. Follow the water upstream, and find out what really happened to the old days of this valley._
 
-```sh
-# JVM / Mod tests & client
-./gradlew test
-./gradlew runClient
+---
 
-# Relational world model & authoring linter
-cd tools/voy_world
-mix test
-mix voy.content lint
-```
+**In development · 0.1 · single-player** ｜ Minecraft 1.21.2 (Fabric / Scala 3)
+
+Design notes live in [`docs/`](docs/) (in Chinese). Build & test: `./gradlew test`, `cd tools/voy_world && mix test`.
 
 ## License
 
