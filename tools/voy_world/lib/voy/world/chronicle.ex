@@ -165,15 +165,6 @@ defmodule Voy.World.Chronicle do
     end
   end
 
-  def history_through_era2bo(topo, history) do
-    fresh [era1, era2a, era2b] do
-      era1_headmano(topo, era1)
-      era2a_magistrateo(topo, era1, era2a)
-      era2b_reclamationo(topo, era1, era2a, era2b)
-      eq(history, era1: era1, era2a: era2a, era2b: era2b)
-    end
-  end
-
   def era3_catastropheo(_topo, _era1, _era2a, era2b, era3) do
     fresh [
       org,

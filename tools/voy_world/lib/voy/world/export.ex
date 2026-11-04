@@ -1,20 +1,7 @@
 defmodule Voy.World.Export do
   @moduledoc """
-  The stable wire format between this prototype and the JVM port.
-
-  A bundle is everything the game side needs for one or more nodes and
-  nothing else: the schema version, the rule set, the numeric stock that
-  produced it (`Voy.World.Profile`), and normalized node records. The
-  payload is deliberately *not* whatever the relation happens to return:
-  keys are fixed here, structures become `site`/`description` maps, and
-  tagged tuples become `tag`/`value` maps, so a Scala reader can be
-  written once.
-
-  Determinism: no timestamps and no wall clock are stamped in, so the
-  same inputs produce byte-identical JSON and the golden cases stay
-  usable. `validate/1` also refuses any payload that would not survive a
-  JSON round-trip, which keeps accidental atoms and tuples out of the
-  contract.
+  Deterministic JSON wire format (`schema_version = 2`) between the relational
+  prototype and the JVM port.
   """
 
   use Voy.Kanren
@@ -103,7 +90,7 @@ defmodule Voy.World.Export do
 
       case slices do
         [] ->
-          {:error, classify_branch(topo)}
+          {:error, :unsupported_topography}
 
         slices ->
           slices |> Enum.map(&branch_record(topo, &1, opts, seed)) |> build_bundle(profile)
@@ -231,13 +218,6 @@ defmodule Voy.World.Export do
   rescue
     error in [KeyError, ArgumentError] ->
       {:error, {:invalid_topography, Exception.message(error)}}
-  end
-
-  defp classify_branch(topo) do
-    era2b? =
-      run(1, fn query -> Chronicle.history_through_era2bo(topo, query) end) != []
-
-    if era2b?, do: :unresolved_history, else: :unsupported_topography
   end
 
   # ==== record normalization ==== //

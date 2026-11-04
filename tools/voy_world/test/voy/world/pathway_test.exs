@@ -545,10 +545,6 @@ defmodule Voy.World.PathwayTest do
     assert {:ok, [seeded]} =
              Voy.World.compile_node(Keyword.put(@ascended_spec, :seed, 303), @ascended_features)
 
-    assert {:ok, [delegated]} =
-             Voy.World.compile_node_dossier(@ascended_spec, @ascended_features, 303)
-
-    assert delegated == seeded
     refute Map.has_key?(seeded, "archives")
 
     dossier = seeded["dossier"]
@@ -559,9 +555,6 @@ defmodule Voy.World.PathwayTest do
     assert length(Enum.filter(dossier["documents"], &(&1["role"] == "main"))) == 5
     assert length(Enum.filter(dossier["documents"], &(&1["role"] == "decoy"))) == 2
     assert dossier["binding"]["safe_tick"] in Witness.safe_ticks()
-
-    assert {:error, {:invalid_seed, "303"}} =
-             Voy.World.compile_node_dossier(@ascended_spec, @ascended_features, "303")
   end
 
   # ==== content preview micro-chain section ==== //

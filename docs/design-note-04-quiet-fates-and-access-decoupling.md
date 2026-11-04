@@ -1,82 +1,32 @@
-# 设计札记 04 — 可达性解耦与两种「未爆发的结局」
+# 设计札记 04 — 可达性解耦与六种历史结局
 
-> 状态：**已落地**（2026-10-27）。配套实现见 `tools/voy_world/`：`Chronicle.era2a_magistrateo`（改为按可达性分叉）、`Chronicle.era2b_reclamationo`（可达性 ⟂ 下游地形）、`Chronicle.era3_catastropheo`（+2 分支）、`Voy.World.Content` 的 `gazetteer_case` 锚定、`Canon.check_archives/1`。
-> 定位：把 48 种地形组合里「未决」的 16 格补成可生成世界，并让「手簿引用的先例 = 残卷记载的先例」从作者的自觉变成编译约束。
+> 状态：**现行规范**。实现见 `tools/voy_world/lib/voy/world/chronicle.ex`。
 
----
+## 1. 地形组合空间（24 / 48 可生成）
 
-## 0. 起因
+支沟地形由 5 个离散特征描述：$2 \text{ 上游地形} \times 2 \text{ 隘口} \times 2 \text{ 下游地形} \times 3 \text{ 源头地质} \times 2 \text{ 可达性} = 48$ 种组合：
 
-设计札记 02 的五阶管线里，`era3` 只有四条手写分支（同化 / 湮灭 / 飞升 / 幸存对照），其余组合返回 `:unsupported_topography` 或 `:unresolved_history`。48 种地形组合的实测分布是：
+- **24 种可生成世界**：源头地形与源头地质落在三条合法物理配对内（`steep_fissure + active_fault`、`karst_sinkhole + deep_stress_cavity`、`steep_fissure + minor_fracture`），每个配对跨越 2 种隘口 × 2 种可达性 × 2 种下游地形，全部编译出唯一历史切片。
+- **24 种不支持地形（`:unsupported_topography`）**：地质与源头地形未配对的 3 组组合，留待后续扩展独立扰动通道。
 
-| 数量 | 原因 |
-| :--- | :--- |
-| 24 | `(up_terrain, up_geology)` 不在扰动表的三个配对里 |
-| 12 | `accessibility` 与 `down_terrain` 被强制耦合 |
-| 4 | `era3` 缺两个 `(c0, pulse)` 象限 |
-| 8 | 已支持 |
+## 2. 可达性解耦：道路决定 $c_0$ 存亡
 
-12 + 4 这 16 格不是「设定还没写」，而是「规则把合法组合排除了」。本札记处理的就是这 16 格。
+古器（铜钲/分水石堰）是否被收缴拆毁，取决于**外部行政力量能否通车进入**（`accessibility`），而非下游聚落是平坝还是台地：
 
-## 1. 可达性解耦：能进与拆器分家
+- `tractor_road_accessible`（机耕道可达）：第二纪上清丈局入寨收器触发反噬，退守「外甲内寨」；第二纪下改组为国营垦殖分队，古器按废料收缴（`c0_collapsed`），山官后裔贬为仓库保管员。
+- `cliff_isolated`（绝壁隔绝）：第二纪上胥吏止步崖下立归化碑；第二纪下仅挂靠林场联营，主器留存原地未拆（`c0_intact`），山官保留祭祀权。
 
-原实现把四件事绑成一条链：
+由此，「平坝但断路」与「台地但通车」均成为合法世界，同一结局可在两种下游地形上生成。
 
-```
-down_terrain = alluvial_flat  ⟺  tractor_road_accessible  ⟺  建制化垦殖场  ⟺  c0 被拆
-down_terrain = mid_terrace    ⟺  cliff_isolated           ⟺  挂靠林场孤寨  ⟺  c0 完好
-```
+## 3. 六种历史结局（$c_0 \times \text{Pulse}$ 完整象限）
 
-于是「坝区」必然被拆、「台地」必然保全，两种地形各锁死一半结局。物理上真正决定后果的是**官能不能进得去**，地形只是它的相关物。改动：
+第三纪结局由 `(c0_status, pulse)` 的 $2 \times 3$ 笛卡尔积完整覆盖：
 
-- `era2a_magistrateo` 改按 `accessibility` 分叉：能通车 → 清丈局收器/毁堰 → 对应先例；断路 → 胥吏只立归化碑 → 立碑案。
-- `era2b_reclamationo` 改按 `accessibility` 分叉：能通车 → 建制化 + 收缴 + `c0_collapsed`；断路 → 挂靠林场 + 保全 + `c0_intact`。
-
-收益：**坝区但断路**（组织进不去，铜钲留在原地）与**台地但通车**（拖拉机道直上，被制度化拆走）成为合法世界。同一结局现在可以长在两种地形上，而内容成本为零——档案按 `(fate, relic)` 索引，本就不看地形。
-
-## 2. 两个缺失象限：未爆发与未成灾
-
-`era3` 的结局由 `(c0 状态, pulse 类型)` 决定。原有四条分支覆盖 4 个象限，剩下两个补上：
-
-| | `alpha_shock`（302 队点炮） | `Overwhelming`（高压注浆） | `heavy_kick`（林场低强度采伐） |
+| $c_0$ 状态 \ 源头脉冲 | `alpha_shock`<br>（302 队浅层点炮） | `OverwhelmingNegativeSuppression`<br>（总指挥部高压反向注浆） | `heavy_kick`<br>（林场水文哨低强度采伐） |
 | :--- | :--- | :--- | :--- |
-| `c0_collapsed` | 同化 `Oscillating` | 湮灭 `Burnout` | **慢性渗漏 `Strained`** |
-| `c0_intact` | **虚警耐受 `Calm`** | 飞升 `Strained` | 幸存对照 `Calm` |
+| **`c0_collapsed`**<br>（通车，主器收缴） | **同化新寨**<br>`Fate_Assimilated_NewZhai`<br>终态：`Oscillating`<br>政体：`brigade_elder_joint_council` | **烧毁死寂区**<br>`Fate_Annihilated_BurnoutZone`<br>终态：`Burnout`<br>政体：`depopulated_concrete_sealed_zone` | **慢性渗漏**<br>`Fate_Deferred_ChronicSeep`<br>终态：`Strained`<br>政体：`deferred_evacuation_watchpost` |
+| **`c0_intact`**<br>（绝壁，主器留存） | **虚警耐受**<br>`Fate_Tolerated_FalseAlarm`<br>终态：`Calm`<br>政体：`cliff_observation_hermitage` | **空间裂隙**<br>`Fate_Ascended_SpatialRift`<br>终态：`Strained`<br>政体：`rift_guarding_cliff_compact` | **幸存对照**<br>`Fate_Ancestral_ControlGroup`<br>终态：`Calm`<br>政体：`restored_ancestral_compact` |
 
-- **`Fate_Deferred_ChronicSeep`（慢性渗漏）**：维持源已毁，但扰动永远不足以点火。世界不振荡也不烧毁，只是一直漏——山鸣年年不断、应力缓慢累积、水位线逐年下降。这是六种世界里**唯一给玩家留时间**的一种，也是 0.1 纵切片最合适的默认开局（先学会读趋势，再去看那四个事后世界）。政体 `deferred_evacuation_watchpost`：两套账本并行，撤离方案待批。
-- **`Fate_Tolerated_FalseAlarm`（虚警耐受）**：c0 完好 + 302 队周期点炮撞在易损窗，每炮都被吸收、每次都在临界擦过。它是**对照组**：玩家在别处见过这条时间线死人，这里是同一条时间线没死人的版本。手簿可以写「虚警四十七次，一次也没成灾」——读者自己会想到，若哪天真把 c0 收走，这四十七次全都会变成真的。政体 `cliff_observation_hermitage`。
-
-## 3. 副产品：先例锚定与「印证」检查转真
-
-解耦之前，「(fate, relic) ⟹ 先例」这条定理成立纯属巧合：`c0` 由地形决定，地形又决定先例。解耦之后 `c0` 改由可达性决定，定理若靠运气就会破——某份手簿写着「对照拆钟旧案」，却被配到立碑案。
-
-因此 `official_report` / `tech_note` 增加可选字段 `gazetteer_case`：**写了就只在该先例下适用**。现有 6 份技术手簿全部钉死（4 份按古器钉在铜钲案/石堰案，2 份钉在立碑案），官方通报保持通配。于是：
-
-- 投影片 `Projection.compile_archiveso` 与装配器 `Content.archives_for` 在选择时都带上先例条件，钉错的手簿匹配不到任何历史 → 该地形直接编不出来；
-- `Canon.check_attribution_split` 里原先恒真的「手簿必须印证残卷」分支**变成真的检查**，因为 `corroborated_gazetteer` 现在取自文档声明，而不是切片自己；
-- 新增 `Canon.check_archives/1`：把「规则能配对但没有档案可用」与「地质根本不在扰动表里」两种失败分开报告——否则档案缺口会伪装成 `:unsupported_topography`。
-
-覆盖检查（`count_matches`）仍只看槽位声明的维度，不把 `gazetteer_case` 纳入笛卡尔积；否则每加一个先例都要 4×2×3 份档案，内容成本立刻失控。
-
-## 4. 结果与代价
-
-| 指标 | 改前 | 改后 |
-| :--- | :--- | :--- |
-| 可生成世界（48 种组合中） | 8 | 24 |
-| 结局种类 | 4 | 6 |
-| 幽灵分类 `:unresolved_history` | 4 格 | 0 格（代码路径保留，当前不可达） |
-| 档案卡 | 17 | 24（+7） |
-| 归因卡 | 8 | 12（+4） |
-| 结构文本（`Texts`） | 8 | 10 |
-
-`:unresolved_history` 归零是这次改动的直接后果，不是遗漏：只要六个 `(c0, pulse)` 象限都有分支，就不存在「第二纪有了、第三纪没写」的地形。该分类保留在 `Voy.World.compile_branch/1` 与 `Node.classify_failure/2` 里，供将来扩象限时继续使用。
-
-## 5. 有意不做的部分
-
-**24 格地质错配仍然不可生成**（`steep_fissure + deep_stress_cavity`、`karst_sinkhole + active_fault_vein`、`karst_sinkhole + minor_fracture`）。这三种配对在故事上有价值——溶蚀慢渗可以喂「慢性渗漏」、断层微震可以喂「虚警」、空腔塌陷可以给你一个**没有人类、连账本都写不出归因**的结局——但它们要改 `Dynamics.disturbance_pulseo` 的语义（引入无脉冲与随机时机两类通道），属于 v2。理由与 JVM 迁移相关：迁移需要一份冻结的 v1 语义面，现在这 24 格是清晰的「不生成」，而不是待填的坑。
-
-## 6. 对 JVM 迁移的影响
-
-- 本札记冻结的历史语义仍是 6 个结局、6 种政体、24 种可生成地形；后续五跳替换没有改变这一边界。
-- 玩家叙事导出已因五跳替换升级为 **schema v2**：`dossier` 取代旧 `archives`，安全刻度读取逐 tick 实测契约。若再补地理三通道，应另升语义版本，不与本次叙事迁移混写。
-- 结局到 `Profile.regime/3` 的映射没有新增分区：慢性渗漏落 `Strained`，虚警耐受落 `Calm`。Scala 已有 `MandateReadout` 与 `PhaseTracker`，四分区之外还须区分静息域、周期、瞬态与方程级无周期状态。
+其中两类「未爆发」结局补齐了叙事对照：
+- **慢性渗漏（`Fate_Deferred_ChronicSeep`）**：维持源已毁，但林场低强度扰动不足以点火；山鸣不断、累积应力逐年抬高，两套账本并行、撤离方案待批，是给玩家留出充裕观察期的开局形态。
+- **虚警耐受（`Fate_Tolerated_FalseAlarm`）**：$c_0$ 完好，302 队四十七次周期点炮全被吸收而未成灾，作为同化新寨线的平行对照组。

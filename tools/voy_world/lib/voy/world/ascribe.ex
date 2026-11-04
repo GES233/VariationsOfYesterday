@@ -1,36 +1,13 @@
 defmodule Voy.World.Ascribe do
   @moduledoc """
-  Reverse abduction over a declared hypothesis space.
+  Relational abduction (`abduceo/4`) over the 24-hypothesis space `H`
+  (`c0_state x pulse_kind x safe_phase_window`).
 
-  The player does not read an answer out of a document; they take the
-  surface records of three institutions and ask which explanations of the
-  season are still possible. This module answers that question by running
-  the *same* observation pipeline forward for every hypothesis in the
-  declared space `H` and keeping the ones whose predicted records survive
-  the recorded ones. There is no rule that maps a cause tag to an answer,
-  no per-case branch, and nothing that reads a fate, a document id or a
-  person's name.
-
-  `H` is `Voy.World.Slice.hypotheses/1`: every combination of
-  `c0_state x pulse_kind x safe_phase_window` the content can produce. The
-  space is small, discrete and *declared*; uniqueness later in this module
-  means "unique within H given E", never "the historical truth".
-
-  Four answers, four different shapes -- an empty list must never stand in
-  for more than one of them:
-
-    * `{:unique, hypothesis}` -- exactly one survivor;
-    * `{:multiple, %{candidates: [...], differing: [...]}}` -- the record is
-      complete and the model genuinely cannot separate these;
-    * `{:none, %{...}}` -- the record contains a value that every
-      hypothesis contradicts: the evidence is contradictory, not thin;
-    * `{:incomplete, %{candidates: [...], missing: [...]}}` -- the archives
-      lost a field the protocol expects, and that gap is why the answer is
-      not unique.
-
-  Identifiability is not a property of the story, it is a property of the
-  record's resolution. `identifiability/2` measures it, so a claim that "the
-  player can work it out" has a number attached.
+  Returns four distinct result shapes:
+    * `{:unique, hypothesis}`
+    * `{:multiple, %{candidates: [...], differing: [...]}}`
+    * `{:none, %{contradictions: [...], missing: [...]}}`
+    * `{:incomplete, %{candidates: [...], missing: [...]}}`
   """
 
   alias Voy.World.{Contract, Observation, Slice}

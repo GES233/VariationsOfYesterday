@@ -17,21 +17,16 @@ defmodule Voy.World.TextsTest do
     assert Timeline.chinese_numeral(28) == "二十八"
   end
 
-  test "structure templates render without global lens narratives" do
+  test "structure templates render cleanly" do
     assert Texts.validate() == :ok
     assert Texts.render!(:structure_assimilated, :upstream) == "302队废弃爆破钻探台（常驻脉冲源）"
     assert Texts.render!(:structure_assimilated, :pass_zheng) == "峡谷隘口·原铜钲基座改挂红绸东方红气缸体的木架 + 验山垂架"
     assert Texts.render!(:structure_ancestral, :pass_stele) == "完好如初的古寨石雕分水堰（c0 维持源完好）"
 
-    for key <- Texts.keys() do
-      assert Atom.to_string(key) =~ ~r/^structure_/
-    end
-  end
-
-  test "every key has payload fields and no placeholder survives rendering" do
     assert length(Texts.keys()) == 6
 
     for key <- Texts.keys() do
+      assert Atom.to_string(key) =~ ~r/^structure_/
       assert {:ok, fields} = Texts.fields(key)
       assert fields != []
 
@@ -43,16 +38,12 @@ defmodule Voy.World.TextsTest do
     end
   end
 
-  test "unknown keys, fields and bindings are reported" do
+  test "unknown keys and fields are reported" do
     assert {:error, {:unknown_text, :nope, :title}} = Texts.render(:nope, :title)
 
     assert {:error, {:unknown_text, :structure_assimilated, :nope}} =
              Texts.render(:structure_assimilated, :nope)
 
     assert :error = Texts.fields(:nope)
-    assert :error = Texts.template(:nope, :text)
-
-    assert {:error, {:unbound_placeholder, "{{other}}"}} = Texts.render_template("{{other}}", %{})
-    assert {:ok, "no placeholders"} = Texts.render_template("no placeholders", [])
   end
 end

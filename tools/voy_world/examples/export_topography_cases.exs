@@ -1,27 +1,19 @@
 # Export every topography combination the rule layer can be asked about,
 # together with the classification the compiler actually returns.
 #
-# The output is the single source of truth for the diagram renderer: nothing in
-# `render_topography_atlas.py` is allowed to hardcode a fate, a precedent or a
-# description, so a picture cannot drift away from the rules.
-#
 #     mix run examples/export_topography_cases.exs
 #
 # writes `docs/diagrams/topography_cases.json`.
 
-alias Voy.World.Schema
+alias Voy.World.{Schema, Witness}
 
-out = Path.expand("../docs/diagrams/topography_cases.json", __DIR__)
-File.mkdir_p!(Path.dirname(out))
-
-pack = Voy.World.Content.default_pack()
-
-claim_label = fn tag ->
-  case Map.fetch(pack.claims, tag) do
-    {:ok, claim} -> claim.label
-    :error -> tag
+out =
+  case System.get_env("VOY_TOPO_OUT") do
+    nil -> Path.expand("../docs/diagrams/topography_cases.json", __DIR__)
+    custom -> Path.expand(custom)
   end
-end
+
+File.mkdir_p!(Path.dirname(out))
 
 base = [branch_id: :atlas, up_name: "上游", pass_name: "隘口", down_name: "聚落"]
 
@@ -44,8 +36,10 @@ combinations =
 features = Schema.feature_keys()
 
 row = fn topo ->
-  {:ok, public} = Voy.World.compile_branch(topo)
-  [slice] = public
+  {:ok, [slice]} = Voy.World.compile_branch(topo)
+  relic = String.to_existing_atom(slice["era1"]["guardian_relic"])
+  fate = String.to_existing_atom(slice["era3"]["fate"])
+  dossier = Witness.render_dossier(101, :atlas, relic, fate, %{up: "上游", pass: "隘口", down: "聚落"})
 
   %{
     "features" =>
@@ -64,18 +58,12 @@ row = fn topo ->
     "disturbance" => slice["era2b"]["disturbance_mode"],
     "stationed_team" => slice["era2b"]["stationed_team"],
     "structures" => slice["structures"],
-    "archives" => %{
-      "gazetteer_title" => slice["archives"]["gazetteer"]["title"],
-      "official_claim" => slice["archives"]["official_report"]["claimed_cause"],
-      "official_label" =>
-        claim_label.("claim." <> slice["archives"]["official_report"]["claimed_cause"]),
-      "official_summary" => slice["archives"]["official_report"]["summary"],
-      "tech_claim" => slice["archives"]["tech_note"]["true_cause"],
-      "tech_label" => claim_label.("claim." <> slice["archives"]["tech_note"]["true_cause"]),
-      "tech_corroborated" => slice["archives"]["tech_note"]["corroborated_gazetteer"],
-      "tech_note" => slice["archives"]["tech_note"]["note"],
-      "council_title" => slice["archives"]["council_document"]["title"],
-      "governance" => slice["archives"]["council_document"]["governance"]
+    "dossier" => %{
+      "batch_id" => dossier.binding.batch_id,
+      "vessel_name" => dossier.binding.vessel_name,
+      "vessel_code" => dossier.binding.vessel_code,
+      "safe_tick" => dossier.binding.safe_tick,
+      "safe_delay" => dossier.binding.safe_delay
     }
   }
 end

@@ -129,20 +129,9 @@ defmodule Voy.World.Node do
         end
       end) != []
 
-    era2b_exists? =
-      run(1, fn q ->
-        fresh [topo, history] do
-          semantic_topoo(spec, features, topo)
-          Chronicle.history_through_era2bo(topo, history)
-          eq(q, history)
-        end
-      end) != []
-
-    cond do
-      history_exists? -> {:error, :fate_constraint_unsatisfied}
-      era2b_exists? -> {:error, :unresolved_history}
-      true -> {:error, :unsupported_topography}
-    end
+    if history_exists?,
+      do: {:error, :fate_constraint_unsatisfied},
+      else: {:error, :unsupported_topography}
   end
 
   defp candidate_topography(candidate) do

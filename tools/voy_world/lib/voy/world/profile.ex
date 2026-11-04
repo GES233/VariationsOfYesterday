@@ -1,35 +1,8 @@
 defmodule Voy.World.Profile do
   @moduledoc """
-  Numeric stock the relational layer is allowed to name.
-
-  The dynamics layer owns the real numbers (synapse tau, cycle-window
-  fractions, dose thresholds, stress cut points). This module is the
-  *contract* for those numbers, not a second simulation:
-
-    * every lag band a rule may name is declared here, with its closed
-      interval;
-    * a measured real is mapped onto a band through `band/3`, so a rule
-      selects a branch by band name instead of comparing floats;
-    * `describe/1` renders the whole stock as JSON-safe data, so an
-      exported canon records which stock produced it and the Scala
-      readout can be checked against the same numbers.
-
-  Band names mirror the frozen rule vocabulary (`:tau_immediate`,
-  `:tau_5`, `:tau_10`), so the existing rule tables stay valid while the
-  numbers behind them become external. Swapping the profile changes which
-  band a measurement lands in without editing a single rule.
-
-  Two sections are not axes and are therefore not banded: `dose` gives a
-  per-pulse acceptance range (pulse names are identities, not positions on
-  a scale), and `stress` gives the cut points of the discrete regime
-  partition.
-
-  `regime/3` is the provisional partition the Scala readout must
-  reproduce. It is deliberately the same shape the development HUD uses
-  today (stress plus the catastrophe-activity tracer), so the two sides
-  can be pinned by goldens before the port; once `MandateReadout` exists,
-  that implementation becomes authoritative and this one is kept only as
-  a cross-check.
+  Numeric stock (`tau` bands, phase `window` bounds, `stress` cut points, and
+  per-pulse `dose` intervals) shared between the relational layer and the JVM
+  readout (`MandateReadout`).
   """
 
   @type interval :: {number(), number()}
@@ -135,21 +108,7 @@ defmodule Voy.World.Profile do
     end
   end
 
-  @doc """
-  Reference stress-regime projection: the discrete partition of the slow
-  variable (plus the catastrophe-activity tracer) into the rule vocabulary.
-
-  Burnout is a saturation corner (the state is clamped at the stress
-  ceiling), so it wins over oscillation; otherwise the activity tracer
-  decides self-sustained oscillation before the stress level decides mere
-  strain.
-
-  This partition is a *definition*, not a dynamics claim: the measured
-  contract shows the cell still spiking at `s = 1.0` while this partition
-  calls that state `:Burnout`. Whether a cycle exists is decided on the JVM
-  by `Readout.oscillating/2` and `PhaseTracker`, using the contract's recovery
-  offset, never by the label this function returns.
-  """
+  @doc "Slow-variable stress-regime partition, mirrored by `Readout.regime` on the JVM."
   @spec regime(t(), number(), number()) :: regime()
   def regime(%__MODULE__{stress: cut}, stress, activity) do
     cond do

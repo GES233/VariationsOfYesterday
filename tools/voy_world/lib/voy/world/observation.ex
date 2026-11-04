@@ -1,35 +1,9 @@
 defmodule Voy.World.Observation do
   @moduledoc """
-  The same trace seen through three institutions.
-
-  A lens is not a synonym table and not a lie detector. Each one is a
-  *measurement and filing procedure*: what its instruments can sense, at what
-  interval, with what range, quantisation and category vocabulary, and what
-  its administrative or communal rules require the clerk to write down
-  afterwards. The pipeline is
-
-      underlying trace
-        -> sensing (range, sampling, quantisation)
-        -> encoding (categories, buckets, thresholds)
-        -> administrative or communal filing rule
-        -> surface record
-
-  Every record carries its `provenance`:
-
-    * `:measured` -- a quantity the instrument resolved;
-    * `:quantised` -- resolved, then rounded to the declared resolution;
-    * `:clipped` -- the instrument saturated, so only "it hit the frame"
-      survives;
-    * `:categorical` -- the number never existed; a category was assigned;
-    * `:administrative` -- a filing rule assigned the field, not the
-      instrument.
-
-  A record whose field the lens cannot sense is emitted with the value
-  `:unrecorded` rather than dropped. A missing observation must be
-  distinguishable from an observation that excluded something, and the
-  abducer treats the two very differently.
-
-  Nothing here modifies the trace it is given.
+  Institutional observation pipelines (`:official_hq`, `:tech_inner`, `:old_zhai`)
+  that transform a numeric `Voy.World.Slice` trace into surface records with
+  explicit provenance (`:measured`, `:quantised`, `:clipped`, `:categorical`,
+  `:administrative`, `:unrecorded`).
   """
 
   alias Voy.World.Slice

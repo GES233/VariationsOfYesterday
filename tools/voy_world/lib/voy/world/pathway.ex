@@ -1,69 +1,16 @@
 defmodule Voy.World.Pathway do
   @moduledoc """
-  mediKanren-style local micro-chains for one relic branch.
+  mediKanren-style five-hop local micro-chains (`hop 1..5`) plus two same-workshop
+  decoy edges per relic branch.
 
-  A complete story is never stored in one card. It is five *single-hop*
-  documents, each written inside its own professional register, that only
-  become a story when their anchor terms unify end to end:
+  Edges chain purely by `:from` / `:to` anchor term unification:
 
       {:relic, relic, damping}
         --hop 1 / gazetteer excerpt-->    {:precedent_omen, omen, anchor}
-        --hop 2 / requisition slip-->     {:scrap_batch, batch, material, anchor}
-        --hop 3 / workshop card-->        {:industrial_vessel, vessel, kind, anchor}
+        --hop 2 / requisition slip-->     {:scrap_batch, batch, material, c0_status, anchor}
+        --hop 3 / workshop card-->        {:industrial_vessel, vessel, kind, c0_status, anchor}
         --hop 4 / field notebook-->       {:modulation_protocol, vessel, window, fate}
         --hop 5 / council ordinance-->    {:emergent_ritual, fate, vessel, outcome}
-
-  Every edge is a map with `:hop`, `:doc_kind`, `:lens`, `:from`, `:relation`,
-  `:to` and `:attrs`. `<batch>` and `<vessel>` are *slots* (`{:batch, :main}`),
-  not names: `Voy.World.Witness` binds them to concrete, seed-derived
-  identifiers. The rule layer therefore never contains a year, a batch number
-  or a workshop part name.
-
-  ## Two physical branches, never crossed
-
-    * `:ancestral_bronze_zheng` — acoustic metallurgy: high-tin bronze is
-      requisitioned as scrap, cast into a tractor spare part that keeps a
-      three-breath (1.5 s) ring, and the ring is the refractory gate.
-    * `:carved_diversion_stele` — karst hydraulics: grooved limestone ashlar is
-      requisitioned as building stone, reused as a pump-house overflow lining
-      that accidentally reproduces the twelve-metre siphon head, and the gate
-      is the siphon penstock.
-
-  ## Decoy records
-
-  Two decoy documents are always in the same drawers as the true chain. They
-  cannot be chained to the ritual ending, and the failure is a *unification*
-  failure, not a label comparison:
-
-    * `:material_mismatch` — a workshop card whose intake batch is plain grey
-      iron (or plain, un-grooved limestone) carrying a zero anchor
-      (`{:tau_breaths, 0}` / `{:siphon_head_m, 0}`). It breaks at hop 3 -> 4:
-      no field notebook records a zero-anchor vessel, so the vibration /
-      siphon evidence cannot be attached.
-    * `:destination_dead_end` — a requisition slip for a batch that does
-      contain the right material but ships it to `:shipped_out_to_provincial_smelter`.
-      It breaks at hop 2 -> 3: its destination node is a `:scrap_shipment`, so
-      no workshop card's `:scrap_batch` input unifies with it.
-
-  The dossier stays at five true cards plus *two* same-workshop distractors,
-  so the material-mismatch card records its own intake batch (its `:origin`
-  attribute is `:requisitioned_as_scrap`) instead of being preceded by a
-  separate requisition slip. The break it demonstrates is unchanged: the
-  zero anchor it carries cannot unify with any field-note vessel.
-
-  ## Chaining is node unification only
-
-  `connect_edges/1` never reads the top-level meaning of a record. It starts
-  at a `{:relic, _, _}` node and extends a path only when the next edge's
-  `:from` unifies with the current node, stopping when it reaches
-  `{:emergent_ritual, fate, vessel, :spike_delayed_or_stabilized}`. Deleting
-  any one hop therefore makes the remaining four documents unconnectable: no
-  single card can short-cut the story.
-
-  The edge graph is a DAG by construction and paths are capped at the five
-  hops of the pathway, so `connect_edges/1` always terminates. All enumeration
-  orders are declared (relic table order, fate order from `Voy.World.Schema`,
-  hop order) and results are sorted deterministically.
   """
 
   use Voy.Kanren

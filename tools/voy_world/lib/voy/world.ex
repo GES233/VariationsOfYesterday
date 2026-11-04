@@ -9,10 +9,9 @@ defmodule Voy.World do
     topo = Schema.topology(topo_fields)
     slices = run_all(fn q -> Chronicle.compile_branch_sliceo(topo, q) end) |> terms()
 
-    cond do
-      slices != [] -> {:ok, Enum.map(slices, &Schema.to_public/1)}
-      era2b_defined?(topo) -> {:error, :unresolved_history}
-      true -> {:error, :unsupported_topography}
+    case slices do
+      [] -> {:error, :unsupported_topography}
+      slices -> {:ok, Enum.map(slices, &Schema.to_public/1)}
     end
   end
 
@@ -34,47 +33,6 @@ defmodule Voy.World do
     with {:ok, record} <- Node.materialize(spec_fields, candidate) do
       {:ok, Schema.to_public(record)}
     end
-  end
-
-  @doc """
-  Compile one named node with the seeded five-hop dossier mounted.
-
-  This is the convenience entry point for callers that want concrete, seeded
-  evidence next to the semantic record without hand-writing the `:seed`
-  field: it injects the seed into the node specification and returns the
-  public records, whose `dossier` key is
-  `Voy.World.Witness.render_dossier(seed, branch_id, relic, fate, names)`.
-
-  This is only a convenience delegate: `compile_node/2` likewise requires a
-  seed because the five-hop dossier is the sole player-facing narrative.
-  """
-  @spec compile_node_dossier(Keyword.t() | map(), Keyword.t() | map(), integer()) ::
-          {:ok, [map()]} | {:error, term()}
-  def compile_node_dossier(spec_fields, feature_fields, seed) when is_integer(seed) do
-    with {:ok, records} <- Node.compile(with_seed(spec_fields, seed), feature_fields) do
-      {:ok, Enum.map(records, &Schema.to_public/1)}
-    end
-  rescue
-    error in [KeyError, ArgumentError] -> {:error, {:invalid_features, Exception.message(error)}}
-  end
-
-  def compile_node_dossier(_spec_fields, _feature_fields, seed),
-    do: {:error, {:invalid_seed, seed}}
-
-  defp with_seed(fields, seed) when is_list(fields), do: Keyword.put(fields, :seed, seed)
-  defp with_seed(fields, seed) when is_map(fields), do: Map.put(fields, :seed, seed)
-  defp with_seed(fields, _seed), do: fields
-
-  @doc """
-  Whether the rule layer gives this topography a reclamation-era history.
-
-  A false answer means the disturbance table never pairs this upstream
-  geology: there is no history to compile, which is a different failure from
-  a history whose archives no longer cover it.
-  """
-  def paired?(topo_fields) do
-    topo = Schema.topology(topo_fields)
-    era2b_defined?(topo)
   end
 
   def reverse_worldgen(fate) do
@@ -104,9 +62,5 @@ defmodule Voy.World do
 
       {:ok, Enum.map(slices, &Schema.to_public/1)}
     end
-  end
-
-  defp era2b_defined?(topo) do
-    run(1, fn q -> Chronicle.history_through_era2bo(topo, q) end) != []
   end
 end

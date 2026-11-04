@@ -574,12 +574,16 @@ def render_profiles(compiled):
 
         ax.plot([x + pad, x + w - pad], [y + 4.35, y + 4.35], color=P5_HAIR, linewidth=0.7,
                 zorder=3)
+        dossier = case.get("dossier", {})
+        c0_label = "c0 已拆毁" if case["c0"] == "c0_collapsed" else "c0 留存完好"
         ax.text(
-            x + pad, y + 3.05, wrap(f"官方口径：{case['archives']['official_label']}", 34)[0],
+            x + pad, y + 3.05,
+            wrap(f"物理条件：{c0_label} + {DISTURBANCE[case['disturbance']]}", 34)[0],
             fontsize=6.9, color=P5_OFFICIAL,
         )
         ax.text(
-            x + pad, y + 1.65, wrap(f"技术真因：{case['archives']['tech_label']}", 34)[0],
+            x + pad, y + 1.65,
+            wrap(f"五跳物证：{dossier.get('vessel_name', '—')}（第{dossier.get('safe_tick', '—')}格）", 34)[0],
             fontsize=6.9, color=P5_TECH,
         )
 

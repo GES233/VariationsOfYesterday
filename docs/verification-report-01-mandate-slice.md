@@ -1,260 +1,90 @@
 # 验证报告 01 — 0.1 纵切片的最短可验证闭环
 
-> 对象：一条沟（`branch_01_baishui`）、三座寨、一个 `p` 通道脉冲事件。
-> 范围：不新增结局、地形、阵营、档案数量、独立子系统。冻结结构（Mandate 方程、通道语义、格子场架构、加载不变性、相位调制与 α 突触脉冲结构）**未修改**。
-> 本报告只记录测量与推理；设计文档中的结论一律按"待验证陈述"处理。
-
-复现：
-
-```
-# JDK 21（本机默认 JAVA_HOME 指向 zulu25 会让 Gradle 在配置阶段就失败）
-export JAVA_HOME=<jdk21>
-./gradlew test          # Scala 侧，53 用例（52 执行、1 跳过）
-cd tools/voy_world && mix test   # Elixir 侧，138 用例
-```
+> 对象：单节点 `branch_01_baishui`（上游 `up` / 隘口 `pass` / 下游 `down`）、一个 `p` 通道脉冲事件。
+> 复现命令：
+> ```sh
+> ./gradlew test                   # Scala 侧契约与动力学测试
+> cd tools/voy_world && mix test   # Elixir 侧关系、溯因与内容包测试
+> ```
 
 ---
 
-## A. 核心命题、定义域与候选空间
+## A. 核心命题与候选空间
 
-**核心命题（一句话）**：在纵切片的单个 Node 上，由 `(c0_state, pulse_kind, safe_phase_window)` 决定的隐藏解释，会在**受控脉冲实验测得的相位响应表**上留下可区分的数值指纹；三方档案经各自的观测/编码/行政变换后保留的信息，足以在该声明的候选空间内把这一解释**唯一**反演出来，且反演结果能被既有 Mandate 通道的数值结算判定为成立或不成立。
+**核心命题**：在纵切片单个 Node 上，由 `(c0_state, pulse_kind, safe_phase_window)` 决定的隐藏解释，会在受控脉冲实验测得的相位响应表上留下可区分的数值指纹；三方机构（总指挥部、技术内层、老寨）经各自的观测、量化与行政规则变换后保留的记录，足以在 24 候选空间内唯一反演该解释，并由 Mandate 数值层结算验证。
 
-| 项 | 声明内容 |
-|---|---|
-| Node | 单节点 `branch_01_baishui`（上游 `up`／隘口 `pass`／下游 `down`），一条有向平流链 |
-| 参数域 | `alpha=0.7, beta=0.8, epsilon=0.08`；`StressParam()` 默认（`gamma=0.01, delta0=0.3, sHalf=0.15, rho=eta=1, lambda=0.2, vSpike=1.8, coupling=1.0, stressMax=1.0`） |
-| 初值域 | `dissonance=-1.2, entrench=-0.6, stress=0, activity=0` |
-| 事件域 | 通道语义（`SetDisturbance` / `SetBaselineCalming` / `FirePulse`）+ 固定步长 `TickArrived(0.05)`；单次脉冲 = 一个 α 核 `(area, tau)`；无维度、无时间戳 |
-| 候选空间 H | `c0_state ∈ {c0_intact, c0_collapsed}` × `pulse_kind ∈ {alpha_shock, heavy_kick, alpha_metal_resonance, OverwhelmingNegativeSuppression}` × `safe_phase_window ∈ {absolute[0.20,0.30], relative[0.40,0.60], late[0.75,1.00]}` = **24 个离散候选**，`Slice.hypotheses/1` 逐条生成，闭集 |
-| 证据集合 E | 三方档案的**字段级**记录：`official_hq{water_level, surge_count, rain_total, material, quantity, cause_tag}`、`tech_inner{impact_count, amplitude, surge_lag, surge_direction, rain_total, material}`、`old_zhai{sign_order, sign_sequence, magnitude, surge_lag, count_of_blows}`；每条记录带 `provenance`（`measured/quantised/clipped/categorical/administrative/unrecorded`） |
-| 数值容差 | 周期：三步长相对散布 < 1e-3；相位分数：步长减半误差 < 0.02；测量-符号一致性容差 = 仪器读表分辨率（声明 0.25 时间单位，见 E）；`delta` 判据：Premature < −30%T、Delayed > +5%T、Displaced 幅度变化 > 0.5 |
-| 离散语义 | "脉冲"= α 核脉冲；"尖峰"= 过阈**且**峰值 ≥ 1.8 后回落穿过 0（不是任何过阈事件）；"相位"= 相对 Poincaré 截面（`v` 上穿 1.2）的分数，仅在极限环存在时有定义 |
-| 明确不在范围内 | 慢通道 α 扩展、`c` 习惯化、多节点同步、D8 汇流、Minecraft 实机生命周期、多人规则、宏观进程线与结局、任何新档案/新地形/新阵营 |
+| 项目 | 定义 |
+| :--- | :--- |
+| **参数与初值** | `alpha=0.7, beta=0.8, epsilon=0.08`；`StressParam()` 默认；初值 `(v, w, s, q) = (-1.2, -0.6, 0, 0)` |
+| **候选空间 $H$** | `c0_state ∈ {c0_intact, c0_collapsed}` × `pulse_kind ∈ {alpha_shock, heavy_kick, alpha_metal_resonance, OverwhelmingNegativeSuppression}` × `safe_phase_window ∈ {absolute[0.20,0.30], relative[0.40,0.60], late[0.75,1.00]}` = **24 个离散候选** |
+| **证据集合 $E$** | `official_hq{water_level, surge_count, rain_total, material, quantity, cause_tag}`、`tech_inner{impact_count, amplitude, surge_lag, surge_direction, rain_total, material}`、`old_zhai{sign_order, sign_sequence, magnitude, surge_lag, count_of_blows}` |
+| **真实尖峰判据** | $v$ 上穿截面 $1.2$ **且**峰值 $\ge 1.8$ 后回落穿过 $0$（排除仅把 $v$ 顶过 $1.2$ 而未激发动作电位的过阈伪影） |
 
-**相位在哪些状态上有定义（显式语义，四者互不等同）**
+### 相位定义域（`MandateReadout` 四态区分）
 
 | 状态 | 判据 | 返回值 |
-|---|---|---|
-| 周期轨道 | `a(s) < a_c` 且 `a(s) > burnout_a`，且已观测 ≥3 次过阈、相邻间隔在 20% 内一致 | `PhaseReading.Cycle(label, fraction)` |
-| 静息吸引域 | 无极限环（`a(s) ≥ a_c`）且 `|v−v*|≤0.25`、`|w−w*|≤0.25`（`v*,w*` 由闭式定点求出） | `PhaseReading.Basin(Resting)`（**无分数**） |
-| 强瞬态 | 有极限环或有激发，但过阈后未稳定成周期（间隔不一致或 ≥2.5T 未再触发） | `Undefined(TransientNoCycle)` |
-| Burnout | `a(s) ≤ burnout_a = beta·(2/3)−1 = −0.46667`（三次曲线右膝失稳） | `Undefined(BurnoutNoCycle)` |
-
-`Readout.regime` 仍逐字段镜像 `Voy.World.Profile.regime/3`（跨栈对表用），但**相位是否存在不按它的标签判定**：实测 `s=1.0` 时该分区报 `Burnout`，而格子在稳态窗口（`t ≥ 2500`）仍以 `settled_period = 39.474` 的周期自持尖峰（全时段含爬坡瞬态的均值为 `50.182`，见 G-3）。
+| :--- | :--- | :--- |
+| **周期轨道** | $a_{\text{burnout}} < a(s) < a_c$，且已观测 $\ge 3$ 次过阈、相邻间隔偏差 $\le 20\%$ | `PhaseReading.Cycle(label, fraction)` |
+| **静息吸引域** | $a(s) \ge a_c$ 且 $|v-v^*|\le 0.25, |w-w^*|\le 0.25$ | `PhaseReading.Basin(Resting)`（无周期分数） |
+| **强瞬态** | 单次激发或未稳定成周期 | `PhaseReading.Undefined(TransientNoCycle)` |
+| **方程级烧毁** | $a(s) \le a_{\text{burnout}} = -0.46667$ | `PhaseReading.Undefined(BurnoutNoCycle)` |
 
 ---
 
-## B. 原始材料、版本与复现条件
+## B. 竞争假设与区分实验
 
-| 材料 | 实际检查 | 版本/条件 |
-|---|---|---|
-| `src/main/scala/.../MandateState.scala`、`helpers/ODESolver.scala` | 逐行读，值语义按代码而非文档 | commit `d86dd04`；SHA-256 `8dd55800…4a7774`（写入契约 `provenance.numeric_source_digest`，测试每次重算） |
-| `MandateGrid.scala` / `MandateAgent.scala` / `EventMsg.scala` | 逐行读；把消息分派提取为纯函数 `MandateAgent.applyEvent` 以便脱离 Pekko 回放（行为不变，`MandateAgentSpec` 4 条全绿） | 同上 |
-| `MandateStateSpec` / `PhaseModulationSpec` / `MandateGridSpec` / `MandateAgentSpec` | 逐行读，**并复跑其装置**（见 G-1/G-2） | 同上 |
-| `docs/design-draft-01-living-world.md` §1.1–§1.5、§8 | 读，仅作"设计意图" | 同上 |
-| `tools/voy_world/lib/voy/**`、`test/**`、`content/**`、`test/fixtures/world_cases.json` | 读核心模块；基线 `mix test` 79 passed | 同上 |
-| 冻结数值参数的独立可复算性 | 闭式推导 + 独立积分参考（不经过 `ODESolver`） | `PhaseResponse.hopfPoint`、`relaxationPeriod` |
-| 1980 年代水文/火工品记录结构 | **只查到二手/扫描资料**（见 F），未见一手规程原件 | —— 列为证据缺口 |
-| 「唯一解」的第三方独立实现 | **没有** | 列为证据缺口 |
+针对「点炮后下游出现强烈地鸣与水体翻涌」的五种竞争假设检验：
 
-工作区改动范围（`git diff --stat`，排除仅行尾差异）：`build.gradle` +4（把 `-Dvoy.contract.write` 透传给 test JVM）、`MandateAgent.scala` +28/−23（抽出 `applyEvent` 纯分派，行为不变）、`profile.ex` +11/−1（补 `late` 窗口与 `windows/1`）；其余为新增文件。**冻结的方程、通道语义、格子场架构一行未改。**
+| # | 假设 | 实验结果 |
+| :--- | :--- | :--- |
+| **C1** | 饱和工作点（$s=1.0, a=-0.30$）下 40%–60% 窗内 `alpha_shock` 当场激发提前尖峰 | **证伪**。在 $a=-0.30$ 下 `alpha_shock` 全域 0 次点火；$\varphi=0.50$ 处实为**强推迟**（`+15.62`） |
+| **C2** | 事件落点坐标系差异导致表观提前 | 排除。不同参考系下的真实下一次尖峰时刻一致 |
+| **C3** | **过阈伪影**：矩形/脉冲把 $v$ 顶过 $1.2$ 后回落，被裸截面检测器误计为尖峰 | **证实**。这是早期测试假阳性的成因（过阈 2 次，真尖峰仅 1 次） |
+| **C4** | 积分步长伪影 | 排除。`dt ∈ {0.02, 0.01, 0.005}` 下周期为 `39.47 / 39.4725 / 39.47375`（相对散布 `9.5e-5`） |
+| **C5** | 参考快照采样点偏移 | 排除。周期偏差 `< 0.03%` |
 
 ---
 
-## C. 竞争假设与区分实验
+## C. 相位响应（PRC）实测与占空比反转
 
-同一现象（"汛期点炮后，下游出现一次强烈的地鸣与涧水翻涌"）可由至少五个假设解释。逐个用实验区分：
+### C.1 受控脉冲响应表（饱和工作点 $a = -0.30, s = 1.0, T = 39.47$）
 
-| # | 假设 | 区分实验 | 结果 |
-|---|---|---|---|
-| C1 | **真正的相位响应**：易损窗内脉冲当场激发一次完整尖峰（设计草案 §1.1.4） | 从正确识别的相位 0（截面下穿 → 上穿 1.2）重启，按 `phase·T` 落点扫描 40 个相位，用"真尖峰"判据（过阈且峰值 ≥1.8 后回落穿 0）计数 | **证伪**。`alpha_shock` 全域 0 次点火；0.40–0.60 反而是**最强推迟**（+15.62 @ 0.50） |
-| C2 | **事件/tick 落点差异**：脉冲落点相对检测截面的对齐不同，导致"看起来提前" | 把脉冲落点固定在 `phase·T`（与任何过阈检测解耦），并对比"从快照重启"与"从检测到的 t1 起算"两种坐标系 | 两种坐标系给出的**真实**下一次尖峰时刻一致；差异全部来自检测器，不来自落点 |
-| C3 | **过阈伪影**：脉冲把 `v` 顶过 1.2 并被压回，却被计为"尖峰" | 追踪 `v(t)`；统计"过阈次数"与"真尖峰次数" | **这就是既有测试的成因**（G-1）。同一次试验里过阈 2 次，真尖峰 1 次 |
-| C4 | **积分步长伪影** | 同一试验在 `dt`、`dt/2`、`dt/4` 重跑；周期三步长对比 | 排除：周期 39.47 / 39.4725 / 39.47375（散布 9.5e-5）；相位分数步长差 <0.02；`dt` 与 `dt/2` 的 `delta` 相对差 <15% 且**符号与判据类相同** |
-| C5 | **快照顺序/引用点**：参考快照取在过阈后的采样点，导致周期估计偏移 | 用固定 `warmup` + 首次过阈作为相位 0，并比较"用最后过阈快照"与"用第一个过阈快照" | 不影响结论（周期一致到 0.03%） |
+| 脉冲类型 | 剂量 `(area, τ)` | 点火相位域 | 推迟相位域 | 三窗中点响应（绝对 `0.25` / 相对 `0.50` / 晚期 `0.875`） |
+| :--- | :--- | :--- | :--- | :--- |
+| `alpha_shock` | `12, 5` | 无 | `0.075–0.575` | `+6.62` / **`+15.62`** / `-2.40`（Absorbed） |
+| `heavy_kick` | `5, 10` | 无 | `0.025–0.500` | `+7.58` / `+18.68` / `-0.72`（Absorbed） |
+| `alpha_metal_resonance` | `2×3, 2` | `0.40, 0.55, 0.575` | `0.325–0.600` | `+0.20` / `+9.12` / `-2.40` |
+| `OverwhelmingNegativeSuppression` | `-25, 5` | `0.025–0.175` | `0.550–0.975` | `-9.08` / `+0.86` / `+12.14` |
 
-**区分能力结论**：C3 与 C1 在**任何只看"是否过阈"的装置下都不可区分**——这正是必须把"尖峰"定义成幅度事件而非时刻事件的原因。
-
----
-
-## D. 相位 / PRC 映射及失效边界
-
-### D.1 映射是什么，不是什么
-
-- 用的是**截面相位**：`phase 0 = v 上穿 1.2`，`fraction = (t − t_cross)/T_est (mod 1)`，`T_est` 取最近两段间隔均值。交叉时刻在两步之间线性插值，故对平滑轨迹是二阶精度。
-- **不宣称"严格商映射"**：本系统没有可用的闭式等时线（isochron）映射，全局严格商映射**不存在**（同一截面相位上不同幅度的状态后续不同）。因此本层表述为**带误差界的抽象映射**：误差界由步长收敛（周期 9.5e-5 相对散布、相位分数 <0.02）与"同相位不同初值"未测试两项共同约束，后者列为缺口。
-- 工作点：`a = alpha − s̄ = −0.300`（`s̄ = 1.0` 取自 `c0_collapsed` 点火回放的平均应力），`T = 39.47`。
-
-### D.2 实测相位响应（受控脉冲，frozen stress）
-
-失效率/推迟率以"该周期包含脉冲时，下一次**真尖峰**相对无脉冲对照的间隔变化"计（单位：仿真时间）。
-
-| 脉冲 | 剂量(area, τ) | peak | 点火相位域 | 推迟相位域 | 三个声明窗中点（绝对 0.25 / 相对 0.50 / 晚期 0.875） |
-|---|---|---|---|---|---|
-| `alpha_shock` | 12, 5 | 0.883 | **无** | 0.075–0.575 | +6.62 / **+15.62** / −2.40（Absorbed） |
-| `heavy_kick` | 5, 10 | 0.184 | **无** | 0.025–0.500 | +7.58 / +18.68 / −0.72（Absorbed） |
-| `alpha_metal_resonance` | 3×2, 2 | 0.368 | **0.40, 0.55, 0.575（离散三点，非连续窗）** | 0.325–0.600 | +0.20 / +9.12 / −2.40 |
-| `OverwhelmingNegativeSuppression` | −25, 5 | −1.839 | 0.025–0.175 | 0.550–0.975 | −9.08 / +0.86 / +12.14 |
-| `alpha_shock_weak`（对照，非世界内容） | 2, 5 | 0.147 | **无** | 0.225–0.525 | +2.60 / +12.88 / −0.88 |
-
-### D.3 边界（可证伪的定量结论）
-
-1. **点火阈值与占空比反转（Duty-Cycle Inversion）**：
-   - 在饱和应力工作点 `s = 1.0, a = −0.30`（周期 `T = 39.47`），去极化高台期（`v > 0`）长达 `23.91` 时间单位，占周期的 **60.57%**（`plateau_fraction = 0.605655`）。因此在截面相位坐标系下，`phase = 0.50` 时细胞仍处于**上支去极化高台期**（`v = +0.911 > 0`），此时施加正向脉冲 `alpha_shock` 会抬升三次零倾线并产生**平台期阻滞延长（Plateau Prolongation）**，导致下一次尖峰推迟 `+15.62`；该点处的暴力点火面积阈值为 **14.84** > 声明剂量上限 **12**。
-   - 反之，在刚越过 Hopf 分岔的**起振工作点 `s = 0.30, a = 0.40`**（周期 `T = 43.715`），慢瓶颈位于左膝附近，去极化高台期仅占周期的 **28.06%**（`plateau_duration = 12.27`）。此时 `phase = 0.50` 真正落在**左支超极化恢复期**（`v = −1.619 < −1.0`），同一剂量的 `alpha_shock`（`area = 12, τ = 5`）当场触发完整提前尖峰（`outcome = Premature, delta = −17.38, v_peak = 2.08`）。
-   - **结论**：设计草案 §1.1.4 的「40–60% 易损窗点火」在**近临界起振区（`a = 0.40`）严格成立**，而在**饱和过驱动区（`a = −0.30`）因高台期占空比越过 50% 翻转为强推迟**。两套工况均已写入 `contracts/mandate-slice-v1.json`（`oracle.oscillator` 与 `oracle.onset_comparison`）。
-2. **窗口结构与草案相反**：中周期是**推迟**峰（最多 +19.3 = +49%T），晚周期（≈0.60–0.98）才是**负向**（提前 7 单位但未达点火判据），绝对窗（0.20–0.30）是 +6.6 的推迟。草案的"40–60% 点火 / 20–30% 推迟 / ≳65% 无效"三条中，只有"20–30% 推迟"方向成立。
-3. **τ 的方向性得到确认**：`τ=10` 的 `heavy_kick` 在相对窗推迟 +18.68 > `τ=5` 的 `alpha_shock` +15.62，与"τ 越大推迟越长"一致（草案这条成立）。
-4. **负向压制不是熄灭工具**：`−25` 脉冲使 `|v|` 峰值冲到 2.34–2.36（对照 1.89），早期相位甚至"提前" −9～−19；即"镇压本身成为扰动"，与 §1.1.4 的诚实边界一致。
-5. **Hopf 点精确值**：`a_c = 0.434975, s_c = 0.265025`（草案 0.467/0.233 来自 `v_c ≈ −1` 的近似，偏差 7%）。
-6. **Burnout 的方程级判据**：`burnout_a = −0.46667`，而 `stressMax = 1.0` 保证 `a(s) ≥ −0.30 > −0.46667` → **常规通道永远到不了方程级 burnout**，§1.1.2.5 的"只有叙事参数通道能制造烧毁"由此得到数值支持（`coupling=2` 时可达并被读出为 `BurnoutNoCycle`）。
-
-### D.4 多节点：只声明"可组合"的条件
-
-一条有向平流链（3 格，`advection=0.001`，仅上游受扰）。实测：上游周期 28.31、下游 28.92、配对间隔从 1485.4 漂到 2124.3（**漂移 22.57 个周期**）。
-
-**不预设相位叠加**。可组合判据声明为：*整个观测窗口内滞后变化 ≤ 0.1 个周期* → 本例**不满足**，因此 Kanren 层只能表达候选/约束/未知，实际结果由 Mandate 数值层结算。判据本身写死在 `ChainObservation.composable`（而非事后解释），并在两栈各有一条测试锁住"拒绝必须带数字"。
+### C.2 定量结论
+1. **占空比反转（Duty-Cycle Inversion）**：
+   - 在**近临界起振区（$s = 0.30, a = 0.40, T = 43.715$）**，去极化高台期（$v > 0$）占周期的 **28.06%**（`12.27` 刻），$\varphi = 0.50$ 落在左支超极化恢复段（$v = -1.619$），`alpha_shock` 当场触发提前尖峰（`Premature, delta = -17.38`）。
+   - 在**饱和过驱动区（$s = 1.0, a = -0.30, T = 39.47$）**，去极化高台期膨胀至 **60.57%**（`23.91` 刻），$\varphi = 0.50$ 仍处上支高台期（$v = +0.911$），正向脉冲产生平台期阻滞延长（`Delayed, delta = +15.62`），该点暴力点火面积阈值达 `14.84 > 12`。
+2. **实测安全刻度**：`PhaseResponse.tickTrials` 对 `alpha_metal_resonance` 逐整数 tick 实测，仅将 `Delayed` 结果写入契约 `safe_ticks`，供 `Witness` 绑定。
+3. **有向平流链不可简单线性叠相**：3 格链（`advection = 0.001`）上下游周期存在微小频差（`28.31` vs `28.92`），观测窗口内滞后漂移达 `22.57` 个周期，`ChainObservation.composable == false`。
 
 ---
 
-## E. 溯因唯一性与最小证据消融
+## D. 溯因唯一性与极小充分证据集（`Voy.World.Ascribe`）
 
-四类结果各自有不同的返回形状，**空列表不承担任何一类语义**：
+`Ascribe.explain/2` 基于 Kanren 关系目标 `abduceo/4` 返回四种互斥结果：`{:unique, h}`、`{:multiple, ...}`、`{:none, ...}`、`{:incomplete, ...}`。
 
-| 结果 | 返回 | 含义 |
-|---|---|---|
-| 唯一解 | `{:unique, h}` | H 中恰好一条存活 |
-| 多解 | `{:multiple, %{candidates: [...], differing: [...]}}` | 记录完整，但模型在该分辨率下无法区分（附"哪几个字段在分"） |
-| 无解 | `{:none, %{contradictions: [...], missing: [...]}}` | 存在确定值与**所有**候选矛盾（附字段/记录值/预测值） |
-| 信息缺失 | `{:incomplete, %{candidates: [...], missing: [...]}}` | 档案丢的正是那个能分开候选的字段 |
-
-### E.1 唯一性（24/24，基于 `Voy.Kanren` 关系目标 `abduceo/4`）
-
-对 H 的全部 24 个候选逐一：真值 → `Slice.trace`（显式区分自持振荡 `settled_period = 39.474` 与静息吸引域 `settled_period = nil` + 山谷参考潮汐周期 `reference_period = 39.47`）→ 三方观测 → 证据 → `Ascribe.explain`（底层调用 `Voy.Kanren.Core.run_all` 求解 `abduceo/4` 关系目标）→ **24/24 精确回真值**（`AscribeTest`"every hypothesis in H is recovered uniquely"）。同时 `Ascribe.official_tabooo/1` 用 `Voy.Kanren.Core.neq` 不等约束直接证明 `:official_hq` 为何被迫合一到 `:seasonal_rain_mudslide`。
-
-### E.2 逐项消融：区分「单点不可替代核（`minimal_chain`）」与「极小充分证据集（`minimal_sufficient_sets`）」
-
-| 概念 | 函数 | 数学定义 | 在 `collapsed / alpha_shock / relative` 上的实测值 | 在 `collapsed / alpha_metal_resonance / late` 上的实测值 |
-|---|---|---|---|---|
-| 单点不可替代核（Leave-One-Out Core） | `Ascribe.minimal_chain/2` | $\bigcap \mathcal{S}$：全集中无备份见证、单删即失去唯一性的项 | `[%{lens: :tech_inner, field: :surge_lag}]` | `[%{lens: :old_zhai, field: :count_of_blows}]` |
-| 极小充分证据集族（Prime Implicants） | `Ascribe.minimal_sufficient_sets/2` | $\mathcal{S}$：自身足以唯一反演真值（`explain(S) == {:unique, h}`）、且删去任一元素即失效的极小子集 | 2 个集合：`{official_hq/water_level, tech_inner/surge_lag}` 与 `{tech_inner/impact_count, tech_inner/surge_lag}` | 包含横跨三方机构的集合：`{official_hq/water_level, tech_inner/surge_lag, old_zhai/count_of_blows}` |
-
-→ **关键定理（已由 `AscribeTest` 锁定）**：
-1. 当存在冗余见证（如 `official_hq/water_level` 与 `tech_inner/impact_count` 互为 `c0_state` 的备份）时，单点消融筛出的 `minimal_chain` 是所有极小充分集的**交集** $\bigcap_{S \in \mathcal{S}} S$，它本身**不充分**（单独喂给 `explain` 返回 `:incomplete`）；
-2. 每个 $S \in \text{minimal\_sufficient\_sets}(E)$ 均严格满足**充分性**与**极小性**；
-3. 在晚期窗（`late`）的 `alpha_shock` vs `alpha_metal_resonance` 对撞案例上，`surge_lag` 均为 `37.0`，此时 **`old_zhai/count_of_blows` 成为唯一的单点不可替代核**，且极小充分集必须同时横跨 `:official_hq`、`:tech_inner`、`:old_zhai` 三方机构。
-
-### E.3 负对照
-
-1. **看似合理但应被排除的替代病因**：`:autumn_rain`（秋雨自然侵蚀，即官方替罪羊）。它对记录的预测是 `impact_count=:single`、`sign_order=:after_rain`、`amplitude=:none`。实测三个见证中**任一个**都能排除它；只有三者全被删掉才变成 `{:not_excluded, [:impact_count, :sign_order, :amplitude]}`。
-2. **会破坏唯一性的缺证案例**：删掉 `tech_inner/surge_lag` → `:incomplete`（候选收缩为「绝对窗/相对窗」两个，`missing=[:surge_lag]`）；把仪器分辨率放宽到 1.0 → 绝对窗下 `alpha_shock` 与 `heavy_kick` 合并为 `:multiple`（两者间隔仅差 0.96）。
-3. **不能被错误规则"碰巧推出正确答案"**：`official_only/1`（只看成因栏的朴素规则）对两个**不同**隐藏解释给出**同一个**答案（且等于其中一个），而真反演能把它们分开。这条同时说明"成因栏不携带解释信息"。
-4. **反演不是答案泄漏**：`Ascribe` 对证据顺序不敏感（有 shuffle 测试）；H 与容差都在调用处显式声明。
-
-### E.4 唯一性的边界（不宣称绝对）
-
-- "唯一"只在 **H 与 E 的声明内**成立；H 是离散闭集，`alpha_shock_weak`（area 2，在 `Profile` 声明的剂量域 [1,12] 内但不在任何世界内容里）被显式排除在 H 之外——**若世界内容签发弱剂量点炮，唯一性立刻失效**。
-- 唯一性还是**分辨率依赖**的：`identifiability/2` 直接把它测成一张表（0.1 / 0.25 / 1.0 / 4.0 → 各自的结果）。
+1. **24 / 24 唯一反演**：在默认仪器读表分辨率 `0.25` 下，$H$ 中全部 24 个候选均唯一还原真值；当分辨率放宽至 `1.0` 时，绝对窗下 `alpha_shock` 与 `heavy_kick`（间隔仅差 `0.96`）诚实退化为 `:multiple`。
+2. **单点不可替代核 vs 极小充分集**：
+   - `Ascribe.minimal_chain/2` 求取所有极小充分集的交集 $\bigcap \mathcal{S}$（单删即失唯一性的证据项）；
+   - `Ascribe.minimal_sufficient_sets/2` 求取所有自身足以唯一还原真值的极小子集 $\mathcal{S}$；例如在晚期窗 `alpha_shock` vs `alpha_metal_resonance` 对撞案例上，极小充分集横跨三方机构：`{official_hq/water_level, tech_inner/surge_lag, old_zhai/count_of_blows}`。
+3. **替罪羊排除**：官方通报因 `official_tabooo/1`（`neq` 禁忌）强制归因于 `:seasonal_rain_mudslide`，但三方记录中的 `impact_count`、`sign_order`、`amplitude` 任一项均可将「秋雨自然侵蚀」证伪排除。
 
 ---
 
-## F. 三种制度观测变换及现实来源
+## E. 三方制度观测变换与现实考据
 
-三方档案 = **同一底层轨迹**经过不同的 `感知（量程/采样/量化/分类）→ 编码 → 行政/共同体规则`。每条记录带 `provenance`。
+| 维度 | OfficialHQ（总指挥部） | TechInner（技术内层） | OldZhai（老寨） |
+| :--- | :--- | :--- | :--- |
+| **观测通道** | 月度水位桶、雨量汇总、火工品领料单 | 铅锤撞框计数、滞后读表（分辨率 `0.25`）、作业票 | 物候四相序列、山应与雨的先后、击打次数 |
+| **信息失真** | 水位削顶分桶；成因栏按行政规则填秋雨滑坡 | 幅度撞框削顶（`:frame_slam`），丢失慢变量 $s$ | 无量值、无日期 |
+| **保留的不可替代线索** | 慢变量粗分区（区分 $c_0$ 存亡的冗余见证） | **脉冲滞后量与方向**（定窗口的唯一通道） | **山应与雨的先后**（排除秋雨）、**敲击次数**（区分三叩共振） |
 
-| | OfficialHQ（总指挥部） | TechInner（技术内层） | OldZhai（老寨） |
-|---|---|---|---|
-| 能观测 | 水位、雨量、领料单（物资与数量） | 铅锤撞框（幅度）、撞框**时刻**、作业票、雨量计纸带 | 物候类别序列、与雨的**先后**、击打次数 |
-| 不能观测 | 一次尖峰、间隔、与雨的先后 | 幅度（撞框即饱和）、慢变量 σ | 任何量值、任何日期 |
-| 粒度 | 旬报/月报；水位按桶 | 钟读表分辨率 0.25 时间单位；纸带 2 小时一点 | 日；类别 |
-| 削顶/混叠/阈值化 | 水位削顶为"超警戒"桶 | 幅度**削顶**（只留 `:frame_slam`）→ 尖锐一击与缓慢推挤在记录上相同 | 量值不记录（`:unrecorded`） |
-| 类别替换 | 成因栏由**行政规则**填（有雨量记录且无第三方见证的生产事故 → `:seasonal_rain_mudslide`） | —— | 四相征兆词表（`§1.3`） |
-| 保留的可反演信息 | 慢变量状态（粗）、事件发生季 | **滞后量与方向**（唯一能定窗口的通道）、事件次数 | 与雨的先后（唯一能排除"秋雨"的通道） |
-| 丢失的可反演信息 | 窗口、机制 | 幅度、慢变量 | 量值、日期 |
-
-三项失真各自的"忠实/误导/线索"：
-
-1. **成因栏替换**：忠实于记录者能拿到的行政类目；误导表层归因（把机制事件记成气象事件）；留下的可证伪线索是**其他两方存在、而它没有的字段**（缺席本身是可检验的）。
-2. **幅度削顶**：忠实于铅锤框架的物理量程；误导"每次撞框都一样严重"；线索是撞框的**时刻结构**（次数、间隔、与作业票的相对位置）。
-3. **共同体类别替换**：忠实于见证者能说的词汇；误导把"钟三叩而山不应"读成仪式无效；线索是**先后**（若山在雨前就应，雨不是原因）。
-
-**现实一手来源核查（诚实标注）**：只查到二手/技术性材料，**未见 1980 年代规程原件**：
-
-- 自记雨量计迹线故障类型（自记钟停、笔压失灵、虹吸浮子漏水、翻斗翻转失灵、跨大步）——记录了"仪器故障会系统性产生异常迹线"这一**记录结构**：[降水迹线异常分析](http://qxkjjz.cn/cn/article/pdf/preview/10.3969/j.issn.2095-1973.2019.03.003.pdf)、[降水现象与自记降水量不一致](http://qxqk.nmc.cn/qx/ch/reader/create_pdf.aspx?file_no=19950114&st=alljournals#1#1#1)
-- 火工品支领/清退台账制度——支撑"领用单据"作为独立见证通道：[火工品支领、清退制度](http://p.safehoo.com/Manage/System/Fire/201504/389489.shtml)
-- 爆破器材库区距离与管理制度——支撑"行政填表规则"的存在性：[爆破器材管理规定摘录](http://www.dcblast.com/UpLoadfiles/upLoadImages/200710221011019167.pdf#6#15#6)、[广东省爆破器材管理条文](https://asianlii.austlii.edu.au/chi/cn/legis/gd/laws/c12bc21081c4b6a3d410910abca7885faea1a5d8/#10)
-
-现实材料**只**用于测量与记录结构；地名、民族、机构、仪式、事件全部虚构，不以现实族群或仪式作为设定的真实性证明。
-
----
-
-## G. 跨栈测试、反例与负结果
-
-**测试清单**（`./gradlew test` = 52 执行 / 0 失败 / 1 跳过：`GridBenchmarkSpec` 需 `VOY_BENCH`；总计 53）
-
-| Spec | 覆盖 |
-|---|---|
-| `MandateReadoutSpec` 5 | 周期相位有分数、静息域只给类别、单次激变判为瞬态、burnout 由动力学（`burnout_a`）而非应力截断判定、**"应力分区把正在尖峰的格子叫烧毁"**这条被显式测出 |
-| `PhaseResponseSpec` 11 | 周期步长收敛、奇异极限参考**不复现**（负结果）、Hopf 精确式、声明剂量全域不点火、相对窗中点=推迟、点火阈值 > 声明剂量、**过阈≠尖峰（反例）**、`dt/2` 不变性、相位 tracker 收敛、占空比反转与逐 tick 实测推迟候选 |
-| `SliceReplaySpec` 6 | 同一事件流回放逐位一致、事件先于其 tick 生效、越界事件确定性丢弃、`c0` 两态的可观测差异（74 vs 1 次撞框）、链上可组合性判据 |
-| `SliceContractSpec` 10 | 检入契约 == 本次测量渲染（逐字节）、周期收敛、解析边界、阈值与声明剂量的关系、三个声明窗中点判据、claims 由测量生成、`c0` 指纹、链判据、分区采样、金属共振安全刻度 |
-| Elixir 37 新增 | 契约版本/结构校验、Profile 与测量对表、三方观测的保留/丢失/不可写回、四类结果、24/24 闭环、消融与最小链、替代病因排除、朴素规则对照、分辨率-可辨识性、`Facts` 记录-结算 |
-
-**负结果与反例（都不是"通过"，是"当前成立/不成立"的结论）**
-
-- **G-1 既有测试假阳性**：`PhaseModulationSpec`"impulse in the vulnerable window fires a premature surge" 之所以绿，是因为脉冲把 `v` 顶过 1.2 又被压回，被**同一个截面**记成"提前的一次尖峰"；追踪 `v(t)`：过阈发生在 t=20.04，而**真实的**下一次尖峰在 42.34（对照 39.48），即实际是**推迟** +2.86。该用例的幅度守卫读的是脉冲**之前**那次自然尖峰的峰值，因此无法区分"点着"与"顶上去"。
-- **G-2 草案数值**：`a_c` 0.467 → 精确 0.434975；`s_c` 0.233 → 0.265025。
-- **G-3 分区标签与动力学不一致（附稳态周期校正）**：`s=1.0` 时 `Profile.regime` 报 `Burnout`，而格子在稳态窗口（`t ≥ 2500`）仍以 `settled_period = 39.474` 的周期尖峰（与冻结 `s=1.0` 振荡器的 `39.47` 完全吻合；全时段 `0..4000` 因包含 `t=300..2500` 慢变量爬坡期，均值为 `50.182`）。分区是**定义**，不是动力学断言；相位域改由 `a(s)` 判。
-- **G-4 奇异极限参考不成立**：`ε→0` 慢流形积分给 24.40，实测 39.47（低 38%）。该参考**不能**用作独立验证，只能作量级参考；已在契约中如实标注 `refuted-at-eps=0.08`。
-- **G-5 链上相位叠加被拒**：滞后漂移 22.57 个周期 → `composable=false`。
-- **G-6 反演的可辨识性依赖分辨率**：0.25 下 24/24 唯一；1.0 下绝对窗的 `alpha_shock`/`heavy_kick` 合并为多解。
-- **G-7 曾出现的 115/116 抖动根因定位与修复**：初版误以为是 `_build` 增量编译所致，实为两处代码缺陷叠加：① `Observation.evidence/1` 使用 `Map.values/1` 遍历三方透镜，而 OTP 26+ 小型 atom Map 的遍历顺序随 BEAM 进程哈希种子变化；② `Ascribe.discriminating?/4` 未过滤 `:unrecorded`，当 `:old_zhai` 排在 `:tech_inner` 之前时，`:old_zhai` 的 `surge_lag: :unrecorded`（Elixir 中为 truthy）遮蔽了 `:tech_inner` 的实测值。现已改为按 `@lenses` 确定性顺序输出并在 `discriminating?/4` 中显式排除 `:unrecorded`，彻底消除抖动。
-
----
-
-## H. 结论—证据矩阵
-
-| # | 结论 | 状态 | 依据 |
-|---|---|---|---|
-| 1 | 相位只在极限环存在时有定义；静息域/瞬态/Burnout 各给**互不相同**的显式非相位语义 | **已证明**（在声明的判据与参数下） | `MandateReadoutSpec` 5 条；`burnout_a`、`restPoint` 闭式 |
-| 2 | Hopf 点精确值为 `a_c=0.434975, s_c=0.265025`；草案 0.467/0.233 是该近似的产物 | **已证明** | 闭式 + `PhaseResponseSpec` + 契约 `analysis.hopf` |
-| 3 | 周期 `T=39.47` 对步长收敛（散布 9.5e-5） | **有实验支持**（`dt∈{0.02,0.01,0.005}`） | `period.rows`；`PhaseResponseSpec` |
-| 4 | "易损窗（40–60%）点火"在工作点 `a=−0.30` 不成立：全相位无点火，0.50 处推迟 +15.62 | **已证伪**（对声明剂量域） | 40 点扫掠 + 真尖峰判据 + `dt/2` 复核 |
-| 5 | 声明剂量上限 12 < 点火阈值 14.84 → 世界内容里的点炮**点不着火** | **已证明**（在该工作点、该判据下） | 面积二分；契约 `fire_threshold` |
-| 6 | "20–30% 推迟"方向成立（+6.62）；"τ 越大推迟越长"方向成立（+18.68 @ τ=10） | **有实验支持** | 同上；`alpha_shock` vs `heavy_kick` |
-| 7 | 既有 `PhaseModulationSpec` 的点火用例是过阈伪影 | **已证明** | 追踪 + 用真尖峰判据重跑；幅度守卫读错窗口 |
-| 8 | 单节点自适应相位映射**不是**严格商映射，只能是带误差界的抽象映射 | **已证明**（不存在性未形式化，只给反例与误差界） | 同相位不同幅度状态后续不同；收敛数据 |
-| 9 | `s=1.0` 仍自持振荡，故 95/0.95 的 Burnout 标签与动力学不符 | **已证明** | 4000 单位回放 74 次撞框 |
-| 10 | 在声明的 H 与 E 内，24/24 候选可被唯一反演 | **有实验支持**（H 为作者声明的闭集） | `AscribeTest` 闭环 24 条 |
-| 11 | 最小充分链（其余证据具备时）= `tech_inner/surge_lag`；c0 维度是冗余覆盖 | **有实验支持** | 逐项消融 + 配对消融 |
-| 12 | "秋雨自然侵蚀"可被三方记录中任一个见证排除 | **有实验支持** | `refute/2` + 三见证消融 |
-| 13 | 反演不依赖成因栏/fate/文档 id；朴素规则可被反例击穿 | **已证明** | `official_only` 对照 + shuffle 不变性 + 字段断言 |
-| 14 | 可辨识性随仪器分辨率退化（1.0 时绝对窗合并） | **有实验支持** | `identifiability/2` 表 |
-| 15 | 链上"相位叠加"不成立（滞后漂移 22.57 周期），Kanren 只可表达候选 | **已证明** | `chainObservation` + 两栈测试 |
-| 16 | 跨栈契约在"同一份 JSON + 同一套容差"下一致 | **有实验支持**（仅证明遵守共同约定） | Scala 逐字节校验 + Elixir 对表测试 |
-| 17 | 三方档案的差异可追溯到具体观测/记录变换，而非任意改数字 | **有实验支持**（结构成立；单条散文级一致性未逐句核） | `Observation` 变换 + 保留/丢失表 |
-| 18 | Mandate 数值结果可作为符号预测的裁判（`Facts` 记录-结算） | **有实验支持**（机制可用，尚未接入真实游戏内预测流） | `AscribeTest` 结算用例 |
-| 19 | Minecraft 实机生命周期、区块加载、游戏线程行为 | **尚未验证** | 纯逻辑测试不能代替 |
-| 20 | 玩家（真人）能否在两小时内据此归因 | **尚未验证** | 需要 §8 的盲测 |
-
----
-
-## I. 剩余证据缺口与最小下一步
-
-**缺口（不宣称已完成独立证明）**
-
-1. **没有独立实现**：所有数值都出自同一份 `MandateState`/`ODESolver`；跨栈一致只证明"共同约定被遵守"，不证明约定正确。唯一的独立参考（奇异极限积分）已**证伪**，因此"周期 39.47 是对的"目前只有步长收敛与内部一致性支持。
-2. **没有第三方复现**：本报告只在本机（Windows + JDK21 + Elixir 1.20/OTP29）跑过。
-3. **一手规程未获取**：水文/火工品记录结构只有二手材料；未见 1980 年代规范原件。
-4. **H 是作者声明的闭集**：唯一性相对于 H 与 E 成立，不是绝对历史真相。
-5. **等时线不存在性未形式化**：只给了"带误差界"的收缩表述与反例。
-6. **游戏内未验证**：`PersistentState`、区块加载、tick 抽稀、HUD 读数、`FirePulse` 的世界侧 1:N 映射都未接入实机。
-7. **可读性未测**：真人盲测未做。
-
-**最小下一步（按性价比）**
-
-1. 用**独立实现**复算 `T` 与点火阈值（例如直接用 `poc_tuning.py` 式外部脚本或另一套积分器），把 §D 的核心数字从"有实验支持"提升到"已证明"。
-2. 在 `runClient` 里把 `FirePulse` 的世界侧映射接上，用 `MandateRuntime.stateAt` 观察一次真实的"敲钟→相位读数"，验证游戏线程与 actor 的快照顺序（H-19）。
-3. 决定"易损窗点火"这条**是改参数还是改文档**：在 `a≈0.25` 附近重测点火阈值，看是否能在可接受周期内把阈值压到声明剂量之下；若不能，就应把 §1.1.4 的窗口语义改写为本报告测出的"中周期强推迟 / 晚周期弱提前"，而不是保留现在的说法。
-4. 给 `Profile.regime` 的 `Burnout` 与 `Readout` 的相位域加一条契约测试，防止两个"burnout"继续各说各话（本轮只记录、未修改）。
-5. 安排一次 §8 的两小时盲测，测 E-2 的"读者能否只用档案反演出窗口"。
+**现实记录结构参考（仅取仪器与台账结构，无现实指涉）**：
+- 自记雨量计故障迹线结构：[降水迹线异常分析](http://qxkjjz.cn/cn/article/pdf/preview/10.3969/j.issn.2095-1973.2019.03.003.pdf)、[降水现象与自记降水量不一致](http://qxqk.nmc.cn/qx/ch/reader/create_pdf.aspx?file_no=19950114&st=alljournals#1#1#1)
+- 火工品领退台账与管理规定：[火工品支领、清退制度](http://p.safehoo.com/Manage/System/Fire/201504/389489.shtml)、[爆破器材管理规定摘录](http://www.dcblast.com/UpLoadfiles/upLoadImages/200710221011019167.pdf#6#15#6)

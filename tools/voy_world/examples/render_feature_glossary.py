@@ -485,7 +485,7 @@ def render_anatomy(case):
     set_aspect(19.6, 13.4)
     fig, ax = canvas(
         "一条支沟怎么变成五个字段：以白水坝（baishui）为例",
-        "同一条沟在规则层里是 5 个 atom 的取值；compile_branch/1 再把它变成结局、遗迹落位与四份档案。",
+        "同一条沟在规则层里是 5 个 atom 的取值；compile_branch/1 与 Witness 再把它变成结局、遗迹落位与五跳卷宗。",
         (19.6, 13.4),
     )
 
@@ -609,8 +609,8 @@ def render_anatomy(case):
         ("政体", case["polity"]),
         ("镇山古器", case["relic"]),
         ("先例", case["precedent"]),
-        ("官方口径", case["archives"]["official_label"]),
-        ("技术真因", case["archives"]["tech_label"]),
+        ("c0 状态", case["c0"]),
+        ("源头扰动", case["disturbance"]),
     ]
     oy = cb + 14.5
     for label, value in outcome:
