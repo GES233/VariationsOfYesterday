@@ -83,6 +83,7 @@ defmodule Voy.World.Export do
 
     with {:ok, profile} <- ensure_profile(profile),
          {:ok, seed} <- require_seed(opts),
+         {:ok, horizon} <- Schema.normalize_horizon(Keyword.get(opts, :horizon, :locked)),
          {:ok, topo} <- topology(topo_fields) do
       slices =
         run_all(fn query -> Chronicle.compile_branch_sliceo(topo, query) end)
@@ -93,6 +94,7 @@ defmodule Voy.World.Export do
           {:error, :unsupported_topography}
 
         slices ->
+          opts = Keyword.put(opts, :horizon, horizon)
           slices |> Enum.map(&branch_record(topo, &1, opts, seed)) |> build_bundle(profile)
       end
     end
@@ -230,11 +232,13 @@ defmodule Voy.World.Export do
     topo = Keyword.fetch!(record, :topography)
     branch_id = record |> Keyword.get(:branch_id) |> to_string()
     node_id = record |> Keyword.get(:node_id) |> to_string()
+    horizon = record |> Keyword.get(:horizon, :locked) |> to_string()
 
     normalize(%{
       "node_id" => node_id,
       "branch_id" => branch_id,
       "rule_set" => to_string(Keyword.fetch!(record, :rule_set)),
+      "horizon" => horizon,
       "sites" => sites(topo, branch_id),
       "names" => Keyword.fetch!(record, :names),
       "topography" => topo,
@@ -247,6 +251,7 @@ defmodule Voy.World.Export do
   defp branch_record(topo, slice, opts, seed) do
     branch_id = to_string(topo[:branch_id])
     node_id = Keyword.get(opts, :node_id, branch_id) |> to_string()
+    horizon = Keyword.get(opts, :horizon, :locked)
     display_names = names(topo, node_id)
     relic = Keyword.fetch!(slice, :era1)[:guardian_relic]
     fate = Keyword.fetch!(slice, :era3)[:fate]
@@ -255,6 +260,7 @@ defmodule Voy.World.Export do
       "node_id" => node_id,
       "branch_id" => branch_id,
       "rule_set" => Keyword.get(opts, :rule_set, :default_branch_v1) |> to_string(),
+      "horizon" => to_string(horizon),
       "sites" => sites(topo, branch_id),
       "names" => display_names,
       "topography" => topo,
@@ -263,7 +269,8 @@ defmodule Voy.World.Export do
           {era, Keyword.fetch!(slice, String.to_existing_atom(era))}
         end),
       "structures" => Keyword.fetch!(slice, :structures),
-      "dossier" => Witness.render_dossier(seed, branch_id, relic, fate, display_names)
+      "dossier" =>
+        Witness.render_dossier(seed, branch_id, relic, fate, display_names, horizon: horizon)
     })
   end
 
@@ -343,6 +350,7 @@ defmodule Voy.World.Export do
   end
 
   defp normalize_term(nil), do: nil
+  defp normalize_term(value) when is_boolean(value), do: value
   defp normalize_term(value) when is_atom(value), do: Atom.to_string(value)
   defp normalize_term(value), do: value
 
@@ -494,26 +502,75 @@ defmodule Voy.World.Export do
 
   defp check_history(node), do: {:error, {:invalid_bundle, {:history, node["history"]}}}
 
-  defp check_dossier(%{"dossier" => dossier, "history" => history}) when is_map(dossier) do
+  defp check_dossier(%{"dossier" => dossier, "history" => history} = node) when is_map(dossier) do
     documents = dossier["documents"]
     main = if is_list(documents), do: Enum.filter(documents, &(&1["role"] == "main")), else: []
     decoys = if is_list(documents), do: Enum.filter(documents, &(&1["role"] == "decoy")), else: []
     binding = dossier["binding"]
+    horizon = Map.get(dossier, "horizon") || Map.get(node, "horizon") || "locked"
+    node_horizon = Map.get(node, "horizon") || horizon
+    settled = Map.get(dossier, "settled", horizon == "locked")
 
-    valid? =
-      is_integer(dossier["seed"]) and
+    base_valid? =
+      horizon in ["locked", "open"] and
+        node_horizon == horizon and
+        is_boolean(settled) and
+        is_integer(dossier["seed"]) and
         dossier["relic"] == get_in(history, ["era1", "guardian_relic"]) and
-        dossier["fate"] == get_in(history, ["era3", "fate"]) and
         is_map(binding) and is_integer(binding["safe_tick"]) and
         is_number(binding["safe_delay"]) and is_number(binding["safe_phase"]) and
-        is_list(documents) and length(documents) == 7 and
-        Enum.map(main, & &1["hop"]) == [1, 2, 3, 4, 5] and length(decoys) == 2 and
+        is_list(documents) and length(decoys) == 2 and
         Enum.all?(documents, &(is_binary(&1["title"]) and is_binary(&1["body"])))
 
-    if valid?, do: :ok, else: {:error, {:invalid_bundle, {:dossier, :shape_or_history_mismatch}}}
+    horizon_valid? =
+      case {horizon, settled} do
+        {"locked", true} ->
+          dossier["fate"] == get_in(history, ["era3", "fate"]) and
+            length(documents) == 7 and
+            Enum.map(main, & &1["hop"]) == [1, 2, 3, 4, 5]
+
+        {"open", false} ->
+          transitions = dossier["reachable_transitions"]
+
+          dossier["fate"] == get_in(history, ["era3", "fate"]) and
+            length(documents) == 6 and
+            Enum.map(main, & &1["hop"]) == [1, 2, 3, 4] and
+            valid_reachable_transitions?(transitions, binding)
+
+        {"open", true} ->
+          transitions = dossier["reachable_transitions"]
+
+          (dossier["baseline_fate"] || dossier["fate"]) == get_in(history, ["era3", "fate"]) and
+            length(documents) == 7 and
+            Enum.map(main, & &1["hop"]) == [1, 2, 3, 4, 5] and
+            valid_reachable_transitions?(transitions, binding) and
+            Enum.any?(transitions, &(&1["target_fate"] == dossier["fate"]))
+
+        _ ->
+          false
+      end
+
+    if base_valid? and horizon_valid?,
+      do: :ok,
+      else: {:error, {:invalid_bundle, {:dossier, :shape_or_history_mismatch}}}
   end
 
   defp check_dossier(node), do: {:error, {:invalid_bundle, {:dossier, node["dossier"]}}}
+
+  defp valid_reachable_transitions?(transitions, binding)
+       when is_list(transitions) and transitions != [] do
+    Enum.all?(transitions, fn t ->
+      is_map(t) and
+        is_binary(t["intervention"]) and
+        is_binary(t["target_fate"]) and
+        is_binary(t["target_regime"]) and
+        t["batch_id"] == binding["batch_id"] and
+        t["vessel_code"] == binding["vessel_code"] and
+        t["safe_tick"] == binding["safe_tick"]
+    end)
+  end
+
+  defp valid_reachable_transitions?(_transitions, _binding), do: false
 
   defp check_string(map, key) do
     case Map.fetch(map, key) do

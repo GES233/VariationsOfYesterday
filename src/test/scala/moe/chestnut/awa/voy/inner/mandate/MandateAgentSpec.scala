@@ -3,11 +3,14 @@ package moe.chestnut.awa.voy.inner.mandate
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
-import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import scala.collection.mutable.ArrayBuffer
+
 import org.junit.jupiter.api.{AfterEach, Test}
 import org.junit.jupiter.api.Assertions.*
 
-import moe.chestnut.awa.voy.inner.event.EventMsg
+import moe.chestnut.awa.voy.inner.action.MandateActionProtocol
+import moe.chestnut.awa.voy.inner.actor.ActorRef
+import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 
 /** Wiring contract of [[MandateAgent]] (design draft §1.4, 2026-09-30):
   * tick events drive integration deterministically, one published snapshot
@@ -15,9 +18,17 @@ import moe.chestnut.awa.voy.inner.event.EventMsg
   * and are dropped deterministically when addressed outside the lattice.
   */
 class MandateAgentSpec:
-  private val testKit = ActorTestKit()
+  /** Actors started by one test; stopped afterwards so worker threads never
+    * leak between cases. */
+  private val spawned = ArrayBuffer.empty[() => Unit]
 
-  @AfterEach def shutdown(): Unit = testKit.shutdownTestKit()
+  @AfterEach def shutdown(): Unit =
+    spawned.foreach(_())
+    spawned.clear()
+
+  private def track[E](ref: ActorRef[E]): ActorRef[E] =
+    spawned += (() => ref.stop())
+    ref
 
   private val origin = CellCoord(0, 0)
 
@@ -38,8 +49,8 @@ class MandateAgentSpec:
       grid: MandateGrid,
       published: AtomicReference[Map[CellCoord, MandateCurrent]],
       latch: CountDownLatch
-  ) =
-    testKit.spawn(
+  ): ActorRef[EventDTO] =
+    track(
       MandateAgent(
         grid,
         snapshot => { published.set(snapshot); latch.countDown() }
@@ -71,7 +82,7 @@ class MandateAgentSpec:
   @Test def noTickNoIntegration(): Unit =
     val published =
       new AtomicReference[Map[CellCoord, MandateCurrent]](Map.empty)
-    val agent = testKit.spawn(
+    val agent = track(
       MandateAgent(singleCellGrid(mkCell(0.08)), published.set(_))
     )
     agent ! EventMsg.FirePulse(origin, 10.0)
@@ -128,10 +139,10 @@ class MandateAgentSpec:
     val readouts =
       new AtomicReference[Map[CellCoord, CellReadout]](Map.empty)
     val actions = new java.util.concurrent.ConcurrentLinkedQueue[
-      moe.chestnut.awa.voy.inner.action.MandateActionProtocol
+      MandateActionProtocol
     ]()
     val latch = new CountDownLatch(2)
-    val agent = testKit.spawn(
+    val agent = track(
       MandateAgent(
         singleCellGrid(mkCell(0.0)),
         _ => (),
@@ -151,4 +162,3 @@ class MandateAgentSpec:
     assertEquals(0.03, r.baselineCalming, 1e-12)
     assertEquals(Regime.Strained, r.regime)
     assertFalse(actions.isEmpty, "regime transition from Calm to Strained should emit an outbound action")
-

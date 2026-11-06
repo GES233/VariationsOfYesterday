@@ -68,7 +68,7 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
 - **读数投影层（`MandateReadout`）**：呈现层不直接读取裸浮点数，统一通过 `ReadoutParam` 映射为：
   - **慢变量分级（`Regime`）**：`Calm` / `Strained` / `Oscillating` / `Burnout`；
   - **快变量相位读数（`PhaseReading`）**：周期轨道 `Cycle(label, fraction)`（四相标签 `Excitation` / `AbsoluteRefractory` / `RelativeRefractory` / `Resting` 及 20 格刻度 `dialTick`）、静息域 `Basin(Resting)`、无周期 `Undefined(BurnoutNoCycle | TransientNoCycle | NoCycleReference)`。
-- **Tick 事件驱动调度**：`END_SERVER_TICK` 投递固定步长 `TickArrived(dt = 0.05, tickRate)` 进入 Pekko actor（`MandateAgent`），与通道事件（`StressInject` / `SetDisturbance` / `SetCalming` / `SetBaselineCalming` / `HoldImpulse` / `FirePulse`）同信箱全序处理，仿真时间恒等于游戏时间。无玩家在线时不投递 tick。游戏线程只读 `@volatile` 快照（`MandateRuntime`）并在下一 tick 消费动作回包（`MandateOverworld`）。
+- **Tick 事件驱动调度**：`END_SERVER_TICK` 投递固定步长 `TickArrived(dt = 0.05, tickRate)` 进入引擎单线程 actor（`inner/actor` 内核上的 `MandateAgent`），与通道事件（`StressInject` / `SetDisturbance` / `SetCalming` / `SetBaselineCalming` / `HoldImpulse` / `FirePulse`）同信箱全序处理，仿真时间恒等于游戏时间。无玩家在线时不投递 tick。游戏线程只读 `@volatile` 快照（`MandateRuntime`）并在下一 tick 消费动作回包（`MandateOverworld`）。
 
 ## 2. 地势与谷地：因果的方向
 
@@ -91,9 +91,9 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
 
 - **叙事知识 = 机制优势**：档案中的实测推迟刻度、器物编号与流转批号由世界种子在生成时填入（`Voy.World.Witness`），对抗 Wiki 剧透。
 - **五跳局部证据链**：故事不写进任何单张全知摘要，而是拆分为五份局部单据（旧志先例 $\rightarrow$ 收缴/代管单 $\rightarrow$ 车间配料卡 $\rightarrow$ 野外观测手簿 $\rightarrow$ 现行条规）加两份同车间干扰单据，靠共享桥接元组合一还原（详见设计札记 03/05）。
-- **历史结局与运行时分账**：
-  - 世界生成时的六种历史结局（同化新寨、烧毁死寂区、空间裂隙、幸存对照、慢性渗漏、虚警耐受）是玩家入场前的既定事实；
-  - 玩家通过跨阵营观测反演隐藏解释（`Ascribe` / `Observation`），在既有动力学约束下介入并由 Mandate 结算运行时结果（`Facts`）。
+- **历史时域分层（既定先例 vs 未决变奏）与运行时分账**：
+  - **既定先例节点（`horizon: :locked`，1–2 个）**：玩家入场前已走完第三纪结局（如 `BurnoutZone` 烧毁死寂区或 `ControlGroup` 幸存对照），五跳卷宗（Hop 1..5）齐全，充当供玩家溯因反演（abduction）因果律的「法医标本」。
+  - **未决变奏节点（`horizon: :open`，其余山谷）**：世界生成期停留在 `era2b` 悬置阈值（如 `c0_collapsed` 后的 `ChronicSeep` 慢性渗漏或 `Oscillating` 周期震荡），仅投放前四跳（Hop 1..4）与 2 张干扰卡。玩家运用从先例节点习得的因果律——由 Hop 1→2→3 筛除干扰卡寻回真工业载体、按 Hop 4 读表在不应期推迟窗口（`safe_tick`）重锚 $c_0$（见 `MandateOverworld.evaluateBellStrike`）、并削减上游扰动——在运行时改写山谷的第三纪结局（`Facts`），动态结算并解锁第 5 跳守山条规。
 - **领地性原则**：仅目标山区谷地为活跃 Node；主世界其余区域休眠；下界为机制真空的死地；末地为空间裂隙飞升者的边缘彩蛋。
 
 ## 5. Worldgen 路线分级

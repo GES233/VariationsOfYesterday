@@ -33,10 +33,24 @@ defmodule Voy.World.Schema do
     :Fate_Tolerated_FalseAlarm
   ]
 
+  @horizons [:locked, :open]
+
+  @interventions [
+    :no_intervention,
+    :reanchor_vessel,
+    :dampen_headwater,
+    :reanchor_and_dampen
+  ]
+
+  @regimes [:Calm, :Strained, :Oscillating, :Burnout]
+
   def topology_keys, do: @topology_keys
   def feature_keys, do: @feature_keys
   def feature_domain(key), do: Map.fetch!(@feature_domains, key)
   def fates, do: @fates
+  def horizons, do: @horizons
+  def interventions, do: @interventions
+  def regimes, do: @regimes
 
   def normalize_fate(fate) when fate in @fates, do: {:ok, fate}
 
@@ -48,6 +62,40 @@ defmodule Voy.World.Schema do
   end
 
   def normalize_fate(_fate), do: {:error, :unknown_fate}
+
+  def normalize_horizon(horizon) when horizon in @horizons, do: {:ok, horizon}
+
+  def normalize_horizon(horizon) when is_binary(horizon) do
+    case Enum.find(@horizons, &(Atom.to_string(&1) == horizon)) do
+      nil -> {:error, :invalid_horizon}
+      normalized -> {:ok, normalized}
+    end
+  end
+
+  def normalize_horizon(_horizon), do: {:error, :invalid_horizon}
+
+  def normalize_intervention(intervention) when intervention in @interventions,
+    do: {:ok, intervention}
+
+  def normalize_intervention(intervention) when is_binary(intervention) do
+    case Enum.find(@interventions, &(Atom.to_string(&1) == intervention)) do
+      nil -> {:error, :unknown_intervention}
+      normalized -> {:ok, normalized}
+    end
+  end
+
+  def normalize_intervention(_intervention), do: {:error, :unknown_intervention}
+
+  def normalize_regime(regime) when regime in @regimes, do: {:ok, regime}
+
+  def normalize_regime(regime) when is_binary(regime) do
+    case Enum.find(@regimes, &(Atom.to_string(&1) == regime)) do
+      nil -> {:error, :unknown_regime}
+      normalized -> {:ok, normalized}
+    end
+  end
+
+  def normalize_regime(_regime), do: {:error, :unknown_regime}
 
   def topology(fields) do
     Enum.map(@topology_keys, fn key ->
@@ -95,6 +143,7 @@ defmodule Voy.World.Schema do
 
   def to_public(%ReifiedVar{id: id}), do: %{"_var" => id}
   def to_public(nil), do: nil
+  def to_public(term) when is_boolean(term), do: term
   def to_public([]), do: []
 
   def to_public(term) when is_list(term) do

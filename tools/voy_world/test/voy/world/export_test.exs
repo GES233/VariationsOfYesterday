@@ -192,4 +192,37 @@ defmodule Voy.World.ExportTest do
     assert {:error, :fate_constraint_unsatisfied} =
              Export.export_node(ascending, features: @complete_features)
   end
+
+  test "exporting and settling an open variation node validates and round-trips through JSON v2" do
+    open_spec = Keyword.put(@spec_fields, :horizon, :open)
+
+    assert {:ok, open_bundle} = Export.export_node(open_spec, features: @complete_features)
+    assert :ok = Export.validate(open_bundle)
+    assert {:ok, json} = Export.to_json(open_bundle)
+    assert {:ok, decoded} = Export.from_json(json)
+    assert decoded == open_bundle
+
+    assert [open_node] = open_bundle["nodes"]
+    assert open_node["horizon"] == "open"
+    assert open_node["dossier"]["horizon"] == "open"
+    assert open_node["dossier"]["settled"] == false
+    assert length(open_node["dossier"]["documents"]) == 6
+    assert length(open_node["dossier"]["reachable_transitions"]) == 4
+
+    # Settle the exported open dossier and verify the updated bundle still validates under v2
+    assert {:ok, settled_dossier} =
+             Voy.World.settle_open_dossier(
+               open_node["dossier"],
+               :reanchor_and_dampen,
+               names: open_node["names"]
+             )
+
+    settled_node = %{open_node | "dossier" => settled_dossier}
+    settled_bundle = %{open_bundle | "nodes" => [settled_node]}
+
+    assert :ok = Export.validate(settled_bundle)
+    assert {:ok, settled_json} = Export.to_json(settled_bundle)
+    assert {:ok, settled_decoded} = Export.from_json(settled_json)
+    assert settled_decoded == settled_bundle
+  end
 end

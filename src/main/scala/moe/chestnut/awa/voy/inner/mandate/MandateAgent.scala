@@ -1,9 +1,7 @@
 package moe.chestnut.awa.voy.inner.mandate
 
-import org.apache.pekko.actor.typed.Behavior
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
-
 import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
+import moe.chestnut.awa.voy.inner.actor.{Actor, ActorRef}
 import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 
 /** The mandate engine actor: owns the lattice and integrates it on tick
@@ -15,6 +13,10 @@ import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
   * event sequence is deterministic and replayable. The actor thread is the
   * single writer of the grid; readers consume the published immutable
   * snapshot instead of asking the actor.
+  *
+  * The mailbox is the in-repo kernel in `inner/actor`, not a third-party
+  * actor framework: the engine only needs one worker thread and a total
+  * order, and the kernel keeps the mod jar free of an extra runtime.
   *
   * @param snapshotSink called after each integration step with an immutable
   *   state map (grid-local coordinates); production wiring republishes it
@@ -52,62 +54,58 @@ object MandateAgent:
       snapshotSink: Map[CellCoord, MandateCurrent] => Unit,
       actionSink: MandateActionProtocol => Unit = (_ => ()),
       readoutSink: Map[CellCoord, CellReadout] => Unit = (_ => ())
-  ): Behavior[EventDTO] =
-    Behaviors.setup { context =>
-      context.log.info("Mandate engine actor started.")
-      val readoutParam = ReadoutParam()
-      var simTime: Double = 0.0
-      val trackers: Map[CellCoord, PhaseTracker] = grid.cells.map { case (coord, cell) =>
-        coord -> new PhaseTracker(readoutParam, cell.param, cell.stressParam.coupling)
-      }
-      var prevRegimes: Map[CellCoord, Regime] = grid.cells.map { case (coord, cell) =>
-        coord -> Readout.regime(cell.getState, readoutParam)
-      }
-      var inSpike: Set[CellCoord] = Set.empty
-
-      Behaviors.receiveMessage {
-        // tickRate is reserved for the step-coarsening ("weathering")
-        // mechanism (§1.4) and intentionally ignored for now.
-        case EventMsg.TickArrived(dt, _) =>
-          grid.step(dt)
-          simTime += dt
-
-          val currentBuilder = Map.newBuilder[CellCoord, MandateCurrent]
-          val readoutBuilder = Map.newBuilder[CellCoord, CellReadout]
-
-          grid.cells.foreach { case (coord, cell) =>
-            val cur = cell.getState
-            currentBuilder += (coord -> cur)
-
-            val phase = trackers(coord).observe(simTime, cur)
-            val regime = Readout.regime(cur, readoutParam)
-            readoutBuilder += (coord -> CellReadout(cur, regime, phase, cell.baselineCalming))
-
-            val spikingNow = Math.abs(cur.dissonance) >= readoutParam.spikeLevel
-            if spikingNow && !inSpike.contains(coord) then
-              inSpike += coord
-              actionSink(ActionMsgPool.CellSpikeTriggered(coord, cur, regime))
-            else if !spikingNow && inSpike.contains(coord) then
-              inSpike -= coord
-
-            prevRegimes.get(coord).foreach { oldRegime =>
-              if oldRegime != regime then
-                prevRegimes = prevRegimes.updated(coord, regime)
-                actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, regime, phase))
-            }
-          }
-
-          snapshotSink(currentBuilder.result())
-          readoutSink(readoutBuilder.result())
-          Behaviors.same
-        case other =>
-          // Channel events apply to a single cell; events addressed outside
-          // the active lattice are dropped deterministically (§1.4 loading
-          // invariance: presence of a cell must not depend on chunk load
-          // order).
-          applyEvent(grid, other)
-          Behaviors.same
-      }
+  ): ActorRef[EventDTO] =
+    val readoutParam = ReadoutParam()
+    var simTime: Double = 0.0
+    val trackers: Map[CellCoord, PhaseTracker] = grid.cells.map { case (coord, cell) =>
+      coord -> new PhaseTracker(readoutParam, cell.param, cell.stressParam.coupling)
     }
+    var prevRegimes: Map[CellCoord, Regime] = grid.cells.map { case (coord, cell) =>
+      coord -> Readout.regime(cell.getState, readoutParam)
+    }
+    var inSpike: Set[CellCoord] = Set.empty
 
+    def integrate(dt: Double): Unit =
+      grid.step(dt)
+      simTime += dt
 
+      val currentBuilder = Map.newBuilder[CellCoord, MandateCurrent]
+      val readoutBuilder = Map.newBuilder[CellCoord, CellReadout]
+
+      grid.cells.foreach { case (coord, cell) =>
+        val cur = cell.getState
+        currentBuilder += (coord -> cur)
+
+        val phase = trackers(coord).observe(simTime, cur)
+        val regime = Readout.regime(cur, readoutParam)
+        readoutBuilder += (coord -> CellReadout(cur, regime, phase, cell.baselineCalming))
+
+        val spikingNow = Math.abs(cur.dissonance) >= readoutParam.spikeLevel
+        if spikingNow && !inSpike.contains(coord) then
+          inSpike += coord
+          actionSink(ActionMsgPool.CellSpikeTriggered(coord, cur, regime))
+        else if !spikingNow && inSpike.contains(coord) then
+          inSpike -= coord
+
+        prevRegimes.get(coord).foreach { oldRegime =>
+          if oldRegime != regime then
+            prevRegimes = prevRegimes.updated(coord, regime)
+            actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, regime, phase))
+        }
+      }
+
+      snapshotSink(currentBuilder.result())
+      readoutSink(readoutBuilder.result())
+
+    def handle(event: EventDTO): Unit =
+      // tickRate is reserved for the step-coarsening ("weathering")
+      // mechanism (§1.4) and intentionally ignored for now.
+      event match
+        case EventMsg.TickArrived(dt, _) => integrate(dt)
+        // Channel events apply to a single cell; events addressed outside
+        // the active lattice are dropped deterministically (§1.4 loading
+        // invariance: presence of a cell must not depend on chunk load
+        // order).
+        case other => applyEvent(grid, other)
+
+    Actor.spawn("mandate")(handle)

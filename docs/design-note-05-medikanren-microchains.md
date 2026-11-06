@@ -8,13 +8,16 @@
 
 - **拓扑多态**：按古器类型分两条互不交叉的物理主链（铜钲声学冶金链 vs 石堰喀斯特水工链）；
 - **单跳守恒锁**：`Pathway.connect_edges/1` 仅靠 `:from` 与 `:to` 元组合一拼链，不读顶层结局标签；删去任一跳即断链；
-- **种子物证绑定（Seeded Skolemization）**：由 `(seed, branch_id, relic, fate)` 确定性派生批号、备件名与实测推迟刻度 `safe_tick`，并同卷宗混入 2 张断链干扰单据。
+- **种子物证绑定（Seeded Skolemization）**：由 `(seed, branch_id, relic, fate)` 确定性派生批号、备件名与实测推迟刻度 `safe_tick`，并同卷宗混入 2 张断链干扰单据；
+- **双时域投放（`horizon: :locked` vs `horizon: :open`）**：
+  - **既定先例节点（`horizon: :locked`，1–2 个）**：生成期即投放全部 5 张主链卡（Hop 1..5）+ 2 张干扰卡，供玩家复盘已发生的历史结局并反向推演规律；
+  - **未决变奏节点（`horizon: :open`，其余山谷）**：生成期停在 `era2b`/悬置初态，世界内仅投放前四跳（Hop 1..4）+ 2 张干扰卡；玩家必须据此筛出真工业载体 `vessel`、读取第 `safe_tick` 格相位推迟窗口重锚 $c_0$ 并平抑上游扰动，在运行时改写 `era3` 结局后才结算生成对应的第 5 跳（`:council_ordinance`）。
 
 ---
 
 ## 2. 五跳微链图谱（`Voy.World.Pathway`）
 
-每条主链由 5 条有向边（Hop 1..5）首尾咬合而成：
+每条主链由 5 条有向边（Hop 1..5）首尾咬合而成（`:locked` 节点生成期全量物化；`:open` 节点生成期物化 Hop 1..4，Hop 5 随运行时 `era3` 结算落定）：
 
 ### 2.1 主链 A：声学冶金微链（`relic == :ancestral_bronze_zheng`）
 

@@ -28,18 +28,20 @@
 | **第一纪：山官火塘** | `topo` | 隘口决定镇山古器：峡谷立**镇山铜钲**（声学阻尼），溶洞立**石雕分水堰**（虹吸泄压）；初始维持 `c0_intact` 与 `Calm` | `era1_headmano/2` |
 | **第二纪上：流官清丈** | `topo + era1` | 按可达性分叉：<br>• **机耕道可达**：清丈局收铜钲或毁石堰 $\rightarrow$ 触发山崩掩署或暗河倒灌反噬 $\rightarrow$ 发还古器、退守「外甲内寨」；<br>• **绝壁隔绝**：胥吏止步崖下，仅立归化碑虚报具结 | `era2a_magistrateo/3` |
 | **第二纪下：垦殖改组** | `topo + era1 + era2a` | • **可达性 $\rightarrow c_0$**：通车则改组为国营垦殖分队、古器按废料收缴（`c0_collapsed`）、山官后裔贬为保管员；绝壁则挂靠林场、古器留存原地（`c0_intact`）；<br>• **源头×地质 $\rightarrow$ 扰动**：陡裂隙+活动断层进驻 302 爆破队（`alpha_shock`）；落水洞+深应力腔进驻高压注浆处（`OverwhelmingNegativeSuppression`）；陡裂隙+微裂隙设林场水文哨（`heavy_kick`） | `era2b_reclamationo/4` |
-| **第三纪：撤场与六结局** | `era2b` | 由 `(c0_status, pulse)` 的 $2 \times 3$ 象限决定六种历史结局与终态 Regime（同化新寨、烧毁死寂区、空间裂隙、幸存对照、慢性渗漏、虚警耐受），并经 `Projection` 派生上中下游三处遗迹结构 | `era3_catastropheo/5`<br>`compile_branch_sliceo/2` |
+| **第三纪：撤场与六结局** | `era2b` | 由 `(c0_status, pulse)` 的 $2 \times 3$ 象限决定六种结局与终态 Regime（同化新寨、烧毁死寂区、空间裂隙、幸存对照、慢性渗漏、虚警耐受）。**既定先例节点（`horizon: :locked`）**在生成期直接落定 `era3`；**未决变奏节点（`horizon: :open`）**在生成期停于 `era2b` 悬置初态，待运行时由玩家干预决定 `era3` 走向 | `era3_catastropheo/5`<br>`compile_branch_sliceo/2` |
 
 ---
 
-## 3. 历史、局部证据与运行时结算的分工
+## 3. 历史时域分层、局部证据与运行时结算的分工
 
-系统将「过去的历史」「散落的档案」与「玩家的运行时干预」严格分账：
+系统将「既定先例」「未决山谷」与「玩家的运行时干预」严格分账：
 
-1. **历史与结构（`Chronicle` + `Projection` + `Node`）**：决定玩家入场前这片山谷发生过什么、三处遗址长什么样。
-2. **五跳局部卷宗（`Pathway` + `Witness` + `Content`）**：将历史拆解为 5 张单跳卡片与 2 张同车间干扰卡，按世界种子绑定批号、工业载体和实测安全刻度（详见札记 03、05）。
+1. **双时域节点编译（`Chronicle` + `Projection` + `Node`）**：
+   - **既定先例节点（`horizon: :locked`，1–2 个）**：入场前已定格于第三纪结局（如 `BurnoutZone` 或 `ControlGroup`），三处遗迹与全套五跳卷宗（Hop 1..5）固定，作为溯因反演的对照标本。
+   - **未决变奏节点（`horizon: :open`，其余山谷）**：生成期停在 `era2b`/悬置初态（如 `c0_collapsed` 下的 `ChronicSeep` 或 `Oscillating`），仅投放前四跳（Hop 1..4）与 2 张同车间干扰卡。
+2. **五跳局部卷宗（`Pathway` + `Witness` + `Content`）**：将因果链拆解为单跳卡片与同车间干扰卡，按世界种子绑定批号、工业载体和实测安全刻度 `safe_tick`（详见札记 03、05）。
 3. **三方观测与溯因反演（`Slice` + `Observation` + `Ascribe`）**：模拟总指挥部（月度汇总+行政甩锅）、技术内层（铅锤削顶+滞后读表）、老寨（物候先后+击打计数）对同一物理轨迹的观测失真，由 `Ascribe.abduceo/4` 在 24 候选空间内反演隐藏解释。
-4. **运行时事实与预测结算（`Facts`）**：追加式记录 `saw / did / said / predicted / settled`，由 Mandate 数值结果对符号预测进行裁判，不篡改生成期的历史结局。
+4. **运行时干预与结局改写（`Facts` + `MandateOverworld`）**：在 `:open` 节点中，玩家通过 Hop 1→2→3 排除干扰寻回真载体，结合 Hop 4 读数在不应期推迟窗口（`safe_tick`）敲击重锚 $c_0$ 并配合上游降扰，驱动山谷在 $2 \times 3$ 状态图上跃迁、结算 `era3` 结局并生成第 5 跳条规；追加式记录 `saw / did / said / predicted / settled`。
 
 ---
 

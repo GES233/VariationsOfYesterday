@@ -13,6 +13,10 @@ object VariationsOfYesterday extends ModInitializer:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   private def registerMandateEngine(): Unit =
+    // Touch the effect holder first: registering status effects must happen
+    // during mod init, before any server-driven `StatusEffectInstance` exists.
+    MandateEffects.Stagnation
+    MandateEffects.StagnationSpike
     ServerLifecycleEvents.SERVER_STARTING.register(_ => MandateRuntime.start())
     ServerLifecycleEvents.SERVER_STOPPED.register(_ => MandateRuntime.stop())
     ServerTickEvents.END_SERVER_TICK.register(MandateRuntime.onTick(_))

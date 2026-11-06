@@ -109,4 +109,87 @@ defmodule Voy.World.ChronicleTest do
     assert result[:era3][:post_withdrawal_polity] == :brigade_elder_joint_council
     assert result[:era3][:fate] == :Fate_Assimilated_NewZhai
   end
+
+  test "history_through_era2bo stops at the threshold before Era 3" do
+    topo = TestFixtures.baishui_topo()
+
+    partials =
+      run_all(fn q -> Chronicle.history_through_era2bo(topo, q) end)
+      |> terms()
+
+    assert [partial] = partials
+    assert Keyword.keys(partial) == [:era1, :era2a, :era2b]
+    assert partial[:era1][:guardian_relic] == :ancestral_bronze_zheng
+    assert partial[:era2b][:c0_status] == :c0_collapsed
+    assert partial[:era2b][:pulse] == :alpha_shock
+  end
+
+  test "forward and backward intervention queries resolve all reachable fates and Calm rescues" do
+    # Forward query on Baishui (baseline: Fate_Assimilated_NewZhai, c0_collapsed + alpha_shock)
+    baishui = TestFixtures.baishui_topo()
+    assert {:ok, reachable} = Chronicle.reachable_fates(baishui)
+
+    by_intervention =
+      Map.new(reachable, fn row -> {row.intervention, {row.target_fate, row.target_regime}} end)
+
+    assert by_intervention == %{
+             no_intervention: {:Fate_Assimilated_NewZhai, :Oscillating},
+             reanchor_vessel: {:Fate_Tolerated_FalseAlarm, :Calm},
+             dampen_headwater: {:Fate_Deferred_ChronicSeep, :Strained},
+             reanchor_and_dampen: {:Fate_Ancestral_ControlGroup, :Calm}
+           }
+
+    # Backward query: how to save Baishui (Fate_Assimilated_NewZhai) to reach :Calm?
+    assert {:ok, calm_solutions} = Chronicle.solve_interventions(baishui, target_regime: :Calm)
+
+    assert Enum.map(calm_solutions, &{&1.intervention, &1.target_fate}) == [
+             {:reanchor_vessel, :Fate_Tolerated_FalseAlarm},
+             {:reanchor_and_dampen, :Fate_Ancestral_ControlGroup}
+           ]
+
+    # Backward query: how to reach Fate_Ancestral_ControlGroup specifically from Baishui?
+    assert {:ok, [ancestral_solution]} =
+             Chronicle.solve_interventions(baishui, target_fate: :Fate_Ancestral_ControlGroup)
+
+    assert ancestral_solution.intervention == :reanchor_and_dampen
+    assert ancestral_solution.effective_c0 == :c0_intact
+    assert ancestral_solution.effective_pulse == :heavy_kick
+    assert ancestral_solution.target_regime == :Calm
+
+    # Backward query: how to save a ChronicSeep valley (c0_collapsed + heavy_kick) to reach :Calm?
+    mahao_topo = [
+      branch_id: :branch_05_mahao,
+      up_name: "蚂蟥窠裂隙",
+      pass_name: "老熊垭口",
+      down_name: "水冬瓜坝",
+      up_terrain: :steep_fissure_headwater,
+      pass_terrain: :canyon_pass,
+      down_terrain: :alluvial_flat,
+      up_geology: :minor_fracture,
+      accessibility: :tractor_road_accessible
+    ]
+
+    assert {:ok, seep_reachable} = Chronicle.reachable_fates(mahao_topo)
+
+    assert Enum.map(seep_reachable, &{&1.intervention, &1.target_fate, &1.target_regime}) == [
+             {:no_intervention, :Fate_Deferred_ChronicSeep, :Strained},
+             {:reanchor_vessel, :Fate_Ancestral_ControlGroup, :Calm}
+           ]
+
+    assert {:ok, [seep_rescue]} =
+             Voy.World.solve_interventions(mahao_topo, target_regime: "Calm")
+
+    assert seep_rescue["intervention"] == "reanchor_vessel"
+    assert seep_rescue["target_fate"] == "Fate_Ancestral_ControlGroup"
+    assert seep_rescue["target_regime"] == "Calm"
+
+    # Burnout valley (Heishui: c0_collapsed + OverwhelmingNegativeSuppression) can also be queried
+    heishui = TestFixtures.heishui_topo()
+
+    assert {:ok, [reanchored_burnout]} =
+             Chronicle.solve_interventions(heishui, intervention: :reanchor_vessel)
+
+    assert reanchored_burnout.target_fate == :Fate_Ascended_SpatialRift
+    assert reanchored_burnout.target_regime == :Strained
+  end
 end

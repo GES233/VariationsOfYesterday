@@ -12,7 +12,7 @@
 ## 技术栈
 
 - **语言与平台**：Scala 3（3.6.3，显著缩进风格）+ Java 21，Minecraft 1.21.2 + Yarn + Fabric Loader 0.16.10 + Fabric API 0.106.1+1.21.2，通过 `kotori_scala` 加载。
-- **并发与调度**：Apache Pekko（`pekko-actor-typed`）。`MandateRuntime` 随服务器生命周期启停；`END_SERVER_TICK` 投递固定步长 `TickArrived(0.05, tickRate)`，与通道事件在 `MandateAgent` 信箱内全序处理。游戏线程只投递事件、读取 `@volatile` 快照并在下一 tick 消费动作队列。
+- **并发与调度**：自建单线程 actor 内核（`inner/actor/`），便于直接发版。`MandateRuntime` 随服务器生命周期启停；`END_SERVER_TICK` 投递固定步长 `TickArrived(0.05, tickRate)`，与通道事件在 `MandateAgent` 信箱内全序处理。游戏线程只投递事件、读取 `@volatile` 快照并在下一 tick 消费动作队列。
 - **关系推理与内容沙盘**：`tools/voy_world/`（独立 Elixir Mix 包，不进模组 jar），内置零依赖 microKanren 引擎（`Voy.Kanren`）。
 
 ## 构建与测试
@@ -25,14 +25,15 @@
 
 - `src/main/scala/moe/chestnut/awa/voy/`
   - `VariationsOfYesterday.scala` — 模组主入口，注册生命周期、tick 与主世界监听
-  - `MandateRuntime.scala` — Minecraft ↔ Mandate 桥接（ActorSystem、tick gate、快照发布、动作回包队列）
+  - `MandateRuntime.scala` — Minecraft ↔ Mandate 桥接（引擎 actor 生命周期、tick gate、快照发布、动作回包队列）
   - `MandateOverworld.scala` — 主世界交互接线（采掘注入应力、敲钟/拆钟控制 $c_0$ 与脉冲、钟表/指南针验山读数、原版「沉滞」debuff）
   - `inner/mandate/` — 核心模拟：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`、`PhaseResponse`、`SliceReplay`、`SliceContract`
+  - `inner/actor/Actor.scala` — 单线程 actor 内核（`ActorRef` 信箱，`tell` / `!` / `stop`）
   - `inner/event/EventMsg.scala` — 入向通道协议 `EventDTO`
   - `inner/action/ActionMsg.scala` — 出向动作协议 `MandateActionProtocol`
   - `helpers/ODESolver.scala` — RK4 / Euler 求解器
 - `src/client/scala/moe/chestnut/awa/voy/` — 客户端入口与开发 HUD（`hud/MandateHud.scala`，`/voy hud [on|off]`）
-- `src/test/scala/moe/chestnut/awa/voy/inner/mandate/` — 10 个 JUnit 5 + Pekko TestKit 测试规范
+- `src/test/scala/moe/chestnut/awa/voy/inner/mandate/` — 10 个 JUnit 5 测试规范；`inner/actor/ActorSpec` 覆盖 actor 内核
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
 - `tools/voy_world/` — Elixir 关系世界模型：
   - `lib/voy/kanren/` — microKanren 内核与 DSL

@@ -36,11 +36,14 @@ defmodule Voy.World.Naming do
 
     case structures do
       [structure_set] ->
+        horizon = Map.get(spec, :horizon, :locked)
+
         {:ok,
          [
            node_id: spec.node_id,
            branch_id: spec.branch_id,
            rule_set: spec.rule_set,
+           horizon: horizon,
            names: spec.names,
            topography: named_topo,
            era1: era1,
@@ -54,7 +57,8 @@ defmodule Voy.World.Naming do
                spec.branch_id,
                Keyword.fetch!(era1, :guardian_relic),
                Keyword.fetch!(era3, :fate),
-               spec.names
+               spec.names,
+               horizon: horizon
              )
          ]}
 

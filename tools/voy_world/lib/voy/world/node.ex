@@ -37,6 +37,7 @@ defmodule Voy.World.Node do
     with {:ok, node_id} <- required_id(fields, :node_id),
          {:ok, branch_id} <- required_id(fields, :branch_id),
          {:ok, rule_set} <- normalize_rule_set(value(fields, :rule_set, :default_branch_v1)),
+         {:ok, horizon} <- Schema.normalize_horizon(value(fields, :horizon, :locked)),
          {:ok, fate_constraint} <-
            normalize_fate_constraint(value(fields, :fate_constraint, :any)),
          {:ok, names} <- normalize_names(fields),
@@ -46,6 +47,7 @@ defmodule Voy.World.Node do
          node_id: node_id,
          branch_id: branch_id,
          rule_set: rule_set,
+         horizon: horizon,
          fate_constraint: fate_constraint,
          names: names,
          seed: seed
@@ -65,6 +67,7 @@ defmodule Voy.World.Node do
             node_id: spec.node_id,
             branch_id: spec.branch_id,
             rule_set: spec.rule_set,
+            horizon: spec.horizon,
             topography: topo,
             history: history
           )

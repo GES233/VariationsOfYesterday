@@ -18,15 +18,17 @@
 
 由此，「平坝但断路」与「台地但通车」均成为合法世界，同一结局可在两种下游地形上生成。
 
-## 3. 六种历史结局（$c_0 \times \text{Pulse}$ 完整象限）
+## 3. 六种结局矩阵：先例分类表与未决山谷状态转移相图
 
-第三纪结局由 `(c0_status, pulse)` 的 $2 \times 3$ 笛卡尔积完整覆盖：
+第三纪结局由 `(c0_status, pulse)` 的 $2 \times 3$ 笛卡尔积完整覆盖。这一矩阵同时承担双重职责：
+1. **既定先例节点（`horizon: :locked`，1–2 个）的尸检分类表**：入场前已定格的结局（如 `BurnoutZone` 死寂标本与 `ControlGroup` 完好对照），提供完整的 Hop 1..5 卷宗供玩家反向前推（abduction）出 `$c_0$ 状态 × 源头脉冲 $\rightarrow$ 终态 Regime` 的因果律。
+2. **未决变奏节点（`horizon: :open`，其余山谷）的运行时状态转移相图**：生成期停留在 `era2b` 悬置阈值（如 `c0_collapsed` 行的 `ChronicSeep` 或 `Oscillating`）。玩家通过寻回真工业载体（Hop 1→2→3）、在不应期推迟窗口（Hop 4 `safe_tick`）敲击重锚 $c_0$（纵向跨行：`c0_collapsed` $\rightarrow$ `c0_intact`），或关停/阻尼上游工业扰动（横向跨列），在运行时改写山谷的第三纪归宿并结算生成第 5 跳条规。
 
 | $c_0$ 状态 \ 源头脉冲 | `alpha_shock`<br>（302 队浅层点炮） | `OverwhelmingNegativeSuppression`<br>（总指挥部高压反向注浆） | `heavy_kick`<br>（林场水文哨低强度采伐） |
 | :--- | :--- | :--- | :--- |
 | **`c0_collapsed`**<br>（通车，主器收缴） | **同化新寨**<br>`Fate_Assimilated_NewZhai`<br>终态：`Oscillating`<br>政体：`brigade_elder_joint_council` | **烧毁死寂区**<br>`Fate_Annihilated_BurnoutZone`<br>终态：`Burnout`<br>政体：`depopulated_concrete_sealed_zone` | **慢性渗漏**<br>`Fate_Deferred_ChronicSeep`<br>终态：`Strained`<br>政体：`deferred_evacuation_watchpost` |
-| **`c0_intact`**<br>（绝壁，主器留存） | **虚警耐受**<br>`Fate_Tolerated_FalseAlarm`<br>终态：`Calm`<br>政体：`cliff_observation_hermitage` | **空间裂隙**<br>`Fate_Ascended_SpatialRift`<br>终态：`Strained`<br>政体：`rift_guarding_cliff_compact` | **幸存对照**<br>`Fate_Ancestral_ControlGroup`<br>终态：`Calm`<br>政体：`restored_ancestral_compact` |
+| **`c0_intact`**<br>（绝壁留存 / 运行时重锚） | **虚警耐受**<br>`Fate_Tolerated_FalseAlarm`<br>终态：`Calm`<br>政体：`cliff_observation_hermitage` | **空间裂隙**<br>`Fate_Ascended_SpatialRift`<br>终态：`Strained`<br>政体：`rift_guarding_cliff_compact` | **幸存对照**<br>`Fate_Ancestral_ControlGroup`<br>终态：`Calm`<br>政体：`restored_ancestral_compact` |
 
-其中两类「未爆发」结局补齐了叙事对照：
-- **慢性渗漏（`Fate_Deferred_ChronicSeep`）**：维持源已毁，但林场低强度扰动不足以点火；山鸣不断、累积应力逐年抬高，两套账本并行、撤离方案待批，是给玩家留出充裕观察期的开局形态。
-- **虚警耐受（`Fate_Tolerated_FalseAlarm`）**：$c_0$ 完好，302 队四十七次周期点炮全被吸收而未成灾，作为同化新寨线的平行对照组。
+其中两类「未爆发」状态构成了关键对照与开局入口：
+- **慢性渗漏（`Fate_Deferred_ChronicSeep`）**：维持源已毁（`c0_collapsed`），但林场低强度扰动尚未击穿分岔；山鸣不断、累积应力逐年抬高，两套账本并行、撤离方案待批，是 `:open` 变奏山谷最典型的悬置开局形态。
+- **虚警耐受（`Fate_Tolerated_FalseAlarm`）**：$c_0$ 完好（或由玩家在相位推迟窗口成功重锚），302 队周期点炮被维持源吸收而免于震荡成灾，既是同化新寨线的平行对照组，也是玩家在 `:open` 节点重锚 $c_0$ 后的可达稳态。

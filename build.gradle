@@ -27,7 +27,6 @@ repositories {
 			includeVersion("org.typelevel", "cats-free_3", project.cats_version)
 		}
 	}
-	// Pekko
 	mavenCentral()
 }
 
@@ -66,22 +65,8 @@ dependencies {
 	implementation "org.typelevel:cats-core_3:${project.cats_version}"
 	implementation "org.typelevel:cats-kernel_3:${project.cats_version}"
 
-	// Pekko
-	implementation platform("org.apache.pekko:pekko-bom_3:${project.pekko_version}")
-
-    implementation "org.apache.pekko:pekko-actor-typed_3:${project.pekko_version}"
-    implementation "org.apache.pekko:pekko-slf4j_3:${project.pekko_version}"
-    // TODO(release): bundle Pekko via Jar-in-Jar before shipping — `include`
-    // pekko-actor-typed_3 / pekko-slf4j_3 (explicit versions, the BOM does not
-    // cover the include configuration), excluding org.scala-lang (provided by
-    // kotori_scala) and org.slf4j (provided by Minecraft). Dev runs use the
-    // Gradle runtime classpath, so a missing JiJ only surfaces in a clean
-    // instance — verify META-INF/jars in the built jar and test there. Add an
-    // Apache-2.0 third-party notice when bundling.
-
 	// Test
 	testImplementation "org.scala-lang:scala3-library_3:${project.scala_version}"
-	testImplementation "org.apache.pekko:pekko-actor-testkit-typed_3:${project.pekko_version}"
 	testImplementation "org.junit.jupiter:junit-jupiter:${project.junit_version}"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }

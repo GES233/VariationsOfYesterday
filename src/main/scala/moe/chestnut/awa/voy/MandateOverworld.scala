@@ -2,6 +2,7 @@ package moe.chestnut.awa.voy
 
 import scala.jdk.CollectionConverters.*
 
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.player.{PlayerBlockBreakEvents, UseBlockCallback}
 import net.minecraft.block.{BlockState, Blocks}
 import net.minecraft.entity.effect.{StatusEffectInstance, StatusEffects}
@@ -10,6 +11,8 @@ import net.minecraft.item.Items
 import net.minecraft.particle.ParticleTypes
 import net.minecraft.registry.tag.BlockTags
 import net.minecraft.server.MinecraftServer
+import com.mojang.brigadier.context.CommandContext
+import net.minecraft.server.command.{CommandManager, ServerCommandSource}
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.server.world.ServerWorld
 import net.minecraft.sound.{SoundCategory, SoundEvents}
@@ -36,8 +39,9 @@ import moe.chestnut.awa.voy.inner.mandate.*
   *      and `c0` shelter status.
   *  - **Mandate -> Overworld (`沉滞` Stagnation & Spike actions)**:
   *    - Chunks without an active, non-spiking `c0` maintenance source apply
-  *      the Overworld Stagnation effect (`MINING_FATIGUE` on players,
-  *      `SLOWNESS` + ash particles on nearby villagers);
+  *      our own `voy:stagnation` effect (`×0.30` block break speed; the spike
+  *      tier `voy:stagnation_spike` is `×0.09`), plus `SLOWNESS` and ash
+  *      particles on nearby villagers;
   *    - Outbound `CellSpikeTriggered` and `RegimeTransitioned` actions produce
   *      audible tremors and ash plumes on the server thread.
   */
@@ -47,6 +51,55 @@ object MandateOverworld:
 
   /** Standard pulse area delivered when ringing a bell (matches SliceContract alpha_shock/resonance scale). */
   val BellPulseArea: Double = 12.0
+
+  /** Phase-gated outcome of striking a bell / resonance vessel on a cell. */
+  enum BellStrikeOutcome(
+      val anchorsC0: Boolean,
+      val baselineCalming: Double,
+      val pulseArea: Double
+  ):
+    /** Calcified BurnoutZone (`Regime.Burnout`): irreversible precedent, cannot restore `c0`. */
+    case BurnoutDeadZone extends BellStrikeOutcome(false, 0.0, BellPulseArea)
+
+    /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck during `PhaseLabel.Excitation`:
+      * pulse is swallowed by the active spike and `c0` fails to re-anchor.
+      */
+    case SpikeSwallowed extends BellStrikeOutcome(false, 0.0, BellPulseArea)
+
+    /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck inside the refractory delay
+      * window (`AbsoluteRefractory` | `RelativeRefractory`): re-anchors `c0` and delays the spike.
+      */
+    case RefractoryReanchored extends BellStrikeOutcome(true, BellBaselineCalming, BellPulseArea)
+
+    /** Calm / Strained / Resting or already-anchored cell: anchors/maintains `c0` and fires pulse. */
+    case AnchoredOrMaintained extends BellStrikeOutcome(true, BellBaselineCalming, BellPulseArea)
+
+  /** Pure, phase-gated rule for re-anchoring `c0` and firing a resonance pulse
+    * when a player strikes a bell / industrial vessel in a chunk:
+    *
+    *  - `Regime.Burnout`: irreversible calcified dead zone (`BurnoutZone` precedent);
+    *    ringing cannot restore `c0` (`baselineCalming` stays `0.0`).
+    *  - Unanchored oscillator (`baselineCalming <= 0.0` and `Regime.Oscillating`):
+    *    - `Cycle(AbsoluteRefractory | RelativeRefractory, _)`: hits the refractory
+    *      delay window (`safe_tick`), re-anchoring `c0 = BellBaselineCalming` and firing the pulse.
+    *    - `Cycle(Excitation, _)`: struck during the active spike; fails to re-anchor `c0`
+    *      while still firing the pulse (swallowed by the spike).
+    *  - `Calm` / `Strained` / `Resting` or already-intact `c0`: anchors/maintains
+    *    `c0 = BellBaselineCalming` and fires the pulse.
+    */
+  def evaluateBellStrike(readout: CellReadout): BellStrikeOutcome =
+    if readout.regime == Regime.Burnout then
+      BellStrikeOutcome.BurnoutDeadZone
+    else if readout.baselineCalming <= 0.0 && readout.regime == Regime.Oscillating then
+      readout.phase match
+        case PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory, _) =>
+          BellStrikeOutcome.RefractoryReanchored
+        case PhaseReading.Cycle(PhaseLabel.Excitation, _) =>
+          BellStrikeOutcome.SpikeSwallowed
+        case _ =>
+          BellStrikeOutcome.AnchoredOrMaintained
+    else
+      BellStrikeOutcome.AnchoredOrMaintained
 
   /** Compute the stress injection dose for breaking a block in the Overworld. */
   def stressDoseForBlock(state: BlockState): Double =
@@ -72,6 +125,35 @@ object MandateOverworld:
   def register(): Unit =
     registerBlockBreakListener()
     registerUseBlockListener()
+    registerDebugCommand()
+
+  /** `/voy debug [on|off]` — the raw `v`/`s`/`c0` numbers are diagnostics and
+    * live behind this toggle instead of in the player's chat bar.
+    */
+  private def registerDebugCommand(): Unit =
+    CommandRegistrationCallback.EVENT.register { (dispatcher, _, _) =>
+      def report(ctx: CommandContext[ServerCommandSource], text: String): Int =
+        ctx.getSource.sendFeedback(() => Text.literal(text), false)
+        1
+      val debug = CommandManager.literal("debug")
+        .executes { ctx =>
+          debugNumbers = !debugNumbers
+          report(ctx, s"§7[旧日变奏] 数值调试：${if debugNumbers then "开" else "关"}")
+        }
+        .`then`(
+          CommandManager.literal("on").executes { ctx =>
+            debugNumbers = true
+            report(ctx, "§7[旧日变奏] 数值调试：开")
+          }
+        )
+        .`then`(
+          CommandManager.literal("off").executes { ctx =>
+            debugNumbers = false
+            report(ctx, "§7[旧日变奏] 数值调试：关")
+          }
+        )
+      dispatcher.register(CommandManager.literal("voy").`then`(debug))
+    }
 
   private def registerBlockBreakListener(): Unit =
     PlayerBlockBreakEvents.AFTER.register { (world, player, pos, state, _) =>
@@ -139,10 +221,15 @@ object MandateOverworld:
           player.sendMessage(Text.literal(formatInspection(chunkX, chunkZ, readout)), true)
           ActionResult.PASS
         else if state.isOf(Blocks.BELL) then
-          MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, BellBaselineCalming)
-          MandateRuntime.firePulseAt(chunkX, chunkZ, BellPulseArea)
           val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-          player.sendMessage(Text.literal(formatBellPulse(chunkX, chunkZ, readout)), true)
+          val outcome = evaluateBellStrike(readout)
+          if outcome.anchorsC0 then
+            MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, outcome.baselineCalming)
+          MandateRuntime.firePulseAt(chunkX, chunkZ, outcome.pulseArea)
+          player.sendMessage(
+            Text.literal(formatBellPulse(chunkX, chunkZ, readout, outcome)),
+            true
+          )
           ActionResult.PASS
         else
           ActionResult.PASS
@@ -161,26 +248,41 @@ object MandateOverworld:
       applyChunkMandateEffects(overworld, player)
     }
 
+  /** Raw `v` / `s` / `c0` numbers are diagnostics, not player-facing text.
+    * Off by default; `/voy debug on` in-game turns them back on.
+    */
+  @volatile var debugNumbers: Boolean = false
+
+  /** Last shelter verdict per player, so a *change* can be announced once
+    * instead of the same line every second. Server thread only.
+    */
+  private val lastShelter = new java.util.HashMap[java.util.UUID, java.lang.Boolean]()
+
   private def applyChunkMandateEffects(world: ServerWorld, player: ServerPlayerEntity): Unit =
     val chunkX = player.getChunkPos.x
     val chunkZ = player.getChunkPos.z
     val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
     val maintained = readout.isMaintained
 
+    announceShelterChange(player, maintained)
+
     if !maintained then
       val spikingOrBurnout =
         readout.regime == Regime.Burnout ||
           Math.abs(readout.current.dissonance) >= ReadoutParam().spikeLevel
-      val amplifier = if spikingOrBurnout then 1 else 0
 
-      // Apply Stagnation (`沉滞`) mining fatigue to the player
+      // Apply `沉滞` (Stagnation) — our own effect, so the slowdown is
+      // attributable to the lattice instead of to vanilla mining fatigue.
+      // Particles are shown only during a spike: the baseline state is a
+      // permanent condition and must not become visual noise.
       player.addStatusEffect(
         new StatusEffectInstance(
-          StatusEffects.MINING_FATIGUE,
+          if spikingOrBurnout then MandateEffects.StagnationSpikeEntry
+          else MandateEffects.StagnationEntry,
           55,
-          amplifier,
-          true,
+          0,
           false,
+          spikingOrBurnout,
           true
         )
       )
@@ -253,6 +355,18 @@ object MandateOverworld:
         0.0
       )
 
+  /** Speak only when the shelter verdict *flips*: entering stagnation and
+    * coming back out are the two moments a player can actually act on.
+    * Repeating the state every second is what turned this system into noise.
+    */
+  private def announceShelterChange(player: ServerPlayerEntity, maintained: Boolean): Unit =
+    val previous = lastShelter.put(player.getUuid, java.lang.Boolean.valueOf(maintained))
+    if previous == null || previous.booleanValue == maintained then return
+    val line =
+      if maintained then "§a地脉归位，沉滞退去，手上又利索了"
+      else "§7地脉松了：沉滞缠上来，挖掘开始发涩"
+    player.sendMessage(Text.literal(line), true)
+
   /** Handle outbound actions drained from the Mandate actor on the server thread. */
   def onAction(server: MinecraftServer, action: MandateActionProtocol): Unit =
     val overworld = server.getOverworld
@@ -284,12 +398,16 @@ object MandateOverworld:
               1.2,
               0.01
             )
-            player.sendMessage(
-              Text.literal(
-                f"§6[地脉尖峰] 区块 [$chunkX%d, $chunkZ%d] 激发地鸣 (v=${cur.dissonance}%.2f, s=${cur.stress}%.2f, $regime)"
-              ),
-              true
-            )
+            // The tremor itself (sound + ash) is the player-facing signal; the
+            // raw readout used to be printed twice per oscillation period and
+            // became the mod's loudest, least useful surface.
+            if debugNumbers then
+              player.sendMessage(
+                Text.literal(
+                  f"§6[地脉尖峰] 区块 [$chunkX%d, $chunkZ%d] 激发地鸣 (v=${cur.dissonance}%.2f, s=${cur.stress}%.2f, $regime)"
+                ),
+                true
+              )
         }
 
       case ActionMsgPool.RegimeTransitioned(cell, from, to, _) =>
@@ -299,13 +417,24 @@ object MandateOverworld:
             val dx = Math.abs(player.getChunkPos.x - chunkX)
             val dz = Math.abs(player.getChunkPos.z - chunkZ)
             if dx <= 3 && dz <= 3 then
-              player.sendMessage(
-                Text.literal(f"§e[验山示警] 区块 [$chunkX%d, $chunkZ%d] 慢应力跃迁: $from -> $to"),
-                true
-              )
+              player.sendMessage(Text.literal(s"§e[验山示警] ${regimeHerald(to)}"), true)
+              if debugNumbers then
+                player.sendMessage(
+                  Text.literal(f"§8[$chunkX%d, $chunkZ%d] $from -> $to"),
+                  true
+                )
           }
 
       case ActionMsgPool.MandateCurrentStatus(_) => ()
+
+  /** Player-facing wording for a slow-variable regime change: what the land is
+    * doing, not which enum member it moved to.
+    */
+  def regimeHerald(regime: Regime): String = regime match
+    case Regime.Burnout => "这一带的地脉僵死了，再也缓不回来"
+    case Regime.Oscillating => "这一带的地脉开始跳，压不住了"
+    case Regime.Strained => "这一带的地脉绷紧了，像要出事"
+    case Regime.Calm => "这一带的地脉松下来了"
 
   def formatInspection(chunkX: Int, chunkZ: Int, r: CellReadout): String =
     val shelter = if r.isMaintained then "§a庇护正常(免除沉滞)" else "§c沉滞生效(缺c0或尖峰失效)"
@@ -313,19 +442,43 @@ object MandateOverworld:
     f"§e[验山读数] [$chunkX%d,$chunkZ%d] 态:${r.regime} 相:$phaseText s=${r.current.stress}%.2f c0=${r.baselineCalming}%.2f | $shelter"
 
   def formatBellPulse(chunkX: Int, chunkZ: Int, r: CellReadout): String =
-    r.phase match
-      case PhaseReading.Cycle(label, _) =>
+    formatBellPulse(chunkX, chunkZ, r, evaluateBellStrike(r))
+
+  def formatBellPulse(
+      chunkX: Int,
+      chunkZ: Int,
+      r: CellReadout,
+      outcome: BellStrikeOutcome
+  ): String =
+    outcome match
+      case BellStrikeOutcome.BurnoutDeadZone =>
+        f"§4[叩钟无应] [$chunkX%d,$chunkZ%d] 钙化烧毁死寂区 (Burnout)，死地不复应答 (c0=0.00)"
+
+      case BellStrikeOutcome.SpikeSwallowed =>
         val tick = r.dialTick.getOrElse(0)
-        val effectHint = label match
-          case PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory =>
-            "§a命中推迟刻度，下一次地鸣尖峰延后"
-          case PhaseLabel.Excitation =>
-            "§c正处尖峰爆发期，钟声被地鸣吞没"
-          case PhaseLabel.Resting =>
-            "§7处于恢复晚期，脉冲被平缓吸收"
-        f"§b[叩钟谐振] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> $effectHint"
-      case _ =>
-        f"§b[叩钟镇山] [$chunkX%d,$chunkZ%d] 维持源已锚定 (c0=$BellBaselineCalming%.2f)，周遭沉滞消退"
+        f"§c[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 (Excitation) -> 正处尖峰爆发期，钟声被吞没，c0重锚失败(需候不应期推迟窗口)"
+
+      case BellStrikeOutcome.RefractoryReanchored =>
+        val tick = r.dialTick.getOrElse(0)
+        val label = r.phase match
+          case PhaseReading.Cycle(l, _) => l.toString
+          case _ => "Refractory"
+        f"§a[叩钟重锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 命中推迟刻度，c0已重锚 ($BellBaselineCalming%.2f) 且下一次尖峰延后"
+
+      case BellStrikeOutcome.AnchoredOrMaintained =>
+        r.phase match
+          case PhaseReading.Cycle(label, _) =>
+            val tick = r.dialTick.getOrElse(0)
+            val effectHint = label match
+              case PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory =>
+                "§a命中推迟刻度，下一次地鸣尖峰延后"
+              case PhaseLabel.Excitation =>
+                "§c正处尖峰爆发期，钟声被地鸣吞没"
+              case PhaseLabel.Resting =>
+                "§7处于恢复晚期，脉冲被平缓吸收"
+            f"§b[叩钟谐振] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> $effectHint"
+          case _ =>
+            f"§b[叩钟镇山] [$chunkX%d,$chunkZ%d] 维持源已锚定 (c0=$BellBaselineCalming%.2f)，周遭沉滞消退"
 
   def formatPhaseShort(phase: PhaseReading): String =
     phase match

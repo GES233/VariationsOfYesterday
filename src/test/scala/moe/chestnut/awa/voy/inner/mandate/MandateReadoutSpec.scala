@@ -3,6 +3,9 @@ package moe.chestnut.awa.voy.inner.mandate
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
+import moe.chestnut.awa.voy.MandateOverworld
+import moe.chestnut.awa.voy.MandateOverworld.BellStrikeOutcome
+
 /** Defined-domain behaviour of the readout (design draft §1.4 + §1.2).
   *
   * The claim under test: a cycle phase exists only where a limit cycle
@@ -135,4 +138,50 @@ class MandateReadoutSpec:
     assertTrue(refractoryCycle.isMaintained, "between spikes, c0 shelter holds")
     assertEquals(Some(5), refractoryCycle.dialTick, "0.25 of 20 divisions is tick 5")
     assertEquals(None, calmMaintained.dialTick, "resting basin has no cycle dial tick")
+
+  @Test def `phase-gated bell strike re-anchoring across Calm, Oscillating, and Burnout`(): Unit =
+    val calmUnanchored = CellReadout(
+      MandateCurrent(-1.2, -0.6, 0.05, 0.0),
+      Regime.Calm,
+      PhaseReading.Basin(PhaseLabel.Resting),
+      baselineCalming = 0.0
+    )
+    val calmOutcome = MandateOverworld.evaluateBellStrike(calmUnanchored)
+    assertEquals(BellStrikeOutcome.AnchoredOrMaintained, calmOutcome)
+    assertTrue(calmOutcome.anchorsC0)
+    assertEquals(MandateOverworld.BellBaselineCalming, calmOutcome.baselineCalming, 1e-12)
+
+    val oscExcitationUnanchored = CellReadout(
+      MandateCurrent(1.9, 0.2, 0.65, 0.55),
+      Regime.Oscillating,
+      PhaseReading.Cycle(PhaseLabel.Excitation, 0.05),
+      baselineCalming = 0.0
+    )
+    val spikeOutcome = MandateOverworld.evaluateBellStrike(oscExcitationUnanchored)
+    assertEquals(BellStrikeOutcome.SpikeSwallowed, spikeOutcome)
+    assertFalse(spikeOutcome.anchorsC0, "striking during Excitation must fail to re-anchor c0")
+    assertEquals(0.0, spikeOutcome.baselineCalming, 1e-12)
+
+    val oscRefractoryUnanchored = CellReadout(
+      MandateCurrent(0.4, 0.8, 0.65, 0.55),
+      Regime.Oscillating,
+      PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory, 0.25),
+      baselineCalming = 0.0
+    )
+    val reanchorOutcome = MandateOverworld.evaluateBellStrike(oscRefractoryUnanchored)
+    assertEquals(BellStrikeOutcome.RefractoryReanchored, reanchorOutcome)
+    assertTrue(reanchorOutcome.anchorsC0, "striking in refractory window re-anchors c0")
+    assertEquals(MandateOverworld.BellBaselineCalming, reanchorOutcome.baselineCalming, 1e-12)
+
+    val burnoutCell = CellReadout(
+      MandateCurrent(1.1, 0.4, 0.98, 0.0),
+      Regime.Burnout,
+      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      baselineCalming = 0.0
+    )
+    val burnoutOutcome = MandateOverworld.evaluateBellStrike(burnoutCell)
+    assertEquals(BellStrikeOutcome.BurnoutDeadZone, burnoutOutcome)
+    assertFalse(burnoutOutcome.anchorsC0, "calcified Burnout dead zone cannot restore c0")
+    assertEquals(0.0, burnoutOutcome.baselineCalming, 1e-12)
+
 

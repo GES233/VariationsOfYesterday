@@ -3,15 +3,15 @@ package moe.chestnut.awa.voy
 import java.util.concurrent.ConcurrentLinkedQueue
 
 import net.minecraft.server.MinecraftServer
-import org.apache.pekko.actor.typed.ActorSystem
 import org.slf4j.{Logger, LoggerFactory}
 
 import moe.chestnut.awa.voy.inner.action.MandateActionProtocol
+import moe.chestnut.awa.voy.inner.actor.ActorRef
 import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 import moe.chestnut.awa.voy.inner.mandate.*
 
 /** Game-side bridge between Minecraft and the mandate engine actor
-  * (design draft §1.4, 2026-09-30): owns the ActorSystem lifecycle, the
+  * (design draft §1.4, 2026-09-30): owns the engine actor lifecycle, the
   * tick gate, snapshot publication, and the action drain.
   *
   * Discipline: the game thread only TELLS events and READS the published
@@ -38,7 +38,7 @@ object MandateRuntime:
     */
   private val TickDt = 0.05
 
-  @volatile private var system: Option[ActorSystem[EventDTO]] = None
+  @volatile private var system: Option[ActorRef[EventDTO]] = None
   @volatile private var snapshot: Map[(Int, Int), MandateCurrent] =
     Map.empty
   @volatile private var readoutSnapshot: Map[(Int, Int), CellReadout] =
@@ -102,23 +102,20 @@ object MandateRuntime:
   /** Start the engine. Idempotent while running. */
   def start(): Unit = synchronized {
     if system.isEmpty then
-      logger.info("Starting mandate engine actor system.")
+      logger.info("Starting mandate engine actor.")
       system = Some(
-        ActorSystem(
-          MandateAgent(
-            buildGrid(),
-            publishSnapshot,
-            pendingActions.add(_),
-            publishReadout
-          ),
-          "voy-mandate"
+        MandateAgent(
+          buildGrid(),
+          publishSnapshot,
+          pendingActions.add(_),
+          publishReadout
         )
       )
   }
 
   /** Stop the engine and drop the published state. */
   def stop(): Unit = synchronized {
-    system.foreach(_.terminate())
+    system.foreach(_.stop())
     system = None
     snapshot = Map.empty
     readoutSnapshot = Map.empty
