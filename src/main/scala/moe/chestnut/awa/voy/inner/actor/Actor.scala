@@ -3,6 +3,8 @@ package moe.chestnut.awa.voy.inner.actor
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
+import org.slf4j.LoggerFactory
+
 /** A handle to one single-writer actor.
   *
   * Keeps the semantics the mandate engine relied on: messages are queued in
@@ -41,11 +43,14 @@ final class ActorRef[T] private[actor] (
 
 object Actor:
 
+  private val logger = LoggerFactory.getLogger(getClass)
+
   /** Start an actor with `handler` as its message loop.
     *
     * The worker is a daemon thread, so a shutdown path that forgets to call
-    * `stop` still lets the JVM exit. A handler failure is reported on stderr
-    * and stops the actor instead of silently killing the worker.
+    * `stop` still lets the JVM exit. A handler failure is logged (SLF4J) and
+    * stops the actor instead of silently killing the worker; there is no
+    * supervision — the state freezes at the last completed message.
     */
   def spawn[T](name: String)(handler: T => Unit): ActorRef[T] =
     val queue = new LinkedBlockingQueue[T]()
@@ -58,8 +63,11 @@ object Actor:
           case _: InterruptedException => ()
           case failure: Throwable =>
             stopped.set(true)
-            System.err.println(s"[voy] actor '$name' failed: $failure")
-            failure.printStackTrace()
+            logger.error(
+              "actor '{}' died on an unhandled failure; state is frozen at the last completed message",
+              name,
+              failure
+            )
       ,
       s"voy-$name"
     )

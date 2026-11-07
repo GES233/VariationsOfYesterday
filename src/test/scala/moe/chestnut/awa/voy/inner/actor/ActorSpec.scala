@@ -35,6 +35,25 @@ class ActorSpec:
     Thread.sleep(100)
     assertEquals(0, handled.get(), "messages sent after stop must be dropped")
 
+  @Test def handlerFailureStopsTheActorAndDropsLaterMessages(): Unit =
+    val handled = new AtomicInteger(0)
+    val actor = Actor.spawn[Int]("test-failure") { message =>
+      if message == 1 then throw new RuntimeException("boom")
+      handled.incrementAndGet()
+    }
+    try
+      actor ! 1
+      // Give the worker a moment to hit the failure.
+      var polls = 0
+      while actor.isRunning && polls < 100 do
+        Thread.sleep(20)
+        polls += 1
+      assertFalse(actor.isRunning, "a handler failure must stop the actor")
+      actor ! 2
+      Thread.sleep(100)
+      assertEquals(0, handled.get(), "messages sent to a dead actor must be dropped")
+    finally actor.stop()
+
   @Test def tellIsNonBlockingWhileTheHandlerRuns(): Unit =
     val gate = new CountDownLatch(1)
     val entered = new CountDownLatch(1)
