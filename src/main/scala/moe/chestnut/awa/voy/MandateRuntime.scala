@@ -36,16 +36,22 @@ import moe.chestnut.awa.voy.inner.mandate.*
 object MandateRuntime:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  private val width = 32
-  private val height = 32
-  private val originX = -width / 2
-  private val originZ = -height / 2
+  // Lattice geometry and tuning come from the external config
+  // (`VoyConfig`, loaded during mod init); they are defs so every read
+  // sees the active configuration.
+  private def lattice = VoyConfig.current.lattice
+  private def width = lattice.width
+  private def height = lattice.height
+  private def originX = lattice.originX
+  private def originZ = lattice.originZ
 
   /** Fixed simulation step per game tick: 20 tps x 0.05 = 1 time unit per
-    * game second. Provisional mapping pending calibration against the
-    * "first catastrophe at 3-5 play hours" target (§7 pending item 3).
+    * game second by default. Provisional mapping pending calibration
+    * against the "first catastrophe at 3-5 play hours" target — now a
+    * runtime config knob (`tickDt` / `stressParam.gamma`), no longer a
+    * contract change (draft-01 §7.3).
     */
-  private val TickDt = 0.05
+  private def TickDt = VoyConfig.current.tickDt
 
   @volatile private var system: Option[ActorRef[EventDTO]] = None
   @volatile private var snapshot: Map[(Int, Int), MandateCurrent] =
@@ -88,27 +94,34 @@ object MandateRuntime:
 
   /** Prototype lattice: disturbance hotspot around its centre, calming ring
     * further out. Constructed per engine start so restarts get a fresh
-    * world state. */
+    * world state; all geometry and tuning come from `VoyConfig`.
+    */
   private def buildGrid(): MandateGrid = MandateGrid.rectangular(
     width,
     height,
-    diffusion = 0.002,
+    diffusion = lattice.diffusion,
     coord =>
       val localX = coord.x - width / 2
       val localZ = coord.z - height / 2
       val distance = Math.sqrt(localX * localX + localZ * localZ)
-      val initialStress = Math.max(0.0, 0.18 - distance * 0.004)
+      val initialStress = Math.max(
+        0.0,
+        lattice.initialStressPeak - distance * lattice.initialStressFalloff
+      )
       val state = MandateCurrent(0.0, 0.0, initialStress, 0.0)
       val cell = MandateState(
         state,
-        MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+        VoyConfig.current.fastParam,
         // The game opts into the mycelial sustenance dynamics (design note
-        // 06 §7.1); the frozen default keeps the contract slice and the
+        // 06 §7.1); the frozen defaults keep the contract slice and the
         // fingerprint rigs on the bare FHN core.
-        StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
+        VoyConfig.current.stressParam
       )
-      cell.disturbance = if distance < 2.0 then 0.08 else 0.002
-      cell.baselineCalming = if distance < 5.0 then 0.03 else 0.0
+      cell.disturbance =
+        if distance < lattice.hotspotRadius then lattice.hotspotDisturbance
+        else lattice.ambientDisturbance
+      cell.baselineCalming =
+        if distance < lattice.calmingRadius then lattice.baselineCalming else 0.0
       cell
   )
 
@@ -141,7 +154,15 @@ object MandateRuntime:
               s"(${snap.cells.size} cells, ${snap.links.size} links, " +
               s"simTime = ${snap.simTime})."
           )
-          (MandateSnapshot.restoreGrid(snap), snap.links, snap.simTime)
+          val grid = MandateSnapshot.restoreGrid(snap)
+          // Restore semantics: STATE from the save, PARAMETERS from the
+          // config — tuning a knob (e.g. the gamma time-scale calibration)
+          // applies to existing worlds without wiping their history.
+          grid.cells.values.foreach { cell =>
+            cell.param = VoyConfig.current.fastParam
+            cell.stressParam = VoyConfig.current.stressParam
+          }
+          (grid, snap.links, snap.simTime)
         case None =>
           (buildGrid(), Nil, 0.0)
 

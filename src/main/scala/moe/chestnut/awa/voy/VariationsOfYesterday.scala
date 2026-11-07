@@ -13,11 +13,17 @@ object VariationsOfYesterday extends ModInitializer:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   private def registerMandateEngine(): Unit =
+    // Load the external config first: the engine's geometry, tick step and
+    // parameters are all read from it when the engine starts.
+    VoyConfig.reload()
     // Touch the effect holder first: registering status effects must happen
     // during mod init, before any server-driven `StatusEffectInstance` exists.
     MandateEffects.Stagnation
     MandateEffects.StagnationSpike
-    ServerLifecycleEvents.SERVER_STARTING.register(server => MandateRuntime.start(server))
+    // SERVER_STARTED, not STARTING: the engine restores its lattice from
+    // the overworld's PersistentStateManager, which only exists after the
+    // dimensions are loaded.
+    ServerLifecycleEvents.SERVER_STARTED.register(server => MandateRuntime.start(server))
     ServerLifecycleEvents.SERVER_STOPPED.register(_ => MandateRuntime.stop())
     ServerTickEvents.END_SERVER_TICK.register(MandateRuntime.onTick(_))
     MandateOverworld.register()

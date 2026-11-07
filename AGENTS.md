@@ -32,6 +32,8 @@
   - `inner/event/EventMsg.scala` — 入向通道与拓扑协议 `EventDTO`（通道电平/脉冲 + 格子、输运边、链路的增删）
   - `inner/action/ActionMsg.scala` — 出向动作协议 `MandateActionProtocol`
   - `helpers/ODESolver.scala` — RK4 / Euler 求解器
+  - `VoyConfig.scala` — 外部运行时配置（`config/variations-of-yesterday.json`：格子几何、`tickDt`、FHN/慢变量参数，默认值即原硬编码值；只注入接线层，不触契约锚）
+  - `MandatePersistence.scala` + `inner/mandate/MandateSnapshot.scala` — 维度级持久化（`PersistentState`，整格快照含 `M`、通道、参数、边、链路与 `simTime`；状态来自存档、参数来自配置）
 - `src/client/scala/moe/chestnut/awa/voy/` — 客户端入口与开发 HUD（`hud/MandateHud.scala`，`/voy hud [on|off]`）
 - `src/test/scala/moe/chestnut/awa/voy/inner/mandate/` — 10 个 JUnit 5 测试规范；`inner/actor/ActorSpec` 覆盖 actor 内核
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
