@@ -2,23 +2,23 @@
 
 > 状态：**草案 · 供实现**。本文档面向实现者（含编码代理）：第 1–4 节是不可违背的设计约束与映射，第 5 节是分阶段工单（WO-1…WO-4），第 6 节是考据与证据分级。
 >
-> 前置阅读：`docs/design-draft-01-living-world.md` §1（动力学层）、`docs/verification-report-01-mandate-slice.md`。脉冲耦合链路见 `docs/design-note-07-pulse-coupling.md`；可编程晶盘见札记 08（待写）。
+> 前置阅读：`docs/design-draft-01-living-world.md` §1（动力学层）、`docs/design-note-02-kanren-worldview-engine.md`（世界模型）、`docs/design-note-05-medikanren-microchains.md`（五跳卷宗）、`docs/verification-report-01-mandate-slice.md`。脉冲耦合链路见 `docs/design-note-07-pulse-coupling.md`；可编程晶盘见札记 08（待写）。
 
 ---
 
 ## 0. 一句话定位
 
-给已冻结的 Mandate Cell 四维方程**补生物学身份**，不改一个符号：快系统是**地下菌丝网络的生物电**，慢系统是**土壤的生物地球化学过程（酸化 + 菌网断裂）**。数值层 0.1 结构冻结继续有效。
+给 Mandate Cell 的数值层**补生物学身份**：四维 RK4 方程与既有阈值保持不变；§7.1 已裁定的维持度 `M` / `Δ` 是**追加**的第五状态（显式积分、不进 RK4 向量）。快系统是**地下菌丝网络的生物电**，慢系统是**土壤的生物地球化学过程（酸化 + 菌网断裂）**。数值层 0.1 结构冻结继续有效。
 
 ## 1. 不可违背的约束
 
-1. **数值冻结**：`MandateState` / `MandateGrid` / `MandateReadout` / `PhaseResponse` 的方程、参数、阈值一字不改。本文档只增加：命名与文案、通道事件的发射源、读数投影的感官签名、维护设施方块。
-2. **确定性**：一切新机制通过既有事件通道（`EventMsg.SetCalming` / `SetBaselineCalming` / `SetDisturbance` / `FirePulse` / `StressInject`）投递，与 tick 同信箱全序；禁止引入新的隐式状态耦合。
-3. **加载不变性**（§1.4）：新方块的行为不得依赖区块加载顺序；离线时按 Node 聚合状态结算。
-4. **契约不动**：不得运行 `voy.contract.write=true` 重新生成 `contracts/mandate-slice-v1.json`；`./gradlew test` 与 `cd tools/voy_world && mix test` 必须全程通过。
+1. **数值冻结（四维核）**：四维 RK4 方程、参数与阈值保持不变；§7.1 裁定的 `M` / `Δ` 已作为追加状态落地（`StressParam` 默认休眠，契约切片与指纹台架仍测裸 FHN 核）。除此之外本文只新增：命名与文案、通道事件的发射源、读数投影的感官签名、维护设施方块。
+2. **确定性**：一切新机制通过既有事件通道（`EventMsg.SetCalming` / `SetBaselineCalming` / `SetDisturbance` / `FirePulse` / `StressInject` / `SetSustenance`）投递，与 tick 同信箱全序；禁止引入新的隐式状态耦合。
+3. **加载不变性**：新方块的行为不得依赖区块加载顺序；Node 调度见 `design-draft-01` §1.3（所有 Node 常驻动力学图、静息粗步进、不做离线加速风化）。
+4. **契约不动**：不得运行 `voy.contract.write=true` 重新生成 `contracts/mandate-slice-v1.json`（`M` 落地时已按 digest-only 重生成一次，此后非必要不再重生成）；`./gradlew test` 与 `cd tools/voy_world && mix test` 必须全程通过。
 5. **读数纪律**：连续量永不直接显示为数字；玩家只能看到感官签名与制度读表（分辨率受限）。
 
-> 第 1–4 条已在现有代码与契约中落实，本文只作验收口径，不重述实现细节。
+> 第 2、4 条已落实；第 1 条按 §7.1 裁定修订；第 3 条的「离线按 Node 聚合结算」已由草案 01 §1.3 的「常驻 + 粗步进」设计取代（不做离线加速风化）。本文只作验收口径，不重述实现细节。
 
 ## 2. 两层生物学底盘
 
@@ -33,7 +33,7 @@
 | `a(s, M) = α − Δ·(1−M) − k·s` | **菌网完整度决定兴奋性**：网络越碎，`a` 越小，越容易被点燃、越难回到静息；维持源被彻底抽走（`M → 0`）则进入去极化阻滞 |
 | `dM/dt = r·M·(1−M) − c·max(s−s_T,0)·M + D·∇²M` | 菌丝 logistic 生长 − 酸中毒（应力越过毒性阈值 `s_T` 才杀，与 §2.2 AMD 一致）+ 沿土壤/水系连续体扩散；`M = 0` 吸收态 |
 | 尖峰（`v` 绝对值 ≥ 1.8） | 菌网电暴发 + 伴生的地球化学脉冲（见 2.2） |
-| 烧毁（`BurnoutNoCycle`） | **去极化阻滞**（depolarization block）：菌网深度失能，静默；恢复需叙事级干预（通道已实现：`SetSustenance`，见 §7 开放问题 1） |
+| 烧毁（`BurnoutNoCycle`） | **去极化阻滞**（depolarization block）：菌网深度失能，静默；恢复靠再接种（`SetSustenance` / 菌种右键土壤，见 §7 开放问题 1） |
 
 ### 2.2 慢系统 = 土壤生物地球化学（酸性矿山排水，AMD）
 
@@ -63,7 +63,7 @@
 | 读数状态 | 感官签名 | 实现钩子 |
 | :-- | :-- | :-- |
 | 尖峰 excursion（`v` 绝对值 ≥ 1.8） | 下游水体黄浊（铁氢氧化物沉淀，"yellow boy"）、死鱼漂浮物、硫磺尾味 | 水体粒子 + 物品实体 + 音效 |
-| 前兆（`Regime.Strained`，恢复变慢 = 临界慢化） | 溪涧水色渐黄、异味渐重（**先于**尖峰） | 粒子密度按 `s` / 恢复速度分档（3 档，不给数值） |
+| 前兆（`Regime.Strained` 或 `Oscillating`，恢复变慢 = 临界慢化） | 溪涧水色渐黄、异味渐重（**先于**尖峰） | 单档低密度菌丝粒子（当前固定 4 颗；按 `s` 分档待做，不给数值） |
 | 尖峰过后（`q` 残留） | 水色持续发黄、底泥泛红、硫磺味持久 | 粒子按 `q` 分档（3 档） |
 | 安抚设施工作中 | **臭味**（湿地硫酸盐还原产 H₂S）——臭是好兆头 | 设施周边粒子 |
 | 静默（`PhaseReading` 为 `Undefined(BurnoutNoCycle)`） | 深度失能：无菌子、无荧光、作物枯败 | 生物群系级粒子抑制 + 枯败 |
@@ -71,7 +71,7 @@
 
 **注意**：`Regime.Burnout`（`s ≥ 0.95`）是应力读数标签（饱和失能），此时快系统可能仍在振荡；**静默签名必须绑 `BurnoutNoCycle`，不能绑 `Regime.Burnout`**。
 
-原则：签名**先于**灾变、**弱于**灾变、**可误读**（三方机构对同一签名的记录不同，见札记 03 的失真层）。
+原则：签名**先于**灾变、**弱于**灾变、**可误读**（三方机构对同一签名的记录不同，见札记 02 §3 的三方观测失真）。
 
 ## 4. 新增机制（真实系统白送的三件）
 
@@ -96,7 +96,7 @@
 - 工作时产出硫化臭味粒子（§3）；
 - 建造慢、占地大，但不装甲化——与石灰石沟形成「快但需维护 / 慢但免维护」的取舍。
 
-**「下游」的当前口径**：运行时晶格只有扩散边、没有平流边（`MandateRuntime` 的 32×32 矩形格）。在 D8 地势推导落地之前，按**区块地表高度**取四邻中最低者为下游（平手按 N→E→S→W 固定顺序），覆盖自身 + 该区块；D8 落地后改为沿真实平流边。
+**「下游」的当前口径**：运行时晶格只有扩散边、没有平流边（`MandateRuntime` 的矩形格，默认 32×32，可经 `VoyConfig.lattice` 覆盖）。在 D8 地势推导落地之前，按**区块地表高度**取四邻中最低者为下游（平手按 N→E→S→W 固定顺序），覆盖自身 + 该区块；D8 落地后改为沿真实平流边。
 
 ### 4.3 菌塘 / 天麻床——把保护动机变成生计
 
@@ -113,7 +113,7 @@
 
 ### WO-1 术语与文案（**已落地，2026-11-07**）
 - ~~`src/main/resources/assets/variations-of-yesterday/lang/zh_cn.json` / `en_us.json` 新增术语条目~~ **已落地**：菌网（mycelial network）、地脉（沿用）、黄水（iron-yellow seep）、石灰石沟（limestone drain）、人工湿地（constructed wetland）、天麻床（gastrodia bed）均已入库，键集一致性由 `MandatePhenomenaSpec` 断言；
-- HUD（`hud/MandateHud.scala`）遥测行已加 `M`；玩家侧验山读数（`MandateOverworld.formatInspection`）接入 §3 的定性菌网词（枯绝/受损/完好，不给数值；开发 HUD 的裸数值行在发布前门控或移除）。
+- HUD（`hud/MandateHud.scala`）遥测行已加 `M`；玩家侧验山读数（`MandateOverworld.formatInspection`）接入 §3 的定性菌网词（枯绝/受损/完好，不给数值）。开发 HUD 的裸数值行只存在于开发环境（`VariationsOfYesterdayClient` 仅在 `isDevelopmentEnvironment` 时注册），不会进入发布环境。
 
 ### WO-2 安抚设施方块（石灰石沟 / 人工湿地）
 - 新包 `moe.chestnut.awa.voy.blocks`：两个方块 + 方块实体；`Registries.BLOCK`、`BlockEntityType`、物品、创造栏、blockstate/model/loot（可用现有 `fabric-datagen` 入口）；
@@ -128,9 +128,9 @@
 - 天麻床方块：待 WO-2 的方块框架落地后接入。
 - 验收：签名映射金样测试见 `MandatePhenomenaSpec`（107 项全量测试通过）；服务器侧无渲染引用；专用服务器可用。
 
-### WO-4 回归与金样
-- 为 §3 签名映射加金样测试（构造 `CellReadout` → 断言签名档位）；
-- 运行 `./gradlew test` 全量（当前 66 项），确认数值指纹测试（`SliceContractSpec` 等）未受影响。
+### WO-4 回归与金样（已完成）
+- ~~为 §3 签名映射加金样测试~~ **已完成**：`MandatePhenomenaSpec` 构造 `CellReadout` 断言签名档位与语言键集；
+- `./gradlew test` 全量 107 项（含 1 项默认跳过的 benchmark）通过，确认数值指纹测试（`SliceContractSpec` 等）未受影响。
 - 验收：CI（`.github/workflows/build.yml`）通过。
 
 ### 明确不做（本工单范围外）
@@ -162,15 +162,17 @@
 
 ## 7. 开放问题
 
+> 本节及代码注释中的 `§7.x` 均指本节第 x 条（例如 `§7.1` = 开放问题 1）。
+
 1. ~~耦合系数 `k`（`a(s)=α−k·s`）的叙事通道~~ **已裁定，正经层已落地（2026-11-07）**：不走「调高 k」的施加论，改走**抽走论**——失能是维持源被抽掉，不是伤害被施加。每格有内禀维持源 `M ∈ [0,1]`（菌网完整度，常态 1），有效恢复偏移 `a = α − Δ·(1−M) − k·s`（Δ = `sustenanceDepth` = 1.2：`M = 0` 时 `a = −0.5 < a_burnout`，零应力也无条件静默）。`M` 是活变量，走 Fisher-KPP 动力学 `dM/dt = r·M·(1−M) − c·max(s−s_T, 0)·M + D·∇²M`：
    - **参数**（2026-11-07 耦合扫描定稿）：`r = 1e-3`、`c = 4e-3`、`s_T = 0.6`、灭绝地板 1e-4，gameplay 值经外部配置 `VoyConfig`（`config/variations-of-yesterday.json`）在接线层注入；`StressParam` 默认休眠（r=c=0），保契约切片与指纹台架的裸 FHN 核——契约金样同日重生成，**数值逐位不变、仅 digest 更新**（切片冻结 M=1，与原型冻结慢变量同纪律）；
    - **消耗由应力 s 驱动而非活动 q**（实测 q̄：饱和 0.0119 vs 近临界 0.0117——q 不区分滥用与正常起振；酸杀菌丝与 §2.2 AMD 底盘一致）；
-   - **`M = 0` 吸收态**：无自生（logistic 项在 0 处为零），恢复需再接种（`EventMsg.SetSustenance` 给种子）；地板是 Allee 阈值——衰减穿过的斑块骤零，但邻格渗入的「移民细流」能越过阈值成活，所以格间扩散（沿应力输运边，`SustenanceMobility = 0.04` → D_eff = 8e-5）会从边缘回填小死斑：单格死斑 ~0.3h、3 格 ~0.9h 愈合，**大死区实质永久**，伤口大小决定命运；
+   - **`M = 0` 吸收态**：无自生（logistic 项在 0 处为零），恢复需再接种（`EventMsg.SetSustenance` 给种子）；地板是 Allee 阈值——衰减穿过的斑块骤零，但邻格渗入的「移民细流」能越过阈值成活，所以格间扩散（沿应力输运边，`SustenanceMobility = 0.04` → D_eff = 8e-5）会从边缘回填小死斑：单格死斑 ~20 min、3 格 ~1 h 愈合，**大死区实质永久**，伤口大小决定命运；
    - **滥用→衰竭涌现**（实测）：持续采挖不泄压 ~0.6h 进入深度失能、~4.4h 灭绝；采挖 + 泄压（c ≳ 2u）永不失能；慢性高应力停在部分平衡（s=0.7 → M\*=0.6 半失能，s=0.8 → M\*=0.2 濒死）；
-   - **与 γ 校准的耦合**：M 消耗使「饱和→深度失能」比 γ 单独决定的快（0.6h 越膝）；draft-01 §7.3 的 γ 对表落地时必须重跑耦合扫描，不能只按纯应力路径；
+   - **与 γ 校准的耦合**：M 消耗使「饱和→深度失能」比 γ 单独决定的快（0.6h 越膝）；草案 01 §7 待完成项 3 的 γ 对表落地时必须重跑耦合扫描，不能只按纯应力路径；
    - **遗留**：触发器清单（哪些叙事事件抽走/回填、各多少）待定；突触解耦仍挂搭车包（持久化已于 2026-11-07 先行落地，未触契约哈希锚）；
 2. 天麻经济的数值（产量、交易价）需与礼物经济（§3.1）统一校准；
 3. 菌光粒子的亮度上限：不能变成免费的数值读表（违反 §1 约束 5）；
-4. ~~烧毁的「不可逆」需要游戏层锁存（`burnoutLatched`）~~ **已裁定（2026-11-07）**：不引入锁存。机制层只有「失能」没有「死」——饱和失能（`Regime.Burnout`）的恢复走成本路径（`c ≳ 2u` 持续泄压后重锚 `c₀`，见札记 07 E4b）；深度失能（`BurnoutNoCycle`）仅经叙事参数通道触发，其恢复是叙事级干预（菌网「再接种」）。「死」只作为叙事层的既定失败布景（如上游先例节点），不进入机制语义；
-5. ~~状态持久化~~ **已落地（2026-11-07）**：维度级 `PersistentState`（`MandatePersistence`，存 `data/voy_mandate.dat`）承载整格快照——每格全状态（`v/w/s/q`、`M`、四通道电平、双参数集）、输运边、水晶链路与 `simTime`；`MandateSnapshot`（纯数据，`inner/` 无 MC 类型）负责 capture/restore，actor 以 1 sim 秒节拍发布、存档时刻序列化，启动时按几何指纹（origin/宽/高）校验后恢复，不匹配则丢弃重来。裁定结果：**粒度取整格**（Node 聚合结算属未来的离线抽稀问题，不在存储层做）；**快变量存**（成本可忽略，且保证重启后相位读数连续）；**突触内核与链路待投递队列不存**（τ≤5 s 即衰减、一周期内重建，丢失无可感知影响）。仍开放：`CalmingBus` 注册表与装甲化落盘（方块实体 NBT，随设施工单同行）、与 §1 约束 3「离线按 Node 聚合结算」的关系；**存档时刻 flush（2026-11-07）**：`BEFORE_SAVE` 让 actor 立即发布并阻塞至多 2 s（超时只 warn，不阻断保存），优雅关服不再丢最后一个 persist 周期；**已知边界**：schema 不匹配（`schemaVersion` 不等）仍静默丢弃并覆盖原文件（`.bak` 备份与迁移留到 payload 真正变更时再做），崩溃/`kill -9` 仍最多丢一个 persist 周期；
+4. ~~烧毁的「不可逆」需要游戏层锁存（`burnoutLatched`）~~ **已裁定（2026-11-07）**：不引入锁存。机制层只有「失能」没有「死」——饱和失能（`Regime.Burnout`）的恢复走成本路径（`c ≳ 2u` 持续泄压后重锚 `c₀`，见札记 07 E4b）；深度失能（`BurnoutNoCycle`）可由叙事通道抽走维持源触发，也可由 M 的酸蚀项在持续高应力下耗尽触发（见 §7 开放问题 1 实测）；恢复靠再接种（菌网「再接种」）或叙事干预。「死」只作为叙事层的既定失败布景（如上游先例节点），不进入机制语义；
+5. ~~状态持久化~~ **已落地（2026-11-07）**：维度级 `PersistentState`（`MandatePersistence`，存 `data/voy_mandate.dat`）承载整格快照——每格全状态（`v/w/s/q`、`M`、四通道电平、双参数集）、输运边、水晶链路与 `simTime`；`MandateSnapshot`（纯数据，`inner/` 无 MC 类型）负责 capture/restore，actor 以 1 sim 秒节拍发布、存档时刻序列化，启动时按几何指纹（origin/宽/高）校验后恢复，不匹配则丢弃重来。裁定结果：**粒度取整格**（Node 聚合结算属未来的离线抽稀问题，不在存储层做）；**快变量存**（成本可忽略，且保证重启后相位读数连续）；**突触内核与链路待投递队列不存**（τ≤5 s 即衰减、一周期内重建，丢失无可感知影响）。仍开放：`CalmingBus` 注册表与装甲化落盘（方块实体 NBT，随设施工单同行）；「离线按 Node 聚合结算」已由草案 01 §1.3 的「常驻 + 粗步进」设计取代（不做离线加速风化）；**存档时刻 flush（2026-11-07）**：`BEFORE_SAVE` 让 actor 立即发布并阻塞至多 2 s（超时只 warn，不阻断保存），优雅关服不再丢最后一个 persist 周期；**已知边界**：schema 不匹配（`schemaVersion` 不等）仍静默丢弃并覆盖原文件（`.bak` 备份与迁移留到 payload 真正变更时再做），崩溃/`kill -9` 仍最多丢一个 persist 周期；
 6. ~~`Regime` / `PhaseReading` 枚举线级名中文化~~ **已裁定（2026-11-07）**：不改线级枚举名——它们锚定契约金样 JSON 与 Elixir 侧 `Voy.World.Profile`，改名需破契约重生成；中文化只做显示层（`MandateOverworld.regimeWord` / `formatPhaseDial`，开发 HUD 与调试输出保留英文调试词表）。

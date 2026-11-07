@@ -1,6 +1,6 @@
 defmodule Voy.World.PathwayTest do
   @moduledoc """
-  The five acceptance theorems of design note 05, plus the API shape they rest
+  The six acceptance theorems of design note 05, plus the API shape they rest
   on.
 
   Every theorem is checked over all twelve `(relic, fate)` pairs, so a single

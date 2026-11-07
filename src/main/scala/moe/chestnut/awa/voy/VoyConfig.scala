@@ -42,9 +42,11 @@ final case class LatticeConfig(
   * what makes the gamma time-scale calibration (design draft 01 §7.3) a
   * runtime tuning knob instead of a contract regeneration.
   *
-  * Restore semantics on world load: STATE comes from the save, PARAMETERS
-  * come from this file. Tuning a knob therefore applies to existing
-  * worlds immediately, without wiping their history.
+  * Restore semantics on world load (save > config > core default): the
+  * save wins for every value it carries, including per-cell parameters;
+  * the config applies to a fresh world and to newly registered cells,
+  * with the core defaults as the last resort. Tuning a knob therefore
+  * does NOT retroactively change the physics of an existing world's cells.
   */
 final case class VoyConfig(
     tickDt: Double = 0.05,

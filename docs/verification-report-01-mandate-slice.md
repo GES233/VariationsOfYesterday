@@ -1,5 +1,7 @@
 # 验证报告 01 — 0.1 纵切片的最短可验证闭环
 
+> 状态：**历史快照**（0.1 冻结期实测，未含 M / 持久化 / 外部配置）；数值仍与当期契约逐条一致，后续机制以草案 01 为准。
+>
 > 对象：单节点 `branch_01_baishui`（上游 `up` / 隘口 `pass` / 下游 `down`）、一个 `p` 通道脉冲事件。
 > 复现命令：
 > ```sh
@@ -20,14 +22,17 @@
 | **证据集合 $E$** | `official_hq{water_level, surge_count, rain_total, material, quantity, cause_tag}`、`tech_inner{impact_count, amplitude, surge_lag, surge_direction, rain_total, material}`、`old_zhai{sign_order, sign_sequence, magnitude, surge_lag, count_of_blows}` |
 | **真实尖峰判据** | $v$ 上穿截面 $1.2$ **且**峰值 $\ge 1.8$ 后回落穿过 $0$（排除仅把 $v$ 顶过 $1.2$ 而未激发动作电位的过阈伪影） |
 
-### 相位定义域（`MandateReadout` 四态区分）
+### 相位定义域（`MandateReadout` 五态区分）
 
 | 状态 | 判据 | 返回值 |
 | :--- | :--- | :--- |
 | **周期轨道** | $a_{\text{burnout}} < a(s) < a_c$，且已观测 $\ge 3$ 次过阈、相邻间隔偏差 $\le 20\%$ | `PhaseReading.Cycle(label, fraction)` |
-| **静息吸引域** | $a(s) \ge a_c$ 且 $|v-v^*|\le 0.25, |w-w^*|\le 0.25$ | `PhaseReading.Basin(Resting)`（无周期分数） |
+| **静息吸引域** | $a(s) \ge a_c$ 且 $|v-v^*|\le 0.25, |w-w^*|\le 0.25$、且未记录过截面穿越 | `PhaseReading.Basin(Resting)`（无周期分数） |
 | **强瞬态** | 单次激发或未稳定成周期 | `PhaseReading.Undefined(TransientNoCycle)` |
+| **无周期参照** | 尚未积累到周期参照（刚注册 / 刚唤醒等） | `PhaseReading.Undefined(NoCycleReference)` |
 | **方程级烧毁** | $a(s) \le a_{\text{burnout}} = -0.46667$ | `PhaseReading.Undefined(BurnoutNoCycle)` |
+
+> 表内 $a(s)$ 为当期口径；现行代码为 $a(s, M)$（`sustenance`，$M=1$ 时与上表等价）。
 
 ---
 

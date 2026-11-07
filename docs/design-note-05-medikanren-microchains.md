@@ -1,6 +1,6 @@
-# 设计札记 05 — mediKanren 五跳局部微链与种子物证绑定
+# 设计札记 05 — 五跳卷宗与内容管线（微链、种子物证与写作规范）
 
-> 状态：**现行规范**。实现见 `tools/voy_world/lib/voy/world/pathway.ex`、`witness.ex` 与 `canon.ex`。
+> 状态：**现行规范**。原札记 03（内容流水线）已并入本文 §4–§5。实现见 `tools/voy_world/lib/voy/world/pathway.ex`、`witness.ex`、`content.ex` 与 `canon.ex`；作者内容在 `content/documents/`。
 
 ## 1. 设计目标：局部证据的多跳合一
 
@@ -8,16 +8,14 @@
 
 - **拓扑多态**：按古器类型分两条互不交叉的物理主链（铜钲声学冶金链 vs 石堰喀斯特水工链）；
 - **单跳守恒锁**：`Pathway.connect_edges/1` 仅靠 `:from` 与 `:to` 元组合一拼链，不读顶层结局标签；删去任一跳即断链；
-- **种子物证绑定（Seeded Skolemization）**：由 `(seed, branch_id, relic, fate)` 确定性派生批号、备件名与实测推迟刻度 `safe_tick`，并同卷宗混入 2 张断链干扰单据；
-- **双时域投放（`horizon: :locked` vs `horizon: :open`）**：
-  - **既定先例节点（`horizon: :locked`，1–2 个）**：生成期即投放全部 5 张主链卡（Hop 1..5）+ 2 张干扰卡，供玩家复盘已发生的历史结局并反向推演规律；
-  - **未决变奏节点（`horizon: :open`，其余山谷）**：生成期停在 `era2b`/悬置初态，世界内仅投放前四跳（Hop 1..4）+ 2 张干扰卡；玩家必须据此筛出真工业载体 `vessel`、读取第 `safe_tick` 格相位推迟窗口重锚 $c_0$ 并平抑上游扰动，在运行时改写 `era3` 结局后才结算生成对应的第 5 跳（`:council_ordinance`）。
+- **种子物证绑定（Seeded Skolemization）**：由 `(seed, branch_id, relic, fate)` 确定性派生批号、备件名与实测推迟刻度 `safe_tick`，并混入 2 张断链干扰单据（规则见 §4.3）；
+- **双时域投放**：`:locked` 生成期全量物化 5 张主链卡 + 2 张干扰卡；`:open` 生成期按 `baseline_fate` 物化 Hop 1..4、结算补 Hop 5（`history.era3` 保持基线，时域分账详见札记 02 §3.1）。
 
 ---
 
 ## 2. 五跳微链图谱（`Voy.World.Pathway`）
 
-每条主链由 5 条有向边（Hop 1..5）首尾咬合而成（`:locked` 节点生成期全量物化；`:open` 节点生成期物化 Hop 1..4，Hop 5 随运行时 `era3` 结算落定）：
+每条主链由 5 条有向边（Hop 1..5）首尾咬合而成（`:locked` 节点生成期全量物化；`:open` 节点生成期按 `baseline_fate` 物化 Hop 1..4，Hop 5 随结算落定）：
 
 ### 2.1 主链 A：声学冶金微链（`relic == :ancestral_bronze_zheng`）
 
@@ -42,17 +40,63 @@
 ### 2.3 两类断链干扰卡（Decoy Edges）
 
 每个卷宗固定附带 2 张同车间干扰卡，由 Kanren 合一自动剪枝淘汰：
+
 1. **材质不符（`:material_mismatch`，断于 Hop 3 $\rightarrow$ 4）**：车间使用普通生铁（`{:tau_breaths, 0}`）或毛石（`{:siphon_head_m, 0}`）铸造备件，无阻尼/水头属性，无法与观测手簿合一。
-2. **去向断链（`:destination_dead_end`，断于 Hop 2 $\rightarrow$ 3）**：回收批号去向为外运省局冶炼厂（`:scrap_shipment`），无法与本场车间配料卡的 `:scrap_batch` 输入合一。
+2. **去向断链（`:destination_dead_end`，断于 Hop 2 $\rightarrow$ 3）**：回收批号去向为外运外单位（铜钲线为省局冶炼厂、石堰线为省水利工程处），无法与本场车间配料卡的 `:scrap_batch` 输入合一。
 
 ---
 
 ## 3. 单卡认知局部性与不变量（`Canon.check_pathways/1`）
 
 静态检查器与测试套件（`pathway_test.exs`）对全部 12 组 `(relic, fate)` 强制执行六条定理：
+
 1. **多跳合一唯一性**：5 张真卡唯一连通起点 `{:relic, ...}` 与终点 `{:emergent_ritual, ...}`。
 2. **单跳消融断链**：删去 Hop 1..5 中任意 1 跳，剩余 4 张卡 `connect_edges/1` 必返回 `[]`。
 3. **干扰链排斥**：混入 2 张干扰卡并打乱顺序后，仍只合出唯一真载体。
 4. **种子隔离与跨卡咬合**：不同 `seed` 派生不同 `(batch_id, vessel_name, safe_tick)`；同一 `seed` 内跨卡引用的批号、载体图号与 `safe_tick` 逐字相等，且 `safe_tick` 必来自契约实测 `Delayed` 列表。
 5. **单卡反剧透（Epistemic Locality）**：`batch_id` 仅出现在 Hop 2 与 3；`vessel_code` 仅出现在 Hop 3 与 5；占空比数值 `28.1%` / `60.6%` 仅出现在 Hop 4；无任何单卡同时出现古器原名、流转批号与载体图号。
 6. **$c_0$ 防火墙与六结局分叉**：Hop 2/3 元组显式携带 `c0_status`，防止拆器单据与留存单据串接。
+
+---
+
+## 4. 内容包与写作规则
+
+### 4.1 三层职责分离
+
+故事不存在于任何一张全知摘要卡中，而是由五张局部单据通过桥接元组首尾合一后涌现：
+
+| 层级 | 维护者 | 负责内容 | 变更方式 |
+| :--- | :--- | :--- | :--- |
+| **内容层** | 叙事作者 | `content/documents/**/*.md`（32 张主链卡 + 4 张干扰卡） | 编辑 Markdown，运行 `mix voy.content lint` |
+| **结构层** | 技术维护者 | 五跳拓扑（`Pathway`）、种子物证池（`Witness`）、四纪历史（`Chronicle`）、数值契约（`Contract`） | 修改代码与测试 |
+| **校验层** | 机器检查 | 卡片覆盖、唯一选择、占位符闭合、禁写死年份、五跳消融与认知局部性（`Canon`） | `mix test` / CI 自动执行 |
+
+作者只负责单据文风与局部事实；新增 hop、古器、结局、干扰类型或安全刻度属于结构变更。
+
+### 4.2 卡片格式与选择规则
+
+每份档案是带平铺头部（`---`）的 Markdown 文件：
+
+- **Hop 1（旧志先例）、Hop 3（车间配料卡）**：声明 `hop / role / relic / title`；
+- **Hop 2（收缴或代管单）**：另声明 `c0_status`（`c0_collapsed` 或 `c0_intact`）；
+- **Hop 4（野外观测手簿）、Hop 5（现行条规）**：另声明 `fate`（六种结局之一）；
+- **干扰卡（Decoy）**：`role: decoy`，声明 `relic / decoy_class / title`。
+
+对于全部 $2 \times 6 = 12$ 个 `(relic, fate)` 组合，`Content.card_for/2` 为每条边唯一选出一张卡片（5 张主链 + 2 张干扰），缺卡或撞卡均直接报错。具体写作语法与占位符清单见 [content/README.md](<../tools/voy_world/content/README.md>)。
+
+### 4.3 种子物化与实测安全刻度
+
+1. **实测安全刻度（`safe_ticks`）**：Scala `PhaseResponse` 对每个整数 tick 实测 `alpha_metal_resonance` 的尖峰响应，仅将结果为 `Delayed` 的刻度写入 `contracts/mandate-slice-v1.json`。
+2. **种子绑定（`Witness.bind/4`）**：按 `(seed, branch_id, relic, fate)` 确定性哈希选出互不冲突的真链批号、工业载体与 `safe_tick`，以及两套同车间干扰批号（材质不符卡另附干扰载体），渲染占位符后填入 `Export`（schema v2）的 `dossier` 字段。
+
+---
+
+## 5. 常用命令
+
+```sh
+mix voy.content lint
+mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all] [--seed N]
+mix voy.content template <hop1|hop2|hop3|hop4|hop5|decoy>
+```
+
+（`preview` 默认 `all`，默认 seed 101；`template` 输出空白主链/干扰卡。）
