@@ -1,5 +1,6 @@
 package moe.chestnut.awa.voy
 
+import net.minecraft.datafixer.DataFixTypes
 import net.minecraft.nbt.{NbtCompound, NbtElement, NbtList}
 import net.minecraft.registry.RegistryWrapper
 import net.minecraft.world.PersistentState
@@ -34,12 +35,17 @@ import moe.chestnut.awa.voy.inner.mandate.{
 final class MandatePersistence extends PersistentState:
   /** `(originX, originZ, width, height)` of the lattice the snapshot was
     * captured under; loaded from NBT or set by the runtime before the
-    * first save.
+    * first save. Server-thread only (engine start and save), unlike
+    * `snapshot`.
     */
   var geometry: (Int, Int, Int, Int) = (0, 0, 0, 0)
 
-  /** Latest published snapshot; `None` before the engine first reports. */
-  var snapshot: Option[MandateSnapshot] = None
+  /** Latest published snapshot; `None` before the engine first reports.
+    * Written by the ENGINE ACTOR thread (`persistSink`) and read by the
+    * server thread at save time, hence `@volatile`: the reference swap is
+    * the entire handoff (the snapshot itself is immutable).
+    */
+  @volatile var snapshot: Option[MandateSnapshot] = None
 
   override def writeNbt(
       nbt: NbtCompound,
@@ -61,7 +67,15 @@ object MandatePersistence:
     new PersistentState.Type[MandatePersistence](
       () => new MandatePersistence,
       (nbt, _) => fromNbt(nbt),
-      null
+      // This slot is the data-fix CARRIER, not a schema claim about our
+      // payload: the compound is ours, no vanilla fixer knows its keys, so
+      // the level fixer leaves it untouched. It must NOT be null —
+      // `PersistentStateManager.readNbt` dereferences it unconditionally on
+      // load, and a null here makes every reload throw (caught, logged as
+      // "Error loading saved data"), silently reset the lattice and then
+      // overwrite the stale save. `MandatePersistenceSpec` round-trips
+      // through the real manager to keep this honest.
+      DataFixTypes.LEVEL
     )
 
   // ==== NBT codec (kept pure so it round-trips in unit tests) ====

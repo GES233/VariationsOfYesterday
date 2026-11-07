@@ -1,7 +1,15 @@
 package moe.chestnut.awa.voy
 
+import java.nio.file.{Files, Path}
+
+import com.mojang.datafixers.{DSL, DataFixer}
+import com.mojang.datafixers.schemas.Schema
+import com.mojang.serialization.Dynamic
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+
+import net.minecraft.SharedConstants
+import net.minecraft.world.PersistentStateManager
 
 import moe.chestnut.awa.voy.inner.mandate.{
   CellCoord,
@@ -87,3 +95,46 @@ class MandatePersistenceSpec:
       loaded.snapshot.isEmpty,
       "an incompatible payload must fall back to a fresh lattice"
     )
+
+  // ==== The real load path (regression: the carrier's DataFixTypes) ==== //
+  //
+  // The two tests above call the deserializer directly, which never touches
+  // `PersistentStateManager` — and that is exactly where a null
+  // `DataFixTypes` used to kill every reload: `readNbt` dereferences it
+  // unconditionally, the NPE is caught and logged, the manager returns a
+  // FRESH state, and the next save overwrites the old file.
+
+  /** No-op data fixer: our payload has no vanilla schema, so the level fixer
+    * must hand it back untouched; the test is about the manager's plumbing.
+    */
+  private val noFixer: DataFixer = new DataFixer:
+    def update[T](
+        `type`: DSL.TypeReference,
+        input: Dynamic[T],
+        version: Int,
+        newVersion: Int
+    ): Dynamic[T] = input
+    def getSchema(version: Int): Schema = null
+
+  private def newManager(dir: Path): PersistentStateManager =
+    new PersistentStateManager(dir, noFixer, null)
+
+  @Test def `a second manager loads the saved lattice back`(): Unit =
+    // `readNbt` stamps the game's save version into the payload.
+    SharedConstants.createGameVersion()
+    val dir = Files.createTempDirectory(Path.of("build"), "persist-")
+
+    val first = newManager(dir)
+    val state = first.getOrCreate(MandatePersistence.StateType, MandatePersistence.Id)
+    state.geometry = geometry
+    state.snapshot = Some(sample)
+    state.markDirty()
+    first.save()
+
+    // A fresh manager is what a server restart looks like.
+    val second = newManager(dir)
+    val loaded =
+      second.getOrCreate(MandatePersistence.StateType, MandatePersistence.Id)
+
+    assertEquals(geometry, loaded.geometry)
+    assertEquals(Some(sample), loaded.snapshot)
