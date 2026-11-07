@@ -1,6 +1,7 @@
 package moe.chestnut.awa.voy
 
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.{ConcurrentLinkedQueue, CountDownLatch, TimeUnit}
+import java.util.concurrent.atomic.AtomicReference
 
 import net.minecraft.server.MinecraftServer
 import org.slf4j.{Logger, LoggerFactory}
@@ -61,6 +62,11 @@ object MandateRuntime:
   private var lastTickRate: Float = 20.0f
   private val pendingActions =
     new ConcurrentLinkedQueue[MandateActionProtocol]()
+
+  /** Latch for the save-time flush: set by [[flush]], counted down by the
+    * actor's next publish (flush or cadence). Atomic because the actor
+    * thread counts it down while the server thread waits. */
+  private val flushLatch = new AtomicReference[CountDownLatch](null)
 
   /** Convert world chunk coordinates to lattice-local cell coordinates. */
   def worldToGrid(chunkX: Int, chunkZ: Int): CellCoord =
@@ -195,6 +201,11 @@ object MandateRuntime:
           persistSink = snap => {
             persistence.snapshot = Some(snap)
             persistence.markDirty()
+            // A publish of any kind satisfies a pending save-time flush: by
+            // mailbox order it already reflects every event before the
+            // `FlushNow` request.
+            val pending = flushLatch.getAndSet(null)
+            if pending != null then pending.countDown()
           }
         )
       )
@@ -263,6 +274,31 @@ object MandateRuntime:
     if !server.getPlayerManager.getPlayerList.isEmpty then
       system.foreach(_ ! EventMsg.TickArrived(TickDt, tickRate))
       MandateOverworld.onServerTick(server)
+
+  /** Make the carrier current before a world save (`BEFORE_SAVE`): ask the
+    * actor to publish now and wait, bounded, so the save writes the latest
+    * integrated tick instead of a snapshot up to one persist period old.
+    *
+    * Server-thread only. No-op when the engine is not running. The wait is
+    * bounded because a wedged actor must not hang every autosave: on timeout
+    * the save still happens, just with the previous snapshot (a warning says
+    * so). Crashes and `kill -9` are outside this path by construction.
+    */
+  def flush(): Unit =
+    system match
+      case None => ()
+      case Some(ref) =>
+        val latch = new CountDownLatch(1)
+        flushLatch.set(latch)
+        ref ! EventMsg.FlushNow
+        try
+          if !latch.await(2, TimeUnit.SECONDS) then
+            logger.warn(
+              "Persistence flush timed out; this save may lag the live lattice " +
+                "by up to one persist period."
+            )
+          else logger.debug("Persistence flushed for save.")
+        finally flushLatch.set(null)
 
   /** HUD / external read: world chunk -> state; zero state outside the
     * lattice or while the engine is stopped.

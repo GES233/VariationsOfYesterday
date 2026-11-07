@@ -137,3 +137,15 @@ object EventMsg:
   /** Remove the pulse link `src -> dst`, if present. Pulses it already
     * scheduled are in-flight events and are not retracted. */
   final case class RemoveLink(src: CellCoord, dst: CellCoord) extends EventDTO
+
+  // ==== Persistence control (no dynamical effect) ====
+
+  /** Publish a lattice snapshot NOW, without advancing the clock.
+    *
+    * This is a control message rather than a world event: `applyEvent`
+    * ignores it (it mutates nothing), and the actor only forwards it to the
+    * persistence sink. It exists so the save-time handler (`BEFORE_SAVE`)
+    * can make the carrier current instead of saving a snapshot up to one
+    * persist period old. Safe to drop in a replay: losing it costs the save
+    * cadence, never the dynamics. */
+  case object FlushNow extends EventDTO

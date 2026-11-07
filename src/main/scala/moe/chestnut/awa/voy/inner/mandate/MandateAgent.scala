@@ -103,6 +103,8 @@ object MandateAgent:
           grid.upsertEdge(edge)
       case EventMsg.RemoveEdge(from, to) => grid.removeEdge(from, to)
       case EventMsg.AddLink(_) | EventMsg.RemoveLink(_, _) => ()
+      // Persistence control: no lattice effect (see `EventMsg.FlushNow`).
+      case EventMsg.FlushNow => ()
 
   def apply(
       grid: MandateGrid,
@@ -211,6 +213,11 @@ object MandateAgent:
         // Link wiring lives in the runner, not the grid.
         case EventMsg.AddLink(link) => linkRunner.addLink(link)
         case EventMsg.RemoveLink(src, dst) => linkRunner.removeLink(src, dst)
+        // Save-time flush (persistence only): publish the current lattice
+        // without advancing the clock, then resume the normal cadence.
+        case EventMsg.FlushNow =>
+          persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime))
+          nextPersistAt = simTime + persistPeriod
         case other @ EventMsg.RegisterCell(cell, _, _) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
           // A (re-)registered cell restarts phase tracking — the dynamics

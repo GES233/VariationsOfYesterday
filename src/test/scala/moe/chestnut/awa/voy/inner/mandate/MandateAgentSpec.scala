@@ -382,3 +382,48 @@ class MandateAgentSpec:
       "the stress set has no per-event override, so the default still applies"
     )
 
+  // ==== persistence control (save-time flush) ==== //
+
+  @Test def flushNowPublishesTheCurrentLatticeWithoutTicking(): Unit =
+    val grid = singleCellGrid(mkCell(0.0))
+    val latch = new AtomicReference(new CountDownLatch(1))
+    val published = new AtomicReference[MandateSnapshot](null)
+    val agent = track(
+      MandateAgent(
+        grid,
+        _ => (),
+        persistSink = snap => {
+          published.set(snap)
+          latch.get.countDown()
+        }
+      )
+    )
+
+    // The first cadence point is the restored clock, so this tick publishes.
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.get.await(5, TimeUnit.SECONDS), "a tick publishes a snapshot")
+    val ticked = published.get()
+
+    latch.set(new CountDownLatch(1))
+    agent ! EventMsg.SetBaselineCalming(origin, 0.9)
+    agent ! EventMsg.FlushNow
+    assertTrue(
+      latch.get.await(5, TimeUnit.SECONDS),
+      "FlushNow must publish without a tick event"
+    )
+
+    val flushed = published.get()
+    assertEquals(
+      ticked.simTime,
+      flushed.simTime,
+      1e-12,
+      "the flush must not advance the integration clock"
+    )
+    assertEquals(
+      0.9,
+      flushed.cells.find(_.coord == origin).get.baselineCalming,
+      1e-12,
+      "the flush must capture the lattice as of the mailbox order"
+    )
+
+

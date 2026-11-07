@@ -24,6 +24,10 @@ object VariationsOfYesterday extends ModInitializer:
     // the overworld's PersistentStateManager, which only exists after the
     // dimensions are loaded.
     ServerLifecycleEvents.SERVER_STARTED.register(server => MandateRuntime.start(server))
+    // BEFORE_SAVE covers autosave, /save-all and the shutdown save (shutdown
+    // also goes through MinecraftServer.save): flush the actor so the carrier
+    // holds the latest tick, not a snapshot up to one persist period old.
+    ServerLifecycleEvents.BEFORE_SAVE.register((_, _, _) => MandateRuntime.flush())
     ServerLifecycleEvents.SERVER_STOPPED.register(_ => MandateRuntime.stop())
     ServerTickEvents.END_SERVER_TICK.register(MandateRuntime.onTick(_))
     MandateOverworld.register()
