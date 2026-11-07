@@ -2,5 +2,11 @@
   "effect.variations-of-yesterday.stagnation": "沉滞",
   "effect.variations-of-yesterday.stagnation.description": "这片地的地脉没人维持，压着你的手",
   "effect.variations-of-yesterday.stagnation_spike": "沉滞·尖峰",
-  "effect.variations-of-yesterday.stagnation_spike.description": "地脉正在尖峰上翻涌，挖起来像在泥里"
+  "effect.variations-of-yesterday.stagnation_spike.description": "地脉正在尖峰上翻涌，挖起来像在泥里",
+  "term.variations-of-yesterday.mycelial_network": "菌网",
+  "term.variations-of-yesterday.mandate_vein": "地脉",
+  "term.variations-of-yesterday.yellow_seep": "黄水",
+  "block.variations-of-yesterday.limestone_drain": "石灰石沟",
+  "block.variations-of-yesterday.constructed_wetland": "人工湿地",
+  "block.variations-of-yesterday.gastrodia_bed": "天麻床"
 }

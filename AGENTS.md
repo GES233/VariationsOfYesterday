@@ -26,7 +26,8 @@
 - `src/main/scala/moe/chestnut/awa/voy/`
   - `VariationsOfYesterday.scala` — 模组主入口，注册生命周期、tick 与主世界监听
   - `MandateRuntime.scala` — Minecraft ↔ Mandate 桥接（引擎 actor 生命周期、tick gate、快照发布、动作回包队列）
-  - `MandateOverworld.scala` — 主世界交互接线（采掘注入应力、敲钟/拆钟控制 $c_0$ 与脉冲、钟表/指南针验山读数、原版「沉滞」debuff）
+  - `MandateOverworld.scala` — 主世界交互接线（采掘注入应力、敲钟/拆钟控制 $c_0$ 与脉冲、钟表/指南针验山读数、原版「沉滞」debuff、服务端感官签名发射、菌种右键土壤再接种）
+  - `MandatePhenomena.scala` — 感官签名与再接种的纯映射层（黄水三档 / 夜光 / 静默枯败 / `evaluateReInoculation`，无 Minecraft 依赖、可单测）
   - `inner/mandate/` — 核心模拟：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`、`PhaseResponse`、`SliceReplay`、`SliceContract`
   - `inner/actor/Actor.scala` — 单线程 actor 内核（`ActorRef` 信箱，`tell` / `!` / `stop`）
   - `inner/event/EventMsg.scala` — 入向通道与拓扑协议 `EventDTO`（通道电平/脉冲 + 格子、输运边、链路的增删）

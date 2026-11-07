@@ -2,5 +2,11 @@
   "effect.variations-of-yesterday.stagnation": "Stagnation",
   "effect.variations-of-yesterday.stagnation.description": "The land's mandate is unmaintained, and it weighs on your hands",
   "effect.variations-of-yesterday.stagnation_spike": "Stagnation: Spike",
-  "effect.variations-of-yesterday.stagnation_spike.description": "The mandate is surging through a spike; digging feels like mud"
+  "effect.variations-of-yesterday.stagnation_spike.description": "The mandate is surging through a spike; digging feels like mud",
+  "term.variations-of-yesterday.mycelial_network": "Mycelial Network",
+  "term.variations-of-yesterday.mandate_vein": "Mandate Vein",
+  "term.variations-of-yesterday.yellow_seep": "Iron-Yellow Seep",
+  "block.variations-of-yesterday.limestone_drain": "Limestone Drain",
+  "block.variations-of-yesterday.constructed_wetland": "Constructed Wetland",
+  "block.variations-of-yesterday.gastrodia_bed": "Gastrodia Bed"
 }

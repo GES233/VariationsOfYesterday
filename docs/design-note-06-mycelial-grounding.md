@@ -111,12 +111,9 @@
 > 仓库：`GES233/VariationsOfYesterday`，Minecraft 1.21.2 / Fabric / Scala 3。
 > 每完成一个 WO 运行 `./gradlew build` 与 `./gradlew test`，全绿才继续。
 
-### WO-1 术语与文案
-- `src/main/resources/assets/variations-of-yesterday/lang/zh_cn.json` / `en_us.json` 新增术语条目：
-  菌网（mycelial network）、地脉（沿用）、黄水（iron-yellow seep）、石灰石沟（limestone drain）、
-  人工湿地（constructed wetland）、天麻床（gastrodia bed）；
-- HUD（`hud/MandateHud.scala`）读数文案接入 §3 的签名描述（只改文案，不改逻辑；开发 HUD 的裸数值行在发布前门控或移除）。
-- 验收：构建通过；`zh_cn` 与 `en_us` 键数一致（加一个 JUnit 键集断言）。
+### WO-1 术语与文案（**已落地，2026-11-07**）
+- ~~`src/main/resources/assets/variations-of-yesterday/lang/zh_cn.json` / `en_us.json` 新增术语条目~~ **已落地**：菌网（mycelial network）、地脉（沿用）、黄水（iron-yellow seep）、石灰石沟（limestone drain）、人工湿地（constructed wetland）、天麻床（gastrodia bed）均已入库，键集一致性由 `MandatePhenomenaSpec` 断言；
+- HUD（`hud/MandateHud.scala`）遥测行已加 `M`；玩家侧验山读数（`MandateOverworld.formatInspection`）接入 §3 的定性菌网词（枯绝/受损/完好，不给数值；开发 HUD 的裸数值行在发布前门控或移除）。
 
 ### WO-2 安抚设施方块（石灰石沟 / 人工湿地）
 - 新包 `moe.chestnut.awa.voy.blocks`：两个方块 + 方块实体；`Registries.BLOCK`、`BlockEntityType`、物品、创造栏、blockstate/model/loot（可用现有 `fabric-datagen` 入口）；
@@ -125,9 +122,11 @@
 - 参数全部进 config（`c_drain`、`k_armor`、`q₀`、`armorMax`、`c_wetland`）。
 - 验收：新单元测试（mock 快照 → 断言总线求和值与装甲累积）；既有测试全绿。
 
-### WO-3 天麻床与感官签名
-- 天麻床方块（§4.3）；§3 签名表中的水体黄浊粒子与湿地臭味粒子，由服务端 `PhenomenonEmitter` 统一驱动（不进客户端逻辑）。
-- 验收：签名随 `CellReadout` 状态切换；服务器侧无渲染引用；专用服务器可用。
+### WO-3 天麻床与感官签名（**签名与再接种已落地，2026-11-07；天麻床方块待 WO-2 方块框架**）
+- 感官签名（§3）已由 `MandatePhenomena`（纯映射，可单测）+ `MandateOverworld.emitChunkPhenomena`（服务端统一发射，不进客户端逻辑）落地：黄水三档（铁锈色 `DustParticleEffect` 扫表层水体，计数按档）、健康夜光（`GLOW`，低密度封顶）、深度失能静默（`WHITE_ASH`，绑 `BurnoutNoCycle` 而非 `Regime.Burnout`）；
+- **菌网再接种**：手持菌种（发光地衣/蘑菇/菌丝体）右键土壤 → `evaluateReInoculation` 纯判定（`Seeded` / `AcidTooToxic` / `AlreadyViable`）→ `EventMsg.SetSustenance(M = 0.05)`；酸毒未退（s ≥ 0.6）时接种失败且菌种照常消耗——失败是身体证据，不是禁令；
+- 天麻床方块：待 WO-2 的方块框架落地后接入。
+- 验收：签名映射金样测试见 `MandatePhenomenaSpec`（107 项全量测试通过）；服务器侧无渲染引用；专用服务器可用。
 
 ### WO-4 回归与金样
 - 为 §3 签名映射加金样测试（构造 `CellReadout` → 断言签名档位）；

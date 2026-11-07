@@ -97,6 +97,9 @@ object MandateRuntime:
   def setDisturbanceAt(chunkX: Int, chunkZ: Int, rate: Double): Unit =
     tell(EventMsg.SetDisturbance(worldToGrid(chunkX, chunkZ), rate))
 
+  def setSustenanceAt(chunkX: Int, chunkZ: Int, level: Double): Unit =
+    tell(EventMsg.SetSustenance(worldToGrid(chunkX, chunkZ), level))
+
 
   /** Prototype lattice: disturbance hotspot around its centre, calming ring
     * further out. Constructed per engine start so restarts get a fresh
