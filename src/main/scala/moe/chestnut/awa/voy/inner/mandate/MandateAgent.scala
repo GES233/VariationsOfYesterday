@@ -25,6 +25,12 @@ import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
   *   transitions) produced during integration.
   * @param readoutSink receives the semantic `CellReadout` projection per cell
   *   after each integration step.
+  * @param initialSimTime restored integration clock on world load (0 for a
+  *   fresh lattice); pulse delays and phase readouts continue from it.
+  * @param persistSink receives the full `MandateSnapshot` on a slow cadence
+  *   for world persistence; the saved copy may lag the live lattice by at
+  *   most `persistPeriod` without losing anything a player can feel.
+  * @param persistPeriod snapshot cadence in simulation-time units.
   */
 object MandateAgent:
   /** Apply one channel or topology event to the lattice.
@@ -75,8 +81,6 @@ object MandateAgent:
           grid.upsertEdge(edge)
       case EventMsg.RemoveEdge(from, to) => grid.removeEdge(from, to)
       case EventMsg.AddLink(_) | EventMsg.RemoveLink(_, _) => ()
-      // Actor-side bookkeeping (base offset), see apply().
-      case EventMsg.SetSustenance(_, _) => ()
 
   def apply(
       grid: MandateGrid,
@@ -84,10 +88,18 @@ object MandateAgent:
       actionSink: MandateActionProtocol => Unit = (_ => ()),
       readoutSink: Map[CellCoord, CellReadout] => Unit = (_ => ()),
       links: Seq[PulseLink] = Nil,
-      spikeCriterion: SpikeCriterion = SpikeCriterion.PeakConfirmed
+      spikeCriterion: SpikeCriterion = SpikeCriterion.PeakConfirmed,
+      initialSimTime: Double = 0.0,
+      persistSink: MandateSnapshot => Unit = (_ => ()),
+      persistPeriod: Double = 1.0
   ): ActorRef[EventDTO] =
     val readoutParam = ReadoutParam()
-    var simTime: Double = 0.0
+    var simTime: Double = initialSimTime
+    // The full lattice snapshot for world persistence is published on a
+    // slow cadence (the dynamics' fastest timescale is seconds; the saved
+    // copy may lag the live one by at most persistPeriod without losing
+    // anything a player can feel).
+    var nextPersistAt: Double = initialSimTime
     // Always constructed: links are runtime wiring (AddLink/RemoveLink), so
     // "no links yet" must not mean "no way to add one". The constructor's
     // `links` are merely the initial wiring.
@@ -160,6 +172,10 @@ object MandateAgent:
 
       snapshotSink(currentBuilder.result())
       readoutSink(readoutBuilder.result())
+
+      if simTime >= nextPersistAt then
+        persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime))
+        nextPersistAt = simTime + persistPeriod
 
     def handle(event: EventDTO): Unit =
       // tickRate is reserved for the step-coarsening ("weathering")

@@ -17,7 +17,7 @@ object VariationsOfYesterday extends ModInitializer:
     // during mod init, before any server-driven `StatusEffectInstance` exists.
     MandateEffects.Stagnation
     MandateEffects.StagnationSpike
-    ServerLifecycleEvents.SERVER_STARTING.register(_ => MandateRuntime.start())
+    ServerLifecycleEvents.SERVER_STARTING.register(server => MandateRuntime.start(server))
     ServerLifecycleEvents.SERVER_STOPPED.register(_ => MandateRuntime.stop())
     ServerTickEvents.END_SERVER_TICK.register(MandateRuntime.onTick(_))
     MandateOverworld.register()

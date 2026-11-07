@@ -22,13 +22,16 @@ import moe.chestnut.awa.voy.inner.mandate.*
   * TODO: the prototype lattice is fixed to world chunks [-16, 15] in both
   * axes, with its disturbance hotspot around chunk (0, 0). Future iterations
   * should anchor it to the spawn point, follow the player's local region, or
-  * derive cells from real world topology and persist them per dimension.
+  * derive cells from real world topology. The saved snapshot records the
+  * geometry it was captured under (`MandatePersistence.geometry`), so a
+  * lattice-geometry change discards the stale save loudly instead of
+  * silently misplacing cells.
   *
-  * TODO(persistence): the lattice dies with the JVM — `buildGrid()` starts
-  * fresh on every engine start, so stress, activity, wiring and any future
-  * facility state reset on restart. Candidate carrier: Minecraft
-  * `PersistentState` (dimension-scoped NBT saved with the world); marked as
-  * an open question in design note 06 §7 (2026-11-07), not yet scheduled.
+  * Persistence (2026-11-07): the lattice survives restarts via the
+  * dimension-scoped `PersistentState` carrier `MandatePersistence`. The
+  * actor publishes a full `MandateSnapshot` on a slow cadence and the
+  * manager serializes the latest one on world save; on start the lattice,
+  * crystal links and the integration clock are restored from it.
   */
 object MandateRuntime:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
@@ -109,16 +112,60 @@ object MandateRuntime:
       cell
   )
 
-  /** Start the engine. Idempotent while running. */
-  def start(): Unit = synchronized {
+  /** Start the engine, restoring the saved lattice when one exists.
+    * Idempotent while running.
+    */
+  def start(server: MinecraftServer): Unit = synchronized {
     if system.isEmpty then
+      val persistence = server.getOverworld.getPersistentStateManager
+        .getOrCreate(MandatePersistence.StateType, MandatePersistence.Id)
+
+      // Restore only a snapshot captured under the same lattice geometry;
+      // a geometry change (the prototype lattice is still anchored to
+      // fixed chunks) discards the stale save loudly.
+      val expectedGeometry = (originX, originZ, width, height)
+      val restored = persistence.snapshot.filter { _ =>
+        val matches = persistence.geometry == expectedGeometry
+        if !matches then
+          logger.warn(
+            s"Discarding saved mandate lattice: geometry ${persistence.geometry} " +
+              s"does not match the active lattice $expectedGeometry."
+          )
+        matches
+      }
+
+      val (grid, links, initialSimTime) = restored match
+        case Some(snap) =>
+          logger.info(
+            s"Restoring mandate lattice from saved state " +
+              s"(${snap.cells.size} cells, ${snap.links.size} links, " +
+              s"simTime = ${snap.simTime})."
+          )
+          (MandateSnapshot.restoreGrid(snap), snap.links, snap.simTime)
+        case None =>
+          (buildGrid(), Nil, 0.0)
+
+      persistence.geometry = expectedGeometry
+      // Seed the carrier immediately so a save landing before the first
+      // cadence publish never writes an empty payload over a valid save.
+      persistence.snapshot = Some(
+        MandateSnapshot.capture(grid, links, initialSimTime)
+      )
+      persistence.markDirty()
+
       logger.info("Starting mandate engine actor.")
       system = Some(
         MandateAgent(
-          buildGrid(),
+          grid,
           publishSnapshot,
           pendingActions.add(_),
-          publishReadout
+          publishReadout,
+          links = links,
+          initialSimTime = initialSimTime,
+          persistSink = snap => {
+            persistence.snapshot = Some(snap)
+            persistence.markDirty()
+          }
         )
       )
   }

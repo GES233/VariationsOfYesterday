@@ -121,7 +121,7 @@ FirePulse(dst, area, transmitter)   // 先设 dst.synapseTau = transmitter.tau�
 - `MandateAgent.apply(..., links: Seq[PulseLink], spikeCriterion)`：链路投递在每步**之前**（`duePulses`），尖峰检测在每步**之后**（`observe`），与离线原型同序。运行器常驻；构造期 `links` 只是初始布线，运行期经拓扑事件 `AddLink` / `RemoveLink` 增删（2026-11-07，为晶盘/微网格与 worldgen 接线预留）。
 - `PulseCoupling.runCoupled(...)`：离线复跑入口，格子无扩散边（链路是事件层），用于复刻实验。
 - `MandateRuntime` 暂不注册链路：水晶元件与微网格尚未落地，等 `design-note-08` 的方块交互定型后再经 `AddLink` 接入。
-- **突触解耦（既定方向，未实施）**：目前每格只有一个突触内核实例（`MandateState.synapseTau/Z/P`），`FirePulse` 到达时按发射器覆写 `synapseTau`——τ 不同的在途内核会互相改写衰减率（铃 5.0 与链路 2.0 叠加时），回放仍确定（发射器记录在事件里），但物理上不干净。方向是把内核状态移出 `MandateState`、挂到发射器/链路实体上（链路自有内核，铃击在 Agent 侧按 `PulseTransmitter` 分桶），格子只留一个 `synapseInput` 注入口，与 `stressFlux` 的接线模式一致；τ 随之彻底成为发射器/链路创建期配置。因必须改动契约哈希锚 `MandateState.scala`（金样需 `-Dvoy.contract.write=true` 重新生成并跨栈复核），与持久化落地搭车进行，不单独破契约。
+- **突触解耦（既定方向，未实施）**：目前每格只有一个突触内核实例（`MandateState.synapseTau/Z/P`），`FirePulse` 到达时按发射器覆写 `synapseTau`——τ 不同的在途内核会互相改写衰减率（铃 5.0 与链路 2.0 叠加时），回放仍确定（发射器记录在事件里），但物理上不干净。方向是把内核状态移出 `MandateState`、挂到发射器/链路实体上（链路自有内核，铃击在 Agent 侧按 `PulseTransmitter` 分桶），格子只留一个 `synapseInput` 注入口，与 `stressFlux` 的接线模式一致；τ 随之彻底成为发射器/链路创建期配置。因必须改动契约哈希锚 `MandateState.scala`（金样需 `-Dvoy.contract.write=true` 重新生成并跨栈复核），原本与持久化搭车；持久化已于 2026-11-07 先行落地（未触契约锚），突触解耦仍待契约重生成窗口，不单独破契约。
 
 ---
 
