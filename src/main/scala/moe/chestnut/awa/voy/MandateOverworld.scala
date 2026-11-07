@@ -58,8 +58,14 @@ object MandateOverworld:
       val baselineCalming: Double,
       val pulseArea: Double
   ):
-    /** Calcified BurnoutZone (`Regime.Burnout`): irreversible precedent, cannot restore `c0`. */
-    case BurnoutDeadZone extends BellStrikeOutcome(false, 0.0, BellPulseArea)
+    /** Saturated incapacitation (`Regime.Burnout`, `s >= 0.95`): the fast
+      * system is still inside its oscillatory window, but the cell is
+      * functionally incapacitated and the bell cannot re-anchor `c0` while
+      * the stress stays saturated. NOT a dead zone: there is no latch, so
+      * once sustained calming pulls the stress back below the threshold
+      * (c ≳ 2u, design note 07 E4b), ordinary strikes anchor again. Recovery
+      * is meant to be expensive, not impossible. */
+    case SaturatedNoAnchor extends BellStrikeOutcome(false, 0.0, BellPulseArea)
 
     /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck during `PhaseLabel.Excitation`:
       * pulse is swallowed by the active spike and `c0` fails to re-anchor.
@@ -77,8 +83,10 @@ object MandateOverworld:
   /** Pure, phase-gated rule for re-anchoring `c0` and firing a resonance pulse
     * when a player strikes a bell / industrial vessel in a chunk:
     *
-    *  - `Regime.Burnout`: irreversible calcified dead zone (`BurnoutZone` precedent);
-    *    ringing cannot restore `c0` (`baselineCalming` stays `0.0`).
+    *  - `Regime.Burnout`: saturated incapacitation (`失能`), not death. The
+    *    cell keeps oscillating; ringing cannot re-anchor `c0` while the stress
+    *    stays saturated (`baselineCalming` stays `0.0`), but nothing is
+    *    latched — relieving the stress re-enables anchoring.
     *  - Unanchored oscillator (`baselineCalming <= 0.0` and `Regime.Oscillating`):
     *    - `Cycle(AbsoluteRefractory | RelativeRefractory, _)`: hits the refractory
     *      delay window (`safe_tick`), re-anchoring `c0 = BellBaselineCalming` and firing the pulse.
@@ -89,7 +97,7 @@ object MandateOverworld:
     */
   def evaluateBellStrike(readout: CellReadout): BellStrikeOutcome =
     if readout.regime == Regime.Burnout then
-      BellStrikeOutcome.BurnoutDeadZone
+      BellStrikeOutcome.SaturatedNoAnchor
     else if readout.baselineCalming <= 0.0 && readout.regime == Regime.Oscillating then
       readout.phase match
         case PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory, _) =>
@@ -431,15 +439,53 @@ object MandateOverworld:
     * doing, not which enum member it moved to.
     */
   def regimeHerald(regime: Regime): String = regime match
-    case Regime.Burnout => "这一带的地脉僵死了，再也缓不回来"
+    case Regime.Burnout => "这一带的地脉饱和失能了，得花大力气泄压才能缓回来"
     case Regime.Oscillating => "这一带的地脉开始跳，压不住了"
     case Regime.Strained => "这一带的地脉绷紧了，像要出事"
     case Regime.Calm => "这一带的地脉松下来了"
 
+  /** Clock/compass readout (验山): the institutional dial, never raw
+    * continuous numbers (design note 06 §1 constraint 5). Raw values ride
+    * the `debugNumbers` gate only. */
   def formatInspection(chunkX: Int, chunkZ: Int, r: CellReadout): String =
     val shelter = if r.isMaintained then "§a庇护正常(免除沉滞)" else "§c沉滞生效(缺c0或尖峰失效)"
-    val phaseText = formatPhaseShort(r.phase)
-    f"§e[验山读数] [$chunkX%d,$chunkZ%d] 态:${r.regime} 相:$phaseText s=${r.current.stress}%.2f c0=${r.baselineCalming}%.2f | $shelter"
+    val base =
+      f"§e[验山读数] [$chunkX%d,$chunkZ%d] 态:${regimeWord(r.regime)} 相:${formatPhaseDial(r.phase)} | $shelter"
+    if debugNumbers then
+      val fracText = r.phase match
+        case PhaseReading.Cycle(_, frac) => f" frac=$frac%.3f"
+        case _ => ""
+      base +
+        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f v=${r.current.dissonance}%.2f$fracText]"
+    else base
+
+  /** Qualitative regime word for player-facing surfaces; enum names are
+    * debug vocabulary. */
+  def regimeWord(regime: Regime): String = regime match
+    case Regime.Calm => "平静"
+    case Regime.Strained => "绷紧"
+    case Regime.Oscillating => "起振"
+    case Regime.Burnout => "饱和失能"
+
+  /** The institutional dial: 20 ticks per cycle, resolution-limited by
+    * design (note 06 §1 constraint 5). Enum labels and fractions stay in
+    * `formatPhaseShort` for the dev HUD. */
+  def formatPhaseDial(phase: PhaseReading): String =
+    phase match
+      case PhaseReading.Cycle(label, _) =>
+        val tick = Readout.dialTick(phase).getOrElse(0)
+        val word = label match
+          case PhaseLabel.Excitation => "激发"
+          case PhaseLabel.AbsoluteRefractory => "绝对不应"
+          case PhaseLabel.RelativeRefractory => "相对不应"
+          case PhaseLabel.Resting => "静息"
+        f"${word}·第$tick%02d/20格"
+      case PhaseReading.Basin(_) => "静息域"
+      case PhaseReading.Undefined(reason) =>
+        reason match
+          case UndefinedReason.BurnoutNoCycle => "静默·深度失能"
+          case UndefinedReason.TransientNoCycle => "瞬态未定"
+          case UndefinedReason.NoCycleReference => "无周期参照"
 
   def formatBellPulse(chunkX: Int, chunkZ: Int, r: CellReadout): String =
     formatBellPulse(chunkX, chunkZ, r, evaluateBellStrike(r))
@@ -451,8 +497,8 @@ object MandateOverworld:
       outcome: BellStrikeOutcome
   ): String =
     outcome match
-      case BellStrikeOutcome.BurnoutDeadZone =>
-        f"§4[叩钟无应] [$chunkX%d,$chunkZ%d] 钙化烧毁死寂区 (Burnout)，死地不复应答 (c0=0.00)"
+      case BellStrikeOutcome.SaturatedNoAnchor =>
+        f"§4[叩钟无应] [$chunkX%d,$chunkZ%d] 地脉饱和失能 (Burnout)，钟声无应——需先泄压方可重锚 (c0=0.00)"
 
       case BellStrikeOutcome.SpikeSwallowed =>
         val tick = r.dialTick.getOrElse(0)
@@ -480,6 +526,8 @@ object MandateOverworld:
           case _ =>
             f"§b[叩钟镇山] [$chunkX%d,$chunkZ%d] 维持源已锚定 (c0=$BellBaselineCalming%.2f)，周遭沉滞消退"
 
+  /** Dev rendering (HUD, `debugNumbers`): enum labels and the raw fraction.
+    * Player-facing surfaces use `formatPhaseDial` instead. */
   def formatPhaseShort(phase: PhaseReading): String =
     phase match
       case PhaseReading.Cycle(label, frac) =>

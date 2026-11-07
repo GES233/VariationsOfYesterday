@@ -169,7 +169,8 @@ final case class CellReadout(
     current: MandateCurrent,
     regime: Regime,
     phase: PhaseReading,
-    baselineCalming: Double = 0.0
+    baselineCalming: Double = 0.0,
+    sustenance: Double = 1.0
 ):
   def isMaintained: Boolean = Readout.isMaintained(this)
   def dialTick: Option[Int] = Readout.dialTick(phase)
@@ -199,7 +200,9 @@ object CellReadout:
 class PhaseTracker(
     param: ReadoutParam = ReadoutParam(),
     fast: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
-    coupling: Double = 1.0
+    coupling: Double = 1.0,
+    sustenance: () => Double = () => 1.0,
+    depth: Double = StressParam().sustenanceDepth
 ):
   private var tPrev = Double.NaN
   private var vPrev = Double.NaN
@@ -240,7 +243,7 @@ class PhaseTracker(
     reading(t, cur)
 
   def reading(t: Double, cur: MandateCurrent): PhaseReading =
-    val a = fast.alpha - coupling * cur.stress
+    val a = fast.alpha - depth * (1.0 - sustenance()) - coupling * cur.stress
     if a <= Readout.burnoutA(fast) then PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
     else if !Readout.oscillating(a, fast) then
       // No limit cycle exists here: the only phase-free reading left is the

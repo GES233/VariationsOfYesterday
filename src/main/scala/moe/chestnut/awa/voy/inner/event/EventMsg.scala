@@ -1,6 +1,13 @@
 package moe.chestnut.awa.voy.inner.event
 
-import moe.chestnut.awa.voy.inner.mandate.CellCoord
+import moe.chestnut.awa.voy.inner.mandate.{
+  CellCoord,
+  LatticeEdge,
+  MandateCurrent,
+  MandateParam,
+  PulseLink,
+  PulseTransmitter
+}
 
 /** Event means something the model receives from outside: the world, some
   * entities, or the player.
@@ -57,6 +64,76 @@ object EventMsg:
   final case class HoldImpulse(cell: CellCoord, strength: Double) extends EventDTO
 
   /** Fire one alpha-synapse pulse on the fast variable (p channel, discrete
-    * form). Carries the kernel AREA; tau stays a per-cell parameter for
-    * now. */
-  final case class FirePulse(cell: CellCoord, area: Double) extends EventDTO
+    * form). Carries the kernel AREA and the transmitter kind.
+    *
+    * The kernel time constant is the transmitter's own constant
+    * (`PulseTransmitter.tau`), never a free number on the wire: a bell
+    * strike keeps the long `tau = 5.0` alpha kernel (`Bell`), a crystal
+    * link (`PulseCoupling`, design note 07) fires narrow `tau = 2.0`
+    * pulses (`CrystalLink`). Naming the transmitter keeps the event stream
+    * the single description of what the fast variable received — that is
+    * what makes a coupled replay deterministic — while giving emitters no
+    * numeric knob to reshape the kernel. Applying the event sets the
+    * cell's `synapseTau` to the transmitter's constant before firing,
+    * exactly as the prototype does. */
+  final case class FirePulse(
+      cell: CellCoord,
+      area: Double,
+      transmitter: PulseTransmitter = PulseTransmitter.Bell
+  ) extends EventDTO
+
+  /** Set the sustenance level `M ∈ [0, 1]` of a cell — the endogenous
+    * supply (mycelial integrity) that holds the fast oscillation inside its
+    * window (design note 06, §7.1). `M = 1` is the native state; lowering it
+    * collapses the recovery offset
+    * `a = alpha - sustenanceDepth * (1 - M) - k * s` toward the burnout
+    * knee, so a fully withdrawn cell is `BurnoutNoCycle` no matter how
+    * calm it is.
+    *
+    * This event is an instantaneous SET — the narrative hand (blight,
+    * re-inoculation). Between events the engine runs its own Fisher-KPP
+    * dynamics (logistic regrowth, acid burn above a stress threshold,
+    * lattice diffusion; see `StressParam`), so the level set here is the
+    * initial condition, not a held value: a re-inoculation seed grows back,
+    * a dead patch inside a large dead region does not. `M = 0` is
+    * absorbing — no spontaneous regrowth. */
+  final case class SetSustenance(cell: CellCoord, level: Double) extends EventDTO
+
+  // ==== Topology (loading-invariant lattice and wiring changes) ====
+  // Topology events share the same mailbox total order as channel events, so
+  // replaying the event stream rebuilds the lattice itself, not just its
+  // inputs. Worldgen anchors cells and terrain-derived edges to the real
+  // world through these; crystal wiring comes and goes through them too.
+
+  /** Register (or fully reset) one lattice cell. Absent `initial` /
+    * `fastParam` default to a zero state and the frozen 0.1 parameter set.
+    * Re-registering an existing coordinate resets its dynamics but keeps its
+    * transport edges. */
+  final case class RegisterCell(
+      cell: CellCoord,
+      initial: Option[MandateCurrent] = None,
+      fastParam: Option[MandateParam] = None
+  ) extends EventDTO
+
+  /** Remove one cell together with every transport edge that touches it.
+    * Pulse links are NOT removed: they are wiring, and may legitimately
+    * outlive (or predate) the cells they connect. */
+  final case class RemoveCell(cell: CellCoord) extends EventDTO
+
+  /** Insert or replace the transport edge `from -> to` (diffusion and/or
+    * advection — worldgen's terrain-derived coupling). Dropped
+    * deterministically if either endpoint is not a live cell. */
+  final case class UpsertEdge(edge: LatticeEdge) extends EventDTO
+
+  /** Remove the transport edge `from -> to`, if present. */
+  final case class RemoveEdge(from: CellCoord, to: CellCoord) extends EventDTO
+
+  /** Register a crystal pulse link (design note 07). Links are event-level
+    * wiring, not lattice: they may be registered before their endpoint cells
+    * exist, and removing a cell never removes its links. Re-registering a
+    * `(src, dst)` pair replaces its parameters. */
+  final case class AddLink(link: PulseLink) extends EventDTO
+
+  /** Remove the pulse link `src -> dst`, if present. Pulses it already
+    * scheduled are in-flight events and are not retracted. */
+  final case class RemoveLink(src: CellCoord, dst: CellCoord) extends EventDTO

@@ -162,3 +162,189 @@ class MandateAgentSpec:
     assertEquals(0.03, r.baselineCalming, 1e-12)
     assertEquals(Regime.Strained, r.regime)
     assertFalse(actions.isEmpty, "regime transition from Calm to Strained should emit an outbound action")
+
+  private def mkOscillatingCell(): MandateState =
+    // The saturated working point of the design-note-07 rigs (a = -0.30,
+    // s = 1.0): the q feedback pins the stress and the cell keeps spiking.
+    val cell = MandateState(
+      MandateCurrent(-1.2, -0.6, 1.0, 0.0),
+      MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+    )
+    cell.disturbance = 0.05
+    cell
+
+  @Test def topologyEventsRebuildTheLatticeInMailboxOrder(): Unit =
+    val ticks = 40
+    val published =
+      new AtomicReference[Map[CellCoord, MandateCurrent]](Map.empty)
+    val latch = new CountDownLatch(ticks)
+    val agent = spawnCapturing(singleCellGrid(mkCell(0.0)), published, latch)
+    val neighbour = CellCoord(1, 0)
+    agent ! EventMsg.RegisterCell(neighbour)
+    agent ! EventMsg.UpsertEdge(LatticeEdge(origin, neighbour, diffusion = 0.5))
+    agent ! EventMsg.StressInject(origin, 0.8)
+    for _ <- 1 to ticks do agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+    val snap = published.get()
+    assertTrue(snap.contains(neighbour), "registered cell must join the published lattice")
+    assertTrue(
+      snap(neighbour).stress > 0.01,
+      s"the new diffusion edge must carry stress into the new cell, got ${snap(neighbour).stress}"
+    )
+
+  @Test def removeCellDropsTheCellAndItsIncidentEdges(): Unit =
+    val neighbour = CellCoord(1, 0)
+    val grid = MandateGrid(
+      Map(origin -> mkCell(0.0), neighbour -> mkCell(0.0)),
+      Seq(LatticeEdge(origin, neighbour, diffusion = 0.5))
+    )
+    val agent = track(MandateAgent(grid, _ => ()))
+    agent ! EventMsg.RemoveCell(neighbour)
+    // Negative-phase assertion style used by this spec: give the mailbox a
+    // beat, then check what did (not) happen.
+    Thread.sleep(300)
+    assertFalse(grid.cells.contains(neighbour), "removed cell must leave the lattice")
+    assertTrue(grid.edges.isEmpty, "incident edges must be removed with the cell")
+
+  @Test def linkTopologyEventsRewireTheRunnerAtRuntime(): Unit =
+    // A saturated oscillator (origin) and a quiet bystander. The bystander
+    // must diverge from an unlinked control only while the link exists.
+    val ticks = 3000
+    val bystander = CellCoord(1, 0)
+    val link = PulseLink(origin, bystander, area = 2.0, delay = 0.5)
+
+    def runBystander(linkEvents: EventDTO*): Double =
+      val grid = MandateGrid(
+        Map(origin -> mkOscillatingCell(), bystander -> mkCell(0.0)),
+        Nil
+      )
+      val published =
+        new AtomicReference[Map[CellCoord, MandateCurrent]](Map.empty)
+      val latch = new CountDownLatch(ticks)
+      val agent = spawnCapturing(grid, published, latch)
+      linkEvents.foreach(agent ! _)
+      for _ <- 1 to ticks do agent ! EventMsg.TickArrived(0.05, 20.0f)
+      assertTrue(latch.await(5, TimeUnit.SECONDS))
+      published.get()(bystander).dissonance
+
+    val control = runBystander()
+    val linked = runBystander(EventMsg.AddLink(link))
+    val removed = runBystander(EventMsg.AddLink(link), EventMsg.RemoveLink(link.src, link.dst))
+
+    assertTrue(
+      Math.abs(linked - control) > 1e-3,
+      s"an active link must perturb the bystander (control=$control, linked=$linked)"
+    )
+    assertEquals(
+      control,
+      removed,
+      1e-12,
+      "a link removed before the first spike must leave the bystander untouched"
+    )
+
+  // ==== sustenance (SetSustenance, design note 06 §7.1) ==== //
+
+  /** Spawn an agent whose per-tick readouts are appended to `seen`, in
+    * publication order, with one latch countdown per tick. */
+  private def spawnReadoutLog(
+      grid: MandateGrid,
+      seen: java.util.concurrent.ConcurrentLinkedQueue[CellReadout],
+      latch: CountDownLatch
+  ): ActorRef[EventDTO] =
+    track(
+      MandateAgent(
+        grid,
+        _ => (),
+        _ => (),
+        r => { seen.add(r(origin)); latch.countDown() }
+      )
+    )
+
+  @Test def fullWithdrawalBurnsTheCellWithoutAnythingInjected(): Unit =
+    val ticks = 12
+    val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    val latch = new CountDownLatch(ticks)
+    val grid = singleCellGrid(mkOscillatingCell())
+    val agent = spawnReadoutLog(grid, seen, latch)
+    for _ <- 1 to 10 do agent ! EventMsg.TickArrived(0.05, 20.0f)
+    agent ! EventMsg.SetSustenance(origin, 0.0)
+    for _ <- 11 to ticks do agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+
+    assertEquals(
+      0.0,
+      grid.cells(origin).sustenance,
+      1e-12,
+      "full withdrawal sets M = 0"
+    )
+    assertEquals(
+      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      seen.toArray(Array.empty[CellReadout]).last.phase,
+      "a fully withdrawn SATURATED cell reads BurnoutNoCycle — nothing was injected, something was removed"
+    )
+
+  @Test def partialWithdrawalBurnsOnlyWithEnoughStress(): Unit =
+    val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    val latch = new CountDownLatch(3)
+    val grid = singleCellGrid(mkCell(0.0))
+    val agent = spawnReadoutLog(grid, seen, latch)
+    // M = 0.8 alone at s = 0: a = 0.7 - 0.24 = 0.46, inside the window.
+    agent ! EventMsg.SetSustenance(origin, 0.8)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    // Saturation alone never burns (a = -0.3); together they do:
+    // a = 0.7 - 0.24 - 1.0 = -0.54 < burnoutA.
+    agent ! EventMsg.StressInject(origin, 1.0)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    // Easing back to M = 0.9 lifts the cell out again even at full stress:
+    // a = 0.7 - 0.12 - 1.0 = -0.42 > burnoutA.
+    agent ! EventMsg.SetSustenance(origin, 0.9)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+
+    val burnout = PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
+    val stages = seen.toArray(Array.empty[CellReadout]).toSeq
+    assertNotEquals(burnout, stages(0).phase, "partial withdrawal alone must not burn a calm cell")
+    assertEquals(burnout, stages(1).phase, "partial withdrawal plus saturation must burn")
+    assertNotEquals(burnout, stages(2).phase, "easing the withdrawal must lift the cell out again")
+
+  @Test def drainageAloneNeverRevivesAWithdrawnCell(): Unit =
+    val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    val latch = new CountDownLatch(3)
+    val grid = singleCellGrid(mkOscillatingCell()) // saturated, s = 1.0
+    val agent = spawnReadoutLog(grid, seen, latch)
+    agent ! EventMsg.SetSustenance(origin, 0.0)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    // Drain the stress completely: a = -0.5 at s = 0, STILL below the knee.
+    agent ! EventMsg.StressInject(origin, -2.0)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    // Narrative re-inoculation: the offset returns to the registered base.
+    agent ! EventMsg.SetSustenance(origin, 1.0)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+
+    val burnout = PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
+    val stages = seen.toArray(Array.empty[CellReadout]).toSeq
+    assertEquals(burnout, stages(0).phase)
+    assertEquals(burnout, stages(1).phase, "draining stress alone must not revive a withdrawn cell")
+    assertNotEquals(burnout, stages(2).phase, "restoring the sustenance must lift the offset back")
+    assertEquals(
+      1.0,
+      grid.cells(origin).sustenance,
+      1e-12,
+      "restoration sets M back to native"
+    )
+
+  @Test def reRegistrationResetsSustenanceToNative(): Unit =
+    val grid = singleCellGrid(mkCell(0.0))
+    val agent = track(MandateAgent(grid, _ => ()))
+    agent ! EventMsg.SetSustenance(origin, 0.0)
+    agent ! EventMsg.RegisterCell(origin)
+    // Negative-phase assertion style used by this spec: give the mailbox a
+    // beat, then check what did (not) happen.
+    Thread.sleep(300)
+    assertEquals(
+      1.0,
+      grid.cells(origin).sustenance,
+      1e-12,
+      "a re-registered cell starts at native sustenance"
+    )

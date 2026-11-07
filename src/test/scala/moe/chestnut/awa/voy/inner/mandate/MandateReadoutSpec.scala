@@ -176,12 +176,14 @@ class MandateReadoutSpec:
     val burnoutCell = CellReadout(
       MandateCurrent(1.1, 0.4, 0.98, 0.0),
       Regime.Burnout,
-      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      // A saturated cell is still oscillating (a = -0.28 > burnoutA): the
+      // refusal to anchor is functional incapacitation, not a dead zone.
+      PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory, 0.25),
       baselineCalming = 0.0
     )
     val burnoutOutcome = MandateOverworld.evaluateBellStrike(burnoutCell)
-    assertEquals(BellStrikeOutcome.BurnoutDeadZone, burnoutOutcome)
-    assertFalse(burnoutOutcome.anchorsC0, "calcified Burnout dead zone cannot restore c0")
+    assertEquals(BellStrikeOutcome.SaturatedNoAnchor, burnoutOutcome)
+    assertFalse(burnoutOutcome.anchorsC0, "saturated cell cannot re-anchor c0 while the stress stays high")
     assertEquals(0.0, burnoutOutcome.baselineCalming, 1e-12)
 
 

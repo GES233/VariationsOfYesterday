@@ -29,7 +29,7 @@
   - `MandateOverworld.scala` — 主世界交互接线（采掘注入应力、敲钟/拆钟控制 $c_0$ 与脉冲、钟表/指南针验山读数、原版「沉滞」debuff）
   - `inner/mandate/` — 核心模拟：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`、`PhaseResponse`、`SliceReplay`、`SliceContract`
   - `inner/actor/Actor.scala` — 单线程 actor 内核（`ActorRef` 信箱，`tell` / `!` / `stop`）
-  - `inner/event/EventMsg.scala` — 入向通道协议 `EventDTO`
+  - `inner/event/EventMsg.scala` — 入向通道与拓扑协议 `EventDTO`（通道电平/脉冲 + 格子、输运边、链路的增删）
   - `inner/action/ActionMsg.scala` — 出向动作协议 `MandateActionProtocol`
   - `helpers/ODESolver.scala` — RK4 / Euler 求解器
 - `src/client/scala/moe/chestnut/awa/voy/` — 客户端入口与开发 HUD（`hud/MandateHud.scala`，`/voy hud [on|off]`）

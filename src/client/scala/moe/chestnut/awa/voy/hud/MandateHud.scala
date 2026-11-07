@@ -143,7 +143,7 @@ object MandateHud:
       (ColStrained, "Strained (承压)"),
       (ColOscillating, "Oscillating (振荡)"),
       (ColSpike, "Spike (尖峰爆发)"),
-      (ColBurnout, "Burnout (烧毁)")
+      (ColBurnout, "Burnout (饱和失能)")
     )
     legendItems.zipWithIndex.foreach { case ((col, label), idx) =>
       val ly = gridY + idx * 12

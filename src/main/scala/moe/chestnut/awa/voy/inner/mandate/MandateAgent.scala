@@ -27,13 +27,15 @@ import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
   *   after each integration step.
   */
 object MandateAgent:
-  /** Apply one channel event to the lattice.
+  /** Apply one channel or topology event to the lattice.
     *
     * The actor and the offline replay harness share this function so the
     * mailbox semantics (address-by-cell, deterministic drop outside the
-    * live lattice, channel level vs. pulse) have exactly one
-    * implementation. `TickArrived` is not a channel event: integration is
-    * driven by the caller's step, so it is ignored here.
+    * live lattice, channel level vs. pulse, topology upserts) have exactly
+    * one implementation. `TickArrived` is not a channel event: integration
+    * is driven by the caller's step, so it is ignored here. Link events
+    * (`AddLink` / `RemoveLink`) are wiring, not lattice: they are handled by
+    * the caller's [[PulseLinkRunner]], and ignored here.
     */
   def applyEvent(grid: MandateGrid, event: EventDTO): Unit =
     def onCell(cell: CellCoord)(op: MandateState => Unit): Unit =
@@ -47,18 +49,64 @@ object MandateAgent:
       case EventMsg.SetCalming(cell, level) => onCell(cell)(_.calming = level)
       case EventMsg.SetBaselineCalming(cell, level) => onCell(cell)(_.baselineCalming = level)
       case EventMsg.HoldImpulse(cell, strength) => onCell(cell)(_.impulse = strength)
-      case EventMsg.FirePulse(cell, area) => onCell(cell)(_.firePulse(area))
+      case EventMsg.SetSustenance(cell, level) =>
+        onCell(cell)(c => c.sustenance = Math.min(Math.max(level, 0.0), 1.0))
+      case EventMsg.FirePulse(cell, area, transmitter) =>
+        onCell(cell) { state =>
+          state.synapseTau = transmitter.tau
+          state.firePulse(area)
+        }
+      // Topology events rebuild the lattice itself (design draft §1.4):
+      // they share the mailbox's total order, so a replayed event stream
+      // reproduces the same topology history.
+      case EventMsg.RegisterCell(cell, initial, fastParam) =>
+        grid.registerCell(
+          cell,
+          MandateState(
+            initial.getOrElse(MandateCurrent(0.0, 0.0, 0.0, 0.0)),
+            fastParam.getOrElse(MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08))
+          )
+        )
+      case EventMsg.RemoveCell(cell) => grid.removeCell(cell)
+      case EventMsg.UpsertEdge(edge) =>
+        // An edge whose endpoints are not both live is dropped
+        // deterministically, same as a channel event outside the lattice.
+        if grid.cells.contains(edge.from) && grid.cells.contains(edge.to) then
+          grid.upsertEdge(edge)
+      case EventMsg.RemoveEdge(from, to) => grid.removeEdge(from, to)
+      case EventMsg.AddLink(_) | EventMsg.RemoveLink(_, _) => ()
+      // Actor-side bookkeeping (base offset), see apply().
+      case EventMsg.SetSustenance(_, _) => ()
 
   def apply(
       grid: MandateGrid,
       snapshotSink: Map[CellCoord, MandateCurrent] => Unit,
       actionSink: MandateActionProtocol => Unit = (_ => ()),
-      readoutSink: Map[CellCoord, CellReadout] => Unit = (_ => ())
+      readoutSink: Map[CellCoord, CellReadout] => Unit = (_ => ()),
+      links: Seq[PulseLink] = Nil,
+      spikeCriterion: SpikeCriterion = SpikeCriterion.PeakConfirmed
   ): ActorRef[EventDTO] =
     val readoutParam = ReadoutParam()
     var simTime: Double = 0.0
-    val trackers: Map[CellCoord, PhaseTracker] = grid.cells.map { case (coord, cell) =>
-      coord -> new PhaseTracker(readoutParam, cell.param, cell.stressParam.coupling)
+    // Always constructed: links are runtime wiring (AddLink/RemoveLink), so
+    // "no links yet" must not mean "no way to add one". The constructor's
+    // `links` are merely the initial wiring.
+    val linkRunner = new PulseLinkRunner(links, criterion = spikeCriterion)
+    /** A phase tracker reading the cell's LIVE sustenance: the burnout knee
+      * is crossed when the recovery offset collapses, which the sustenance
+      * collapse drives (design note 06 §7.1). */
+    def trackerFor(cell: MandateState): PhaseTracker =
+      new PhaseTracker(
+        readoutParam,
+        cell.param,
+        cell.stressParam.coupling,
+        () => cell.sustenance,
+        cell.stressParam.sustenanceDepth
+      )
+
+    val trackers = scala.collection.mutable.HashMap.empty[CellCoord, PhaseTracker]
+    grid.cells.foreach { case (coord, cell) =>
+      trackers(coord) = trackerFor(cell)
     }
     var prevRegimes: Map[CellCoord, Regime] = grid.cells.map { case (coord, cell) =>
       coord -> Readout.regime(cell.getState, readoutParam)
@@ -66,8 +114,12 @@ object MandateAgent:
     var inSpike: Set[CellCoord] = Set.empty
 
     def integrate(dt: Double): Unit =
+      // Links deliver before the step and observe after it, the same order
+      // the offline harness uses (design note 07).
+      linkRunner.duePulses(simTime).foreach(event => applyEvent(grid, event))
       grid.step(dt)
       simTime += dt
+      linkRunner.observe(simTime, grid.cells)
 
       val currentBuilder = Map.newBuilder[CellCoord, MandateCurrent]
       val readoutBuilder = Map.newBuilder[CellCoord, CellReadout]
@@ -76,9 +128,17 @@ object MandateAgent:
         val cur = cell.getState
         currentBuilder += (coord -> cur)
 
-        val phase = trackers(coord).observe(simTime, cur)
+        // Cells registered after startup get their tracker on first sight.
+        val tracker = trackers.getOrElseUpdate(coord, trackerFor(cell))
+        val phase = tracker.observe(simTime, cur)
         val regime = Readout.regime(cur, readoutParam)
-        readoutBuilder += (coord -> CellReadout(cur, regime, phase, cell.baselineCalming))
+        readoutBuilder += (coord -> CellReadout(
+          cur,
+          regime,
+          phase,
+          cell.baselineCalming,
+          cell.sustenance
+        ))
 
         val spikingNow = Math.abs(cur.dissonance) >= readoutParam.spikeLevel
         if spikingNow && !inSpike.contains(coord) then
@@ -87,11 +147,15 @@ object MandateAgent:
         else if !spikingNow && inSpike.contains(coord) then
           inSpike -= coord
 
-        prevRegimes.get(coord).foreach { oldRegime =>
-          if oldRegime != regime then
+        prevRegimes.get(coord) match
+          case Some(oldRegime) if oldRegime != regime =>
             prevRegimes = prevRegimes.updated(coord, regime)
             actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, regime, phase))
-        }
+          case None =>
+            // A cell registered after startup: adopt its current regime as
+            // the baseline instead of fabricating a transition.
+            prevRegimes = prevRegimes.updated(coord, regime)
+          case _ => ()
       }
 
       snapshotSink(currentBuilder.result())
@@ -102,6 +166,24 @@ object MandateAgent:
       // mechanism (§1.4) and intentionally ignored for now.
       event match
         case EventMsg.TickArrived(dt, _) => integrate(dt)
+        // Link wiring lives in the runner, not the grid.
+        case EventMsg.AddLink(link) => linkRunner.addLink(link)
+        case EventMsg.RemoveLink(src, dst) => linkRunner.removeLink(src, dst)
+        case other @ EventMsg.RegisterCell(cell, _, _) =>
+          applyEvent(grid, other)
+          // A (re-)registered cell restarts phase tracking — the dynamics
+          // were just reset.
+          grid.cells.get(cell).foreach { c =>
+            trackers(cell) = trackerFor(c)
+          }
+        case other @ EventMsg.RemoveCell(cell) =>
+          applyEvent(grid, other)
+          // Drop the per-cell bookkeeping so a stale detector cannot leak
+          // into a cell later re-registered at the same coordinate.
+          trackers.remove(cell)
+          prevRegimes = prevRegimes - cell
+          inSpike = inSpike - cell
+          linkRunner.forgetCell(cell)
         // Channel events apply to a single cell; events addressed outside
         // the active lattice are dropped deterministically (§1.4 loading
         // invariance: presence of a cell must not depend on chunk load

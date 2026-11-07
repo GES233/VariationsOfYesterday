@@ -23,6 +23,12 @@ import moe.chestnut.awa.voy.inner.mandate.*
   * axes, with its disturbance hotspot around chunk (0, 0). Future iterations
   * should anchor it to the spawn point, follow the player's local region, or
   * derive cells from real world topology and persist them per dimension.
+  *
+  * TODO(persistence): the lattice dies with the JVM — `buildGrid()` starts
+  * fresh on every engine start, so stress, activity, wiring and any future
+  * facility state reset on restart. Candidate carrier: Minecraft
+  * `PersistentState` (dimension-scoped NBT saved with the world); marked as
+  * an open question in design note 06 §7 (2026-11-07), not yet scheduled.
   */
 object MandateRuntime:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
@@ -92,7 +98,11 @@ object MandateRuntime:
       val state = MandateCurrent(0.0, 0.0, initialStress, 0.0)
       val cell = MandateState(
         state,
-        MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+        MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+        // The game opts into the mycelial sustenance dynamics (design note
+        // 06 §7.1); the frozen default keeps the contract slice and the
+        // fingerprint rigs on the bare FHN core.
+        StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
       )
       cell.disturbance = if distance < 2.0 then 0.08 else 0.002
       cell.baselineCalming = if distance < 5.0 then 0.03 else 0.0
