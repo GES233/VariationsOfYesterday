@@ -155,15 +155,20 @@ object MandateRuntime:
               s"simTime = ${snap.simTime})."
           )
           val grid = MandateSnapshot.restoreGrid(snap)
-          // Restore semantics: STATE from the save, PARAMETERS from the
-          // config — tuning a knob (e.g. the gamma time-scale calibration)
-          // applies to existing worlds without wiping their history.
-          grid.cells.values.foreach { cell =>
-            cell.param = VoyConfig.current.fastParam
-            cell.stressParam = VoyConfig.current.stressParam
-          }
+          // Restore precedence: the SAVE wins for every value it carries
+          // (state and per-cell parameters); the config is the fallback for
+          // what the payload cannot provide, and the core default is the
+          // last resort. Tuning the config therefore affects NEWLY
+          // registered cells only — `logSavedParameters` says so loudly,
+          // because silently ignoring a knob is worse than not having one.
+          logSavedParameters(snap)
           (grid, snap.links, snap.simTime)
         case None =>
+          logger.info(
+            s"Starting fresh mandate lattice (${width}x$height cells); " +
+              s"parameters from config `$VoyConfig.FileName` " +
+              "(core defaults if absent)."
+          )
           (buildGrid(), Nil, 0.0)
 
       persistence.geometry = expectedGeometry
@@ -183,6 +188,10 @@ object MandateRuntime:
           publishReadout,
           links = links,
           initialSimTime = initialSimTime,
+          // Defaults for cells registered later: the config, not the core
+          // (restore precedence save > config > default applies here too).
+          defaultFastParam = VoyConfig.current.fastParam,
+          defaultStressParam = VoyConfig.current.stressParam,
           persistSink = snap => {
             persistence.snapshot = Some(snap)
             persistence.markDirty()
@@ -190,6 +199,42 @@ object MandateRuntime:
         )
       )
   }
+
+  /** Say, once per load, what physics the save carries and where it came
+    * from. The restore precedence is save > config > core default, so a
+    * tuned config does NOT apply to the existing cells of an existing
+    * world: reporting it is the difference between a knob and a silent lie.
+    */
+  private def logSavedParameters(snap: MandateSnapshot): Unit =
+    val sets = MandateSnapshot.parameterSets(snap)
+    logger.info(
+      s"Saved parameters: ${sets.size} distinct set(s) over ${snap.cells.size} cells " +
+        "(restore precedence: save > config > default)."
+    )
+    val shown = sets.take(4)
+    shown.foreach { case (fast, stress, count) =>
+      logger.info(s"  saved by $count cell(s): fast=$fast stress=$stress")
+    }
+    if sets.size > shown.size then
+      logger.info(s"  ... ${sets.size - shown.size} more saved set(s) omitted")
+
+    val config = VoyConfig.current
+    val matching = sets
+      .filter { case (fast, stress, _) =>
+        fast == config.fastParam && stress == config.stressParam
+      }
+      .map(_._3)
+      .sum
+    if matching == snap.cells.size then
+      logger.info(
+        "  config parameters match the save: editing them affects newly registered cells only."
+      )
+    else
+      logger.warn(
+        s"  config parameters (fast=${config.fastParam} stress=${config.stressParam}) " +
+          s"match $matching/${snap.cells.size} saved cells; the saved values win for the rest, " +
+          "the config applies to newly registered cells only."
+      )
 
   /** Stop the engine and drop the published state. */
   def stop(): Unit = synchronized {

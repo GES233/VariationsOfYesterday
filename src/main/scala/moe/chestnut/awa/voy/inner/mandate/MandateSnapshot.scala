@@ -92,3 +92,29 @@ object MandateSnapshot:
       cells.contains(e.from) && cells.contains(e.to)
     )
     MandateGrid(cells, edges)
+
+  /** Distinct `(fastParam, stressParam)` pairs carried by the snapshot, most
+    * used first with a deterministic tie-break. This is what the save
+    * actually holds; the wiring layer logs it on load so a tuned config
+    * that does *not* apply to an existing world is visible instead of
+    * silent (precedence on restore: save > config > core default).
+    */
+  def parameterSets(
+      snapshot: MandateSnapshot
+  ): Seq[(MandateParam, StressParam, Int)] =
+    snapshot.cells
+      .groupBy(cs => (cs.fastParam, cs.stressParam))
+      .toSeq
+      .map { case ((fast, stress), cells) =>
+        (fast, stress, cells.size)
+      }
+      .sortBy { case (fast, stress, count) =>
+        (
+          -count,
+          fast.alpha,
+          fast.beta,
+          fast.epsilon,
+          stress.gamma,
+          stress.coupling
+        )
+      }

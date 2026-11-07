@@ -27,12 +27,28 @@ import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
   *   after each integration step.
   * @param initialSimTime restored integration clock on world load (0 for a
   *   fresh lattice); pulse delays and phase readouts continue from it.
+  * @param defaultFastParam fast set for cells registered without an explicit
+  *   one; the wiring layer injects the config here.
+  * @param defaultStressParam slow set for the same cells (dormant core
+  *   default unless the wiring layer injects the config).
   * @param persistSink receives the full `MandateSnapshot` on a slow cadence
   *   for world persistence; the saved copy may lag the live lattice by at
   *   most `persistPeriod` without losing anything a player can feel.
   * @param persistPeriod snapshot cadence in simulation-time units.
   */
 object MandateAgent:
+  /** Core parameter sets used for a cell registered without explicit
+    * parameters when the wiring layer injects nothing. The game side always
+    * injects its configuration instead (`VoyConfig`), so "save > config >
+    * default" has a well-defined last resort: these.
+    */
+  val DefaultFastParam: MandateParam =
+    MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+
+  /** Dormant sustenance by default: the pure FHN core, as the contract
+    * slice and the fingerprint rigs instantiate it. */
+  val DefaultStressParam: StressParam = StressParam()
+
   /** Apply one channel or topology event to the lattice.
     *
     * The actor and the offline replay harness share this function so the
@@ -43,7 +59,12 @@ object MandateAgent:
     * (`AddLink` / `RemoveLink`) are wiring, not lattice: they are handled by
     * the caller's [[PulseLinkRunner]], and ignored here.
     */
-  def applyEvent(grid: MandateGrid, event: EventDTO): Unit =
+  def applyEvent(
+      grid: MandateGrid,
+      event: EventDTO,
+      defaultFastParam: MandateParam = DefaultFastParam,
+      defaultStressParam: StressParam = DefaultStressParam
+  ): Unit =
     def onCell(cell: CellCoord)(op: MandateState => Unit): Unit =
       grid.cells.get(cell).foreach(op)
 
@@ -70,7 +91,8 @@ object MandateAgent:
           cell,
           MandateState(
             initial.getOrElse(MandateCurrent(0.0, 0.0, 0.0, 0.0)),
-            fastParam.getOrElse(MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08))
+            fastParam.getOrElse(defaultFastParam),
+            defaultStressParam
           )
         )
       case EventMsg.RemoveCell(cell) => grid.removeCell(cell)
@@ -90,6 +112,8 @@ object MandateAgent:
       links: Seq[PulseLink] = Nil,
       spikeCriterion: SpikeCriterion = SpikeCriterion.PeakConfirmed,
       initialSimTime: Double = 0.0,
+      defaultFastParam: MandateParam = DefaultFastParam,
+      defaultStressParam: StressParam = DefaultStressParam,
       persistSink: MandateSnapshot => Unit = (_ => ()),
       persistPeriod: Double = 1.0
   ): ActorRef[EventDTO] =
@@ -128,7 +152,9 @@ object MandateAgent:
     def integrate(dt: Double): Unit =
       // Links deliver before the step and observe after it, the same order
       // the offline harness uses (design note 07).
-      linkRunner.duePulses(simTime).foreach(event => applyEvent(grid, event))
+      linkRunner
+        .duePulses(simTime)
+        .foreach(event => applyEvent(grid, event, defaultFastParam, defaultStressParam))
       grid.step(dt)
       simTime += dt
       linkRunner.observe(simTime, grid.cells)
@@ -186,14 +212,14 @@ object MandateAgent:
         case EventMsg.AddLink(link) => linkRunner.addLink(link)
         case EventMsg.RemoveLink(src, dst) => linkRunner.removeLink(src, dst)
         case other @ EventMsg.RegisterCell(cell, _, _) =>
-          applyEvent(grid, other)
+          applyEvent(grid, other, defaultFastParam, defaultStressParam)
           // A (re-)registered cell restarts phase tracking — the dynamics
           // were just reset.
           grid.cells.get(cell).foreach { c =>
             trackers(cell) = trackerFor(c)
           }
         case other @ EventMsg.RemoveCell(cell) =>
-          applyEvent(grid, other)
+          applyEvent(grid, other, defaultFastParam, defaultStressParam)
           // Drop the per-cell bookkeeping so a stale detector cannot leak
           // into a cell later re-registered at the same coordinate.
           trackers.remove(cell)
@@ -204,6 +230,6 @@ object MandateAgent:
         // the active lattice are dropped deterministically (§1.4 loading
         // invariance: presence of a cell must not depend on chunk load
         // order).
-        case other => applyEvent(grid, other)
+        case other => applyEvent(grid, other, defaultFastParam, defaultStressParam)
 
     Actor.spawn("mandate")(handle)

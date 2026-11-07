@@ -348,3 +348,37 @@ class MandateAgentSpec:
       1e-12,
       "a re-registered cell starts at native sustenance"
     )
+
+  // ==== parameter provenance (save > config > default) ==== //
+
+  @Test def registerCellUsesTheInjectedDefaultParameters(): Unit =
+    val grid = singleCellGrid(mkCell(0.0))
+    val fast = MandateParam(alpha = 0.61, beta = 0.72, epsilon = 0.09)
+    val stress =
+      StressParam(gamma = 7e-4, sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
+    val added = CellCoord(1, 0)
+
+    MandateAgent.applyEvent(grid, EventMsg.RegisterCell(added), fast, stress)
+
+    assertEquals(fast, grid.cells(added).getParam)
+    assertEquals(stress, grid.cells(added).stressParam)
+
+  @Test def explicitRegisterCellParametersWinOverTheInjectedDefaults(): Unit =
+    val grid = singleCellGrid(mkCell(0.0))
+    val explicit = MandateParam(alpha = 0.5, beta = 0.6, epsilon = 0.1)
+    val added = CellCoord(2, 0)
+
+    MandateAgent.applyEvent(
+      grid,
+      EventMsg.RegisterCell(added, None, Some(explicit)),
+      MandateAgent.DefaultFastParam,
+      MandateAgent.DefaultStressParam
+    )
+
+    assertEquals(explicit, grid.cells(added).getParam)
+    assertEquals(
+      MandateAgent.DefaultStressParam,
+      grid.cells(added).stressParam,
+      "the stress set has no per-event override, so the default still applies"
+    )
+
