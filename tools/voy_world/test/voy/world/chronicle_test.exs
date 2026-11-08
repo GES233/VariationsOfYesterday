@@ -127,7 +127,7 @@ defmodule Voy.World.ChronicleTest do
   test "forward and backward intervention queries resolve all reachable fates and Calm rescues" do
     # Forward query on Baishui (baseline: Fate_Assimilated_NewZhai, c0_collapsed + alpha_shock)
     baishui = TestFixtures.baishui_topo()
-    assert {:ok, reachable} = Chronicle.reachable_fates(baishui)
+    assert {:ok, reachable} = Chronicle.solve_interventions(baishui)
 
     by_intervention =
       Map.new(reachable, fn row -> {row.intervention, {row.target_fate, row.target_regime}} end)
@@ -169,7 +169,7 @@ defmodule Voy.World.ChronicleTest do
       accessibility: :tractor_road_accessible
     ]
 
-    assert {:ok, seep_reachable} = Chronicle.reachable_fates(mahao_topo)
+    assert {:ok, seep_reachable} = Chronicle.solve_interventions(mahao_topo)
 
     assert Enum.map(seep_reachable, &{&1.intervention, &1.target_fate, &1.target_regime}) == [
              {:no_intervention, :Fate_Deferred_ChronicSeep, :Strained},

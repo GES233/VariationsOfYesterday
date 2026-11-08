@@ -449,14 +449,6 @@ defmodule Voy.World.Ascribe do
     for(rest <- combinations(t, k - 1), do: [h | rest]) ++ combinations(t, k)
   end
 
-  @doc "The evidence items the abducer can lose without any consequence."
-  @spec irrelevant([map()], Keyword.t()) :: [map()]
-  def irrelevant(evidence, opts \\ []) do
-    for %{irrelevant?: true} = item <- ablate(evidence, opts).items do
-      %{lens: item.lens, field: item.field}
-    end
-  end
-
   # ==== etiological competitors ==== //
 
   @doc """

@@ -257,18 +257,8 @@ defmodule Voy.World.Witness do
     end
   end
 
-  def settle_open_dossier!(dossier, intervention, opts \\ []) do
-    case settle_open_dossier(dossier, intervention, opts) do
-      {:ok, settled} ->
-        settled
-
-      {:error, reason} ->
-        raise ArgumentError, "cannot settle dossier: #{inspect(reason)}"
-    end
-  end
-
   defp build_reachable_transitions(fate, batch_id, vessel_name, vessel_code, safe_tick) do
-    {:ok, transitions} = Chronicle.reachable_fates(fate)
+    {:ok, transitions} = Chronicle.solve_interventions(fate)
 
     Enum.map(transitions, fn t ->
       %{

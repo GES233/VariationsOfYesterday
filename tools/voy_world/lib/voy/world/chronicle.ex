@@ -360,11 +360,6 @@ defmodule Voy.World.Chronicle do
     end
   end
 
-  @doc "Enumerate every valid `(intervention, effective_c0, effective_pulse, era3)` reachable from a topography or an `era2b` slice."
-  def reachable_fates(topo_or_era2b) do
-    solve_interventions(topo_or_era2b, [])
-  end
-
   @doc """
   Forward and backward relational solver for Era 3 runtime interventions.
 
@@ -380,7 +375,7 @@ defmodule Voy.World.Chronicle do
          {:ok, source} <- classify_source(topo_or_era2b) do
       case source do
         {:era2b, era2b} ->
-          {:ok, query_era2b_transitions(era2b, normalized_opts)}
+          {:ok, query_transitions(era2b, normalized_opts)}
 
         {:topo, topo} ->
           partials =
@@ -395,7 +390,7 @@ defmodule Voy.World.Chronicle do
               transitions =
                 partials
                 |> Enum.flat_map(fn partial ->
-                  query_partial_transitions(topo, partial, normalized_opts)
+                  query_transitions(partial[:era2b], normalized_opts)
                 end)
                 |> Enum.uniq_by(
                   &{&1.intervention, &1.target_fate, &1.baseline_c0, &1.baseline_pulse}
@@ -407,33 +402,7 @@ defmodule Voy.World.Chronicle do
     end
   end
 
-  defp query_partial_transitions(topo, partial, opts) do
-    era1 = partial[:era1]
-    era2a = partial[:era2a]
-    era2b = partial[:era2b]
-
-    run_all(fn q ->
-      fresh [intervention, effective_c0, effective_pulse, era3] do
-        constrain_interventiono(intervention, opts.intervention)
-        interventiono(era2b, intervention, effective_c0, effective_pulse)
-        constrain_valueo(effective_c0, opts.target_c0)
-        constrain_valueo(effective_pulse, opts.target_pulse)
-        transition_era3o(topo, era1, era2a, era2b, intervention, era3)
-        constrain_era3o(era3, opts)
-
-        eq(q,
-          intervention: intervention,
-          effective_c0: effective_c0,
-          effective_pulse: effective_pulse,
-          era3: era3
-        )
-      end
-    end)
-    |> terms()
-    |> Enum.map(&format_transition(era2b, &1))
-  end
-
-  defp query_era2b_transitions(era2b, opts) do
+  defp query_transitions(era2b, opts) do
     run_all(fn q ->
       fresh [intervention, effective_c0, effective_pulse, era3] do
         constrain_interventiono(intervention, opts.intervention)

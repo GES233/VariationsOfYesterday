@@ -52,50 +52,29 @@ defmodule Voy.World.Schema do
   def interventions, do: @interventions
   def regimes, do: @regimes
 
-  def normalize_fate(fate) when fate in @fates, do: {:ok, fate}
+  def normalize_fate(fate), do: normalize_enum(fate, @fates, :unknown_fate)
+  def normalize_horizon(horizon), do: normalize_enum(horizon, @horizons, :invalid_horizon)
 
-  def normalize_fate(fate) when is_binary(fate) do
-    case Enum.find(@fates, &(Atom.to_string(&1) == fate)) do
-      nil -> {:error, :unknown_fate}
-      normalized -> {:ok, normalized}
+  def normalize_intervention(intervention),
+    do: normalize_enum(intervention, @interventions, :unknown_intervention)
+
+  def normalize_regime(regime), do: normalize_enum(regime, @regimes, :unknown_regime)
+
+  defp normalize_enum(value, allowed, error) do
+    cond do
+      value in allowed ->
+        {:ok, value}
+
+      is_binary(value) ->
+        case Enum.find(allowed, &(Atom.to_string(&1) == value)) do
+          nil -> {:error, error}
+          normalized -> {:ok, normalized}
+        end
+
+      true ->
+        {:error, error}
     end
   end
-
-  def normalize_fate(_fate), do: {:error, :unknown_fate}
-
-  def normalize_horizon(horizon) when horizon in @horizons, do: {:ok, horizon}
-
-  def normalize_horizon(horizon) when is_binary(horizon) do
-    case Enum.find(@horizons, &(Atom.to_string(&1) == horizon)) do
-      nil -> {:error, :invalid_horizon}
-      normalized -> {:ok, normalized}
-    end
-  end
-
-  def normalize_horizon(_horizon), do: {:error, :invalid_horizon}
-
-  def normalize_intervention(intervention) when intervention in @interventions,
-    do: {:ok, intervention}
-
-  def normalize_intervention(intervention) when is_binary(intervention) do
-    case Enum.find(@interventions, &(Atom.to_string(&1) == intervention)) do
-      nil -> {:error, :unknown_intervention}
-      normalized -> {:ok, normalized}
-    end
-  end
-
-  def normalize_intervention(_intervention), do: {:error, :unknown_intervention}
-
-  def normalize_regime(regime) when regime in @regimes, do: {:ok, regime}
-
-  def normalize_regime(regime) when is_binary(regime) do
-    case Enum.find(@regimes, &(Atom.to_string(&1) == regime)) do
-      nil -> {:error, :unknown_regime}
-      normalized -> {:ok, normalized}
-    end
-  end
-
-  def normalize_regime(_regime), do: {:error, :unknown_regime}
 
   def topology(fields) do
     Enum.map(@topology_keys, fn key ->

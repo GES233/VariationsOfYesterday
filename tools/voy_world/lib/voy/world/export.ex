@@ -141,11 +141,6 @@ defmodule Voy.World.Export do
 
   def from_json(other), do: {:error, {:not_json, other}}
 
-  @doc "Profile recorded in a bundle, rebuilt as a validated struct."
-  @spec profile(map()) :: {:ok, Profile.t()} | {:error, term()}
-  def profile(%{"profile" => profile}) when is_map(profile), do: Profile.from_map(profile)
-  def profile(bundle), do: {:error, {:missing_profile, bundle}}
-
   # ==== bundle assembly ==== //
 
   defp build_bundle(records, %Profile{} = profile) do

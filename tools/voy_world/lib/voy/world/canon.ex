@@ -133,7 +133,7 @@ defmodule Voy.World.Canon do
         Enum.map(chain, & &1.hop) != [1, 2, 3, 4, 5] ->
           [{:pathway_chain_shape, relic, fate, seed, {:hop_order, Enum.map(chain, & &1.hop)}}]
 
-        not anchored?(chain) ->
+        not Pathway.chained?(chain) ->
           [{:pathway_chain_shape, relic, fate, seed, :unanchored_hops}]
 
         true ->
@@ -154,9 +154,6 @@ defmodule Voy.World.Canon do
 
     shape_issues ++ uniqueness_issues
   end
-
-  defp anchored?([_single]), do: true
-  defp anchored?([left, right | rest]), do: left.to == right.from and anchored?([right | rest])
 
   defp ablation_issues(relic, fate, seed, chain) do
     Enum.flat_map(1..5, fn dropped ->

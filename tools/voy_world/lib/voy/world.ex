@@ -15,12 +15,6 @@ defmodule Voy.World do
     end
   end
 
-  def reachable_fates(topo_or_era2b) do
-    with {:ok, transitions} <- Chronicle.reachable_fates(topo_or_era2b) do
-      {:ok, Enum.map(transitions, &Schema.to_public/1)}
-    end
-  end
-
   def solve_interventions(topo_or_era2b, opts \\ []) do
     with {:ok, transitions} <- Chronicle.solve_interventions(topo_or_era2b, opts) do
       {:ok, Enum.map(transitions, &Schema.to_public/1)}

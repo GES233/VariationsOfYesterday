@@ -241,7 +241,7 @@ defmodule Voy.World.Contract do
   """
   @spec c0_truth(t(), atom()) :: {:ok, map()} | :error
   def c0_truth(%__MODULE__{data: data}, state) do
-    wire = Enum.find_value(@c0, fn {wire, atom} -> if atom == state, do: wire end)
+    wire = wire_for(@c0, state)
 
     case data["oracle"]["c0"][wire] do
       nil ->
@@ -281,7 +281,7 @@ defmodule Voy.World.Contract do
   """
   @spec pulse(t(), atom()) :: {:ok, map()} | :error
   def pulse(%__MODULE__{data: data}, kind) do
-    wire = Enum.find_value(@pulses, fn {wire, atom} -> if atom == kind, do: wire end)
+    wire = wire_for(@pulses, kind)
 
     case Enum.find(data["oracle"]["kinds"], &(&1["pulse"] == wire)) do
       nil ->
@@ -309,7 +309,7 @@ defmodule Voy.World.Contract do
   """
   @spec safe_ticks(t(), atom()) :: {:ok, [map()]} | :error
   def safe_ticks(%__MODULE__{data: data}, kind) do
-    wire = Enum.find_value(@pulses, fn {wire, atom} -> if atom == kind, do: wire end)
+    wire = wire_for(@pulses, kind)
 
     case Enum.find(data["oracle"]["kinds"], &(&1["pulse"] == wire)) do
       nil ->
@@ -352,7 +352,7 @@ defmodule Voy.World.Contract do
   """
   @spec outcome(t(), atom(), atom()) :: {:ok, map()} | :error
   def outcome(%__MODULE__{} = contract, pulse_kind, window) do
-    window_wire = Enum.find_value(@windows, fn {wire, atom} -> if atom == window, do: wire end)
+    window_wire = wire_for(@windows, window)
 
     with {:ok, _pulse} <- pulse(contract, pulse_kind),
          row when is_map(row) <- find_outcome(contract, pulse_kind, window_wire) do
@@ -371,8 +371,11 @@ defmodule Voy.World.Contract do
     end
   end
 
+  defp wire_for(map, atom),
+    do: Enum.find_value(map, fn {wire, known} -> if known == atom, do: wire end)
+
   defp find_outcome(%__MODULE__{data: data}, kind, window_wire) do
-    wire = Enum.find_value(@pulses, fn {wire, atom} -> if atom == kind, do: wire end)
+    wire = wire_for(@pulses, kind)
 
     with row when is_map(row) <- Enum.find(data["oracle"]["kinds"], &(&1["pulse"] == wire)),
          found when is_map(found) <-

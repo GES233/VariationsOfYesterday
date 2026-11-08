@@ -414,9 +414,10 @@ defmodule Voy.World.Pathway do
     end
   end
 
-  defp chained?([_single]), do: true
+  @doc "Whether a hop list is anchored end-to-end (`left.to == right.from`)."
+  def chained?([_single]), do: true
 
-  defp chained?([left, right | rest]) do
+  def chained?([left, right | rest]) do
     left.to == right.from and chained?([right | rest])
   end
 
