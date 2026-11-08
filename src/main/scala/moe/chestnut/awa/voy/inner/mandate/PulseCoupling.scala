@@ -208,9 +208,9 @@ object PulseCoupling:
   /** Confirmation window of the `PeakConfirmed` criterion: the section
     * upcrossing and the spike level must be reached within this many
     * simulation-time units of each other. Genuine FHN upstrokes take
-    * ~0.6 (saturated) to ~1.2 (near-critical) units; 5.0 keeps a wide
-    * margin while rejecting driven creeps (ghost relays). */
-  val SpikeConfirmWindow: Double = 5.0
+    * ~0.6 (saturated) to ~1.2 (near-critical) units; the shared window keeps a
+    * wide margin while rejecting driven creeps (ghost relays). */
+  val SpikeConfirmWindow: Double = PhaseDetection.ConfirmWindow
 
   /** Fold each `other` spike into the window `(-period/2, period/2]` of the
     * nearest `ref` spike: the prototype's `lag_series`, unchanged.

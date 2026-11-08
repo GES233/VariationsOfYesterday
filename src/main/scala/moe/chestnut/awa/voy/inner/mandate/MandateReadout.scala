@@ -55,20 +55,21 @@ object PhaseReading:
 /** Every threshold of the readout, in one place.
   *
   * The stress cut points and `oscillatingQ` mirror `Voy.World.Profile`
-  * (`stress: %{calm: 0.18, strained: 0.45, burnout: 0.95, oscillating_q:
-  * 0.4}`) so the two sides can be pinned by goldens. They are *not* used to
-  * decide whether a phase exists: a stress level is not a dynamics
-  * statement, and the slice reaches `s = stress_max = 1.0` while the cell
-  * still spikes (measured, see the contract oracle). Phase existence is
+  * (`stress: %{strained: 0.45, burnout: 0.95, oscillating_q: 0.4}`; the Elixir
+  * profile also keeps a `calm: 0.18` tolerance cut used by its own
+  * `within_tolerance?/3`, which the Scala regime partition does not need — the
+  * Scala side only needs the lower edges it actually partitions on). They are
+  * *not* used to decide whether a phase exists: a stress level is not a
+  * dynamics statement, and the slice reaches `s = stress_max = 1.0` while the
+  * cell still spikes (measured, see the contract oracle). Phase existence is
   * decided by the recovery offset `a(s)`, below.
   */
 case class ReadoutParam(
-    calm: Double = 0.18,
     strained: Double = 0.45,
     burnout: Double = 0.95,
     oscillatingQ: Double = 0.4,
-    sectionLevel: Double = 1.2,
-    spikeLevel: Double = 1.8,
+    sectionLevel: Double = PhaseDetection.SectionLevel,
+    spikeLevel: Double = PhaseDetection.SpikeLevel,
     fireWindowLo: Double = 0.40,
     fireWindowHi: Double = 0.60,
     regularityTol: Double = 0.20,
@@ -142,7 +143,7 @@ object Readout:
     */
   def isEcologicalBurnout(
       readout: CellReadout,
-      fast: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+      fast: MandateParam = MandateAgent.DefaultFastParam,
       coupling: Double = 1.0,
       depth: Double = StressParam().sustenanceDepth,
       pulseParam: PulseToleranceParam = PulseToleranceParam()
@@ -267,7 +268,7 @@ object CellReadout:
   */
 class PhaseTracker(
     param: ReadoutParam = ReadoutParam(),
-    fast: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+    fast: MandateParam = MandateAgent.DefaultFastParam,
     coupling: Double = 1.0,
     sustenance: () => Double = () => 1.0,
     depth: Double = StressParam().sustenanceDepth,
@@ -304,7 +305,7 @@ class PhaseTracker(
     if !tPrev.isNaN then
       val l = param.sectionLevel
       if vPrev <= l && v > l then
-        val frac = if v == vPrev then 0.0 else (l - vPrev) / (v - vPrev)
+        val frac = PhaseDetection.upcrossingFraction(vPrev, v, l)
         val tc = tPrev + frac * (t - tPrev)
         if lastCross.isNaN || tc - lastCross > param.minPeriod then
           lastCross = tc

@@ -110,7 +110,7 @@ final case class DutyCycle(
   */
 final case class Oscillator(
     a: Double,
-    fast: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+    fast: MandateParam = MandateAgent.DefaultFastParam,
     coupling: Double = 1.0,
     readout: ReadoutParam = ReadoutParam()
 ):
@@ -126,11 +126,12 @@ final case class Oscillator(
 object PhaseResponse:
   /** Section level: the same reference upcrossing `PhaseModulationSpec` and
     * [[ReadoutParam]] use. Phase 0 is defined here. */
-  val section: Double = ReadoutParam().sectionLevel
+  /** Poincaré section level, shared with the readout and the link runner. */
+  val section: Double = PhaseDetection.SectionLevel
 
   /** Peak a genuine excursion must reach. A driven crossing that stalls
     * below this is not a spike. */
-  val spikeLevel: Double = 1.8
+  val spikeLevel: Double = PhaseDetection.SpikeLevel
 
   // ==== reference cycle ==== //
 
