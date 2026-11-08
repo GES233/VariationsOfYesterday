@@ -38,7 +38,7 @@
   - `VoyConfig.scala` — 外部运行时配置（`config/variations-of-yesterday.json`：格子几何、`tickDt`、FHN/慢变量参数，默认值即原硬编码值；只注入接线层，不触契约锚）
   - `MandatePersistence.scala` + `inner/mandate/MandateSnapshot.scala` — 维度级持久化（`PersistentState`，整格快照含 `M`、通道、参数、边、链路与 `simTime`；状态与逐格参数来自存档，配置只作用于新注册格子、核心默认兜底）
 - `src/client/scala/moe/chestnut/awa/voy/` — 客户端入口与开发 HUD（`hud/MandateHud.scala`，`/voy hud [on|off]`）
-- `src/test/scala/moe/chestnut/awa/voy/` — 18 个 JUnit 5 测试规范 / 121 个用例（`GridBenchmarkSpec` 默认跳过）；`inner/mandate/` 下 14 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
+- `src/test/scala/moe/chestnut/awa/voy/` — 19 个 JUnit 5 测试规范 / 125 个用例（`GridBenchmarkSpec` 默认跳过）；`inner/mandate/` 下 15 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
 - `tools/voy_world/` — Elixir 关系世界模型：
   - `lib/voy/kanren/` — microKanren 内核与 DSL

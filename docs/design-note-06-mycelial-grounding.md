@@ -130,7 +130,7 @@
 
 ### WO-4 回归与金样（已完成）
 - ~~为 §3 签名映射加金样测试~~ **已完成**：`MandatePhenomenaSpec` 构造 `CellReadout` 断言签名档位与语言键集；
-- `./gradlew test` 全量 121 项（含 1 项默认跳过的 benchmark）通过，确认数值指纹测试（`SliceContractSpec` 等）未受影响。
+- `./gradlew test` 全量 125 项（含 1 项默认跳过的 benchmark）通过，确认数值指纹测试（`SliceContractSpec` 等）未受影响。
 - 验收：CI（`.github/workflows/build.yml`）通过。
 
 ### 明确不做（本工单范围外）
