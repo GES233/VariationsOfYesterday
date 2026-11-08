@@ -20,7 +20,7 @@
 | **参数与初值** | `alpha=0.7, beta=0.8, epsilon=0.08`；`StressParam()` 默认；初值 `(v, w, s, q) = (-1.2, -0.6, 0, 0)` |
 | **候选空间 $H$** | `c0_state ∈ {c0_intact, c0_collapsed}` × `pulse_kind ∈ {alpha_shock, heavy_kick, alpha_metal_resonance, OverwhelmingNegativeSuppression}` × `safe_phase_window ∈ {absolute[0.20,0.30], relative[0.40,0.60], late[0.75,1.00]}` = **24 个离散候选** |
 | **证据集合 $E$** | `official_hq{water_level, surge_count, rain_total, material, quantity, cause_tag}`、`tech_inner{impact_count, amplitude, surge_lag, surge_direction, rain_total, material}`、`old_zhai{sign_order, sign_sequence, magnitude, surge_lag, count_of_blows}` |
-| **真实尖峰判据** | $v$ 上穿截面 $1.2$ **且**峰值 $\ge 1.8$ 后回落穿过 $0$（排除仅把 $v$ 顶过 $1.2$ 而未激发动作电位的过阈伪影） |
+| **真实尖峰判据（相位传感层）** | $v$ 上穿截面 $1.2$ **且**峰值 $\ge 1.8$ 后回落穿过 $0$（排除仅把 $v$ 顶过 $1.2$ 而未激发动作电位的过阈伪影；读数层尖峰为正向 $v \ge +1.8$，见札记 08） |
 
 ### 相位定义域（`MandateReadout` 五态区分）
 

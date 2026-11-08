@@ -38,9 +38,10 @@
 
 ### 2.1 脉冲抵消窗（保鲜）
 
-- 一次**正面积脉冲**（`FirePulse(area > 0)`：敲钟、水晶链路）到达活细胞时，开启
+- 一次**正面积脉冲**（`FirePulse(area > 0, heartbeat = true)`：敲钟、水晶链路）到达活细胞时，开启
   沉滞抵消窗：`suppressedUntil = t + W_eff(T)`，其中
-  `W_eff(T) = W_0 · max(0, 1 − T/T_invert)`；
+  `W_eff(T) = W_0 · max(0, 1 − T/T_invert)`；敲钟分派为 `SpikeSwallowed` 的
+  那一击由分派置 `heartbeat = false`（见 §3），脉冲照常进方程但不记账；
 - 窗内 `沉滞`（`voy:stagnation`）**主动移除**（不再等 55 tick 自然衰减）；窗外每 20 tick
   重新施加。`isMaintained` 的新定义（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateReadout.scala)）：
 
@@ -81,8 +82,10 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
 - **负脉冲不记账**：`area ≤ 0`（如 `OverwhelmingNegativeSuppression`）不参与心跳簿记；
 - **死菌不吃脉冲**：`M ≤ floor` 或 `a_slow ≤ a_burnout` 的细胞跳过耐受簿记
   （死亡不是玩家的错，不叠耐受）；
+- **尖峰吞没不记账**：`SpikeSwallowed` 的一击照常把脉冲送进方程（`v/q/s` 仍记账），
+  但不写心跳抵消窗，也不会刷新已有的旧窗（`FirePulse.heartbeat = false`）；
 - **水晶链路也心跳**：链路转发的正脉冲同样开启抵消窗（周期 ~39.5 s 的锁相链路
-  恰好能自动维持一个区块的庇护——自动化心跳是涌现玩法）；
+  恰好能自动维持一个区块的庇护——自动化心跳是涌现玩法；**当前无游戏侧 `AddLink` 发射者，仅为恢复/预留路径**，见札记 07 §6）；
 - **通道物理不变**：钟永远发声、山永远记账（`FirePulse` 照常进方程，
   过载脉冲同样喂养 `q`/`s` 的压力账）；
 - **账本随存档**：脉冲耐受四元组（`lastPulseTime / suppressedUntil / overloadUntil /
@@ -99,7 +102,7 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
 | 1 | 慢性菌竭（`M` 死透或 `a_slow ≤ a_burnout`） | `DeadMyceliumBurnout` | 不锚 `c0`、不抵消、不罚——死肉无回音；指路泄压+接种 |
 | 2 | 脉冲过密 / 耐受饱和 / 已在急性锁闭 / 相读 `BurnoutNoCycle` | `PulseOverloadBurnout` | 不锚 `c0`、抵消窗作废、`T+ΔT_over`、玩家吃 `voy:pulse_saturation` |
 | 3 | `Regime.Burnout`（s ≥ 0.95 但菌网活着） | `SaturatedNoAnchor` | 不锚 `c0`，**但正常开启抵消窗**（敲了有用但治不好） |
-| 4 | 未锚振荡 + `Cycle(Excitation)` | `SpikeSwallowed` | 尖峰吞没：不锚 `c0`、不抵消 |
+| 4 | 未锚振荡 + `Cycle(Excitation)` | `SpikeSwallowed` | 尖峰吞没：不锚 `c0`、**不计心跳**（脉冲照常进方程，不写/不续抵消窗） |
 | 5 | 未锚振荡 + `Cycle(Absolute/RelativeRefractory)` | `RefractoryReanchored` | 锚 `c0` + 抵消窗 + 推迟下一次尖峰 |
 | 6 | 其余（Calm/Strained/静息域/瞬态/无周期参照） | `AnchoredOrMaintained` | 锚 `c0` + 抵消窗（宽容：起振初期不设防） |
 
@@ -142,7 +145,11 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
   `MandatePhenomenaSpec` 断言）。
 - **增**：[PulseTolerance.scala](../src/main/scala/moe/chestnut/awa/voy/inner/mandate/PulseTolerance.scala)
   （纯函数耐受簿记）+ `PulseToleranceSpec`；`MandateReadoutSpec` / `MandateAgentSpec`
-  增加心跳/过载/死菌三组行为测试。
+  增加心跳/过载/死菌/吞没四组行为测试。
+- **协议二修（2026-11-08）**：`EventMsg.FirePulse` 增加 `heartbeat` 位（默认 true）；
+  六分派的 `SpikeSwallowed` 置 false，`BellStrikeOutcome.bookkeepsHeartbeat` 取代
+  原先未接线的 `suppressesStagnation`；`recordPulse` 只在 `heartbeat = true` 时记账
+  （链路脉冲无分派，恒为 true）。
 - **感官签名口径微调**：[MandatePhenomena.scala](../src/main/scala/moe/chestnut/awa/voy/MandatePhenomena.scala)
   的菌光与前兆孢子改绑 **`c0` 庇护**（`baselineCalming ≥ 0.01`）而非 `isMaintained`——
   心跳管玩家的身体，签名管土地自己的健康；札记 06 §3 签名表因此不破。
@@ -157,4 +164,4 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
 2. 耐受数值（`W_0`、`I_min`、步进与衰减）为首批手感值，待 playtest 校准；
 3. 「敲钟近处心跳重一拍」的世界侧代价反馈（近处重拍音效）待做；
 4. 水晶链路自动心跳与 `minSafeInterval` 的交互（锁相周期 ≈ 39.5 s > `I_min` = 8 s，
-   现参数下单链路安全；多链路汇聚到同格的过密风险是涌现特性，保留观察）。
+   现参数下单链路安全；多链路汇聚到同格的过密风险是涌现特性，保留观察）。前提是游戏侧已有 `AddLink` 接线（当前尚未落地，见札记 07 §6）。

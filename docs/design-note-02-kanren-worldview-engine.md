@@ -24,7 +24,7 @@
 
 | 阶段 | 输入锚点 | 核心关系与物理/制度分支 | 规则谓词 |
 | :--- | :--- | :--- | :--- |
-| **地理骨相** | 5 项离散特征 | 上游地形（陡裂隙/落水洞）、隘口（峡谷/溶洞）、下游（平坝/台地）、地质（活动断层/深应力腔/微裂隙）、可达性（机耕道/绝壁） | `Schema.topology/1` |
+| **地理骨相** | 5 项离散特征 | 上游地形（陡裂隙/落水洞）、隘口（峡谷/溶洞）、下游（平坝/台地）、地质（活动断层/深应力腔/微裂隙）、可达性（机耕道/绝壁） | `Schema.features/1`（合法性由 `era2b_reclamationo/4` 的物理配对判定） |
 | **第一纪：山官火塘** | `topo` | 隘口决定镇山古器：峡谷立**镇山铜钲**（声学阻尼），溶洞立**石雕分水堰**（虹吸泄压）；初始维持 `c0_intact` 与 `Calm` | `era1_headmano/2` |
 | **第二纪上：流官清丈** | `topo + era1` | 按可达性分叉：<br>• **机耕道可达**：清丈局收铜钲或毁石堰 $\rightarrow$ 触发山崩掩署或暗河倒灌反噬 $\rightarrow$ 发还古器、退守「外甲内寨」；<br>• **绝壁隔绝**：胥吏止步崖下，仅立归化碑虚报具结 | `era2a_magistrateo/3` |
 | **第二纪下：垦殖改组** | `topo + era1 + era2a` | • **可达性 $\rightarrow c_0$**：通车则改组为国营垦殖分队、古器按废料收缴（`c0_collapsed`）、山官后裔贬为保管员；绝壁则挂靠林场、古器留存原地（`c0_intact`）；<br>• **源头×地质 $\rightarrow$ 扰动**：陡裂隙+活动断层进驻 302 爆破队（`alpha_shock`）；落水洞+深应力腔进驻高压注浆处（`OverwhelmingNegativeSuppression`）；陡裂隙+微裂隙设林场水文哨（`heavy_kick`） | `era2b_reclamationo/4` |
@@ -46,7 +46,7 @@
 第三纪结局由 `(c0_status, pulse)` 的 $2 \times 3$ 笛卡尔积完整覆盖。这一矩阵同时承担双重职责：
 
 1. **既定先例节点（`horizon: :locked`，设计目标 1–2 个）的尸检分类表**：入场前已定格的结局（如 `BurnoutZone` 死寂标本与 `ControlGroup` 完好对照），提供完整的 Hop 1..5 卷宗供玩家反向前推（abduction）出 `$c_0$ 状态 × 源头脉冲 $\rightarrow$ 终态 Regime` 的因果律。
-2. **未决变奏节点（`horizon: :open`，其余山谷）的运行时状态转移相图**：生成期按无干预基线编译 `era3`（`baseline_fate`，如 `c0_collapsed` 行的 `ChronicSeep` 或 `Oscillating`，仍写入 `history`），卷宗 `settled: false` 并携带 `reachable_transitions`。玩家通过寻回真工业载体（Hop 1→2→3）、在不应期推迟窗口（Hop 4 `safe_tick`）敲击重锚 $c_0$（纵向跨行：`c0_collapsed` $\rightarrow$ `c0_intact`），或关停/阻尼上游工业扰动（横向跨列），在运行时把卷宗结算到目标结局并生成第 5 跳条规（生成期 `history.era3` 保持基线不改写；游戏侧接线见草案 01 §7 待完成项 4）。
+2. **未决变奏节点（`horizon: :open`，其余山谷）的运行时状态转移相图**：生成期按无干预基线编译 `era3`（`baseline_fate`，如 `c0_collapsed` × `heavy_kick` 的 `Fate_Deferred_ChronicSeep`（终态 `Strained`），或 × `alpha_shock` 的同化新寨（终态 `Oscillating`），仍写入 `history`），卷宗 `settled: false` 并携带 `reachable_transitions`。玩家通过寻回真工业载体（Hop 1→2→3）、在不应期推迟窗口（Hop 4 `safe_tick`）敲击重锚 $c_0$（纵向跨行：`c0_collapsed` $\rightarrow$ `c0_intact`），或关停/阻尼上游工业扰动（横向跨列），在运行时把卷宗结算到目标结局并生成第 5 跳条规（生成期 `history.era3` 保持基线不改写；游戏侧接线见草案 01 §7 待完成项 4）。
 
 | $c_0$ 状态 \ 源头脉冲 | `alpha_shock`<br>（302 队浅层点炮） | `OverwhelmingNegativeSuppression`<br>（总指挥部高压反向注浆） | `heavy_kick`<br>（林场水文哨低强度采伐） |
 | :--- | :--- | :--- | :--- |

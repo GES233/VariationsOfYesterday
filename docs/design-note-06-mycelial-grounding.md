@@ -1,8 +1,8 @@
 # 设计札记 06 — 地脉的生物基础：菌网、酸水与缓冲容量（实施规格）
 
-> 状态：**草案 · 供实现**。本文档面向实现者（含编码代理）：第 1–4 节是不可违背的设计约束与映射，第 5 节是分阶段工单（WO-1…WO-4），第 6 节是考据与证据分级。
+> 状态：**实施规格（WO-1/3/4 已落地，WO-2 待排期）**。本文档面向实现者（含编码代理）：第 1–4 节是不可违背的设计约束与映射，第 5 节是分阶段工单（WO-1…WO-4），第 6 节是考据与证据分级。
 >
-> 前置阅读：`docs/design-draft-01-living-world.md` §1（动力学层）、`docs/design-note-02-kanren-worldview-engine.md`（世界模型）、`docs/design-note-05-medikanren-microchains.md`（五跳卷宗）、`docs/verification-report-01-mandate-slice.md`。脉冲耦合链路见 `docs/design-note-07-pulse-coupling.md`；可编程晶盘见札记 08（待写）。
+> 前置阅读：`docs/design-draft-01-living-world.md` §1（动力学层）、`docs/design-note-02-kanren-worldview-engine.md`（世界模型）、`docs/design-note-05-medikanren-microchains.md`（五跳卷宗）、`docs/verification-report-01-mandate-slice.md`。脉冲耦合链路见 `docs/design-note-07-pulse-coupling.md`；可编程晶盘见札记 09（待写）。
 
 ---
 
@@ -18,7 +18,7 @@
 4. **契约不动**：不得运行 `voy.contract.write=true` 重新生成 `contracts/mandate-slice-v1.json`（`M` 落地时已按 digest-only 重生成一次，此后非必要不再重生成）；`./gradlew test` 与 `cd tools/voy_world && mix test` 必须全程通过。
 5. **读数纪律**：连续量永不直接显示为数字；玩家只能看到感官签名与制度读表（分辨率受限）。
 
-> 第 2、4 条已落实；第 1 条按 §7.1 裁定修订；第 3 条的「离线按 Node 聚合结算」已由草案 01 §1.3 的「常驻 + 粗步进」设计取代（不做离线加速风化）。本文只作验收口径，不重述实现细节。
+> 第 2、4 条已落实；第 1 条按 §7.1 裁定修订；第 3 条的「离线按 Node 聚合结算」已由草案 01 §1.3 的「常驻 + 粗步进」设计取代（不做离线加速风化）。
 
 ## 2. 两层生物学底盘
 
@@ -32,7 +32,7 @@
 | `entrench w` | 恢复过程打包（Ca²⁺ 再螯合、后续通道过程） |
 | `a(s, M) = α − Δ·(1−M) − k·s` | **菌网完整度决定兴奋性**：网络越碎，`a` 越小，越容易被点燃、越难回到静息；维持源被彻底抽走（`M → 0`）则进入去极化阻滞 |
 | `dM/dt = r·M·(1−M) − c·max(s−s_T,0)·M + D·∇²M` | 菌丝 logistic 生长 − 酸中毒（应力越过毒性阈值 `s_T` 才杀，与 §2.2 AMD 一致）+ 沿土壤/水系连续体扩散；`M = 0` 吸收态 |
-| 尖峰（`v` 绝对值 ≥ 1.8） | 菌网电暴发 + 伴生的地球化学脉冲（见 2.2） |
+| 尖峰（正向 `v ≥ +1.8`） | 菌网电暴发 + 伴生的地球化学脉冲（见 2.2） |
 | 烧毁（`BurnoutNoCycle`） | **去极化阻滞**（depolarization block）：菌网深度失能，静默；恢复靠再接种（`SetSustenance` / 菌种右键土壤，见 §7 开放问题 1） |
 
 ### 2.2 慢系统 = 土壤生物地球化学（酸性矿山排水，AMD）
@@ -51,7 +51,7 @@
 ### 2.3 黑箱声明（只许这三条）
 
 1. 菌网电活动与地质灾变的宏观耦合方式不明（黑箱，类比 HH 当年的「载流子」）；
-2. 仪式声波（铜钲）经压电效应/振动影响菌网——弱证据档，按黑箱使用。**晶体换能器（札记 07 的晶盘/谐振件）也归入本条**，不新增第四条；
+2. 仪式声波（铜钲）经压电效应/振动影响菌网——弱证据档，按黑箱使用。**晶体换能器（札记 07 的谐振件；可编程晶盘见札记 09）也归入本条**，不新增第四条；
 3. 红石走线遵循 MC 原生规则，不解释。器件只在边界上读写原版红石信号，内部介质是菌网生物电，不是「新红石物理」。
 
 **禁止**再发明第四条（不许给菌网加「意识」「能量场」等第二属性）。
@@ -62,8 +62,8 @@
 
 | 读数状态 | 感官签名 | 实现钩子 |
 | :-- | :-- | :-- |
-| 尖峰 excursion（`v` 绝对值 ≥ 1.8） | 下游水体黄浊（铁氢氧化物沉淀，"yellow boy"）、死鱼漂浮物、硫磺尾味 | 水体粒子 + 物品实体 + 音效 |
-| 前兆（`Regime.Strained` 或 `Oscillating`，恢复变慢 = 临界慢化） | 溪涧水色渐黄、异味渐重（**先于**尖峰） | 单档低密度菌丝粒子（当前固定 4 颗；按 `s` 分档待做，不给数值） |
+| 尖峰 excursion（`abs(v) ≥ 1.8`，酸负荷口径；读数层尖峰为正向 `v ≥ +1.8`） | 下游水体黄浊（铁氢氧化物沉淀，"yellow boy"）、死鱼漂浮物、硫磺尾味 | 水体粒子 + 物品实体 + 音效 |
+| 前兆（`Regime.Strained` 或 `Oscillating`，且 `c₀ ≥ 0.01` 庇护） | 溪涧水色渐黄、异味渐重（**先于**尖峰） | 单档低密度菌丝粒子（当前固定 4 颗；按 `s` 分档待做，不给数值） |
 | 尖峰过后（`q` 残留） | 水色持续发黄、底泥泛红、硫磺味持久 | 粒子按 `q` 分档（3 档） |
 | 安抚设施工作中 | **臭味**（湿地硫酸盐还原产 H₂S）——臭是好兆头 | 设施周边粒子 |
 | 静默（`PhaseReading` 为 `Undefined(BurnoutNoCycle)`） | 深度失能：无菌子、无荧光、作物枯败 | 生物群系级粒子抑制 + 枯败 |
@@ -126,16 +126,16 @@
 - 感官签名（§3）已由 `MandatePhenomena`（纯映射，可单测）+ `MandateOverworld.emitChunkPhenomena`（服务端统一发射，不进客户端逻辑）落地：黄水三档（铁锈色 `DustParticleEffect` 扫表层水体，计数按档）、健康夜光（`GLOW`，低密度封顶）、深度失能静默（`WHITE_ASH`，绑 `BurnoutNoCycle` 而非 `Regime.Burnout`）；
 - **菌网再接种**：手持菌种（发光地衣/蘑菇/菌丝体）右键土壤 → `evaluateReInoculation` 纯判定（`Seeded` / `AcidTooToxic` / `AlreadyViable`）→ `EventMsg.SetSustenance(M = 0.05)`；酸毒未退（s ≥ 0.6）时接种失败且菌种照常消耗——失败是身体证据，不是禁令；
 - 天麻床方块：待 WO-2 的方块框架落地后接入。
-- 验收：签名映射金样测试见 `MandatePhenomenaSpec`（107 项全量测试通过）；服务器侧无渲染引用；专用服务器可用。
+- 验收：签名映射金样测试见 `MandatePhenomenaSpec`（全量测试数见 `AGENTS.md` 构建与测试）；服务器侧无渲染引用；专用服务器可用。
 
 ### WO-4 回归与金样（已完成）
 - ~~为 §3 签名映射加金样测试~~ **已完成**：`MandatePhenomenaSpec` 构造 `CellReadout` 断言签名档位与语言键集；
-- `./gradlew test` 全量 107 项（含 1 项默认跳过的 benchmark）通过，确认数值指纹测试（`SliceContractSpec` 等）未受影响。
+- `./gradlew test` 全量 121 项（含 1 项默认跳过的 benchmark）通过，确认数值指纹测试（`SliceContractSpec` 等）未受影响。
 - 验收：CI（`.github/workflows/build.yml`）通过。
 
 ### 明确不做（本工单范围外）
 - 水晶/红石脉冲链路：已有札记 07 与事件层实现，不在本工单；
-- 晶盘/微网格：札记 08；
+- 晶盘/微网格：札记 09；
 - `tools/voy_world` 卷宗内容的菌网化改写（待内容管线排期）；
 - 任何 `inner/mandate` 数值改动。
 

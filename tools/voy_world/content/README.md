@@ -1,6 +1,6 @@
 # 五跳内容包写作指南
 
-本目录（`content/documents/`）是唯一的叙事散文来源。每份卡片只记录一条局部单据，完整因果由 `Voy.World.Pathway` 按桥接元组合一拼出，批号、载体与勘定格由 `Voy.World.Witness` 按世界种子注入。
+本目录下的 `content/documents/` 是唯一的叙事散文来源。每份卡片只记录一条局部单据，完整因果由 `Voy.World.Pathway` 按桥接元组合一拼出，批号、载体与勘定格由 `Voy.World.Witness` 按世界种子注入。
 
 ## 目录与卡片头部规则
 

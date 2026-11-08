@@ -9,10 +9,12 @@
 - `Voy.World.Pathway`：mediKanren 五跳局部证据关系；仅凭 `from/to` 桥接元组合一拼链，删去任一跳即断链。
 - `Voy.World.Witness`：按 `(seed, branch_id, relic, fate)` 绑定批号、工业载体和 `Contract` 实测 `Delayed` 安全刻度（`safe_ticks`）。
 - `Voy.World.Content`：加载并校验 `content/documents/**/*.md`（32 张主链卡 + 4 张干扰卡）。
-- `Voy.World.Slice / Observation / Ascribe / Contract`：读取 Scala 实测契约，模拟三方制度观测变换并在 24 候选空间内唯一反演隐藏解释。
+- `Voy.World.Slice / Observation / Ascribe / Contract`：读取 Scala 实测契约，模拟三方制度观测变换并在 24 候选空间内按证据与分辨率给出唯一/多解/缺证/矛盾四型反演。
+- `Voy.World.Profile / Schema / Projection / Timeline / Texts / Dynamics`：跨栈 Regime 阈值镜像、地形 schema 与特征校验、结构投影、年代时间线、文本校验、相位/Regime 词汇表。
 - `Voy.World.Facts`：观测、行动、预测与结算的追加式运行时事实日志。
 - `Voy.World.Node / Naming / Export`：稳定节点身份、种子卷宗物化与确定性 JSON bundle（`schema_version = 2`）。
 - `Voy.World.Canon`：时间线、结构、地形覆盖及五跳成链/消融/干扰排斥/单卡认知局部性静态检查。
+- `Voy.World`：JSON 边界门面（`compile_node` / `compile_branch` / `settle_open_dossier`）；Mix 任务 `mix voy.content` 见下。
 
 ## 常用命令
 

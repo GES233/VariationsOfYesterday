@@ -48,7 +48,7 @@
 
 ## 3. 单卡认知局部性与不变量（`Canon.check_pathways/1`）
 
-静态检查器与测试套件（`pathway_test.exs`）对全部 12 组 `(relic, fate)` 强制执行六条定理：
+`Canon.check_pathways/1` 对全部 12 组 `(relic, fate)` 检查定理 1/2/3/5；`pathway_test.exs` 补定理 4（跨 seed 隔离）与 6（$c_0$ 防火墙）：
 
 1. **多跳合一唯一性**：5 张真卡唯一连通起点 `{:relic, ...}` 与终点 `{:emergent_ritual, ...}`。
 2. **单跳消融断链**：删去 Hop 1..5 中任意 1 跳，剩余 4 张卡 `connect_edges/1` 必返回 `[]`。
