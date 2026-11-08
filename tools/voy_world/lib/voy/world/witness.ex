@@ -118,7 +118,8 @@ defmodule Voy.World.Witness do
   def safe_ticks, do: Enum.map(dynamics().safe_ticks, & &1.tick)
 
   @doc "Render the five main cards (or Hop 1..4 when `horizon: :open`) and two decoys from the authoring pack. Options: `:pack` and `:horizon`."
-  def render_dossier(seed, branch_id, relic, fate, names \\ [], opts \\ []) do
+  def render_dossier(seed, branch_id, relic, fate, names \\ [], opts \\ [])
+      when is_list(opts) or (is_map(opts) and not is_struct(opts)) do
     pack = Fields.fetch_opt(opts, :pack, nil) || Content.default_pack()
 
     horizon_opt =

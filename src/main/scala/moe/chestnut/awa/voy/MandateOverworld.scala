@@ -263,7 +263,7 @@ object MandateOverworld:
             0.5f
           )
           player.sendMessage(
-            Text.literal(f"§c[旧日变奏] 镇山钟损毁：区块 [$chunkX%d, $chunkZ%d] 维持源 (c0) 坍塌，沉滞浮现"),
+            Text.literal(f"§c[旧日变奏] 镇山钟损毁：区块 [$chunkX%d, $chunkZ%d] 维持源 (c0) 坍塌，失去镇山钟将无法续上脉动庇护"),
             true
           )
         else

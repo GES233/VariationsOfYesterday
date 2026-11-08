@@ -20,7 +20,7 @@
 
 | 旧问题 | 裁定 |
 |---|---|
-| Q1 快变量重写幅度 | **(a) 不动方程**：四维 RK4 与契约哈希锚（`MandateState.scala` / `ODESolver.scala`）零改动；只重写读数与玩家侧语义。契约 `mandate-slice-v1.json` 未重生成，`SliceContractSpec` 全程通过。 |
+| Q1 快变量重写幅度 | **(a) 不动方程**：四维 RK4 方程与契约数值 oracle 零改动；只重写读数与玩家侧语义（同分支后续审计提交仅精简了 `MandateState.scala` 注释并同步更新 `numeric_source_digest` 与 `symbolic.claims`），`SliceContractSpec` 全程通过。 |
 | Q2 `v` 的叙事身份 | **(c) 分层**：`v` 是菌网生物电（电生理量），`Regime`/`PhaseReading` 是叙事读数。尖峰（spike）= **正向**除极暴发（`v ≥ +1.8`）。 |
 | Q3 沉滞主来源 | **脉冲保鲜窗（心跳）**：沉滞的基础来源从「无 `c0`」改为「**太久没有脉冲**」。一次有效脉冲开启抵消窗 `W_eff(T)`，窗过期沉滞回归；`c0` 退居慢变量安抚通道与感官签名的庇护条件。 |
 | Q4 `c0` 的角色 | **(c) 沉滞与 `c0` 解耦**：`c0` 只进慢变量方程（`-ρc0` 项）与菌光/前兆签名（见 §5）；不再提供沉滞免疫。 |
@@ -153,8 +153,7 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
 - **感官签名口径微调**：[MandatePhenomena.scala](../src/main/scala/moe/chestnut/awa/voy/MandatePhenomena.scala)
   的菌光与前兆孢子改绑 **`c0` 庇护**（`baselineCalming ≥ 0.01`）而非 `isMaintained`——
   心跳管玩家的身体，签名管土地自己的健康；札记 06 §3 签名表因此不破。
-- **不动**：`MandateState.scala`、`ODESolver.scala`（契约哈希锚）、
-  `contracts/mandate-slice-v1.json`、`tools/voy_world` 全部、`Regime`/`PhaseReading` 枚举线级名。
+- **不动**：四维 RK4 方程（`MandateState.scala` / `ODESolver.scala` 数值实现）、契约数值 oracle、`Regime`/`PhaseReading` 枚举线级名与 `Voy.World.Profile` 阈值镜像（同分支对 `tools/voy_world` 的改动均为独立去重重构，不涉心跳机制）。
 
 ---
 

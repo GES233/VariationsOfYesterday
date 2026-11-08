@@ -19,6 +19,7 @@ import moe.chestnut.awa.voy.inner.mandate.{
   MandateParam,
   MandateSnapshot,
   PulseLink,
+  PulseToleranceState,
   PulseTransmitter,
   StressParam
 }
@@ -44,7 +45,13 @@ class MandatePersistenceSpec:
         impulse = -0.2,
         fastParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
         stressParam =
-          StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
+          StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
+        pulseState = PulseToleranceState(
+          lastPulseTime = 54300.0,
+          suppressedUntil = 54336.0,
+          overloadUntil = Double.NegativeInfinity,
+          tolerance = 0.25
+        )
       ),
       CellSnapshot(
         CellCoord(31, 31),

@@ -29,16 +29,19 @@ class VoyConfigSpec:
       """{
         |  "tickDt": 0.025,
         |  "stressParam": { "gamma": 0.0007 },
-        |  "lattice": { "width": 64 }
+        |  "lattice": { "width": 64 },
+        |  "pulseParam": { "minSafeInterval": 10.0 }
         |}""".stripMargin
     )
     val cfg = VoyConfig.loadFrom(configPath)
 
     assertEquals(0.025, cfg.tickDt, 1e-12)
     assertEquals(0.0007, cfg.stressParam.gamma, 1e-12, "the calibration knob")
+    assertEquals(10.0, cfg.pulseParam.minSafeInterval, 1e-12)
     // Untouched fields keep the (previously hardcoded) defaults.
     assertEquals(0.01, VoyConfig().stressParam.gamma, 1e-12)
     assertEquals(1e-3, cfg.stressParam.sustenanceGrowth, 1e-12)
+    assertEquals(40.0, cfg.pulseParam.suppressionWindow, 1e-12)
     assertEquals(64, cfg.lattice.width)
     assertEquals(32, cfg.lattice.height)
     assertEquals(-16, cfg.lattice.originX)
