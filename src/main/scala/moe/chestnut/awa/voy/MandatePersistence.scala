@@ -19,9 +19,8 @@ import moe.chestnut.awa.voy.inner.mandate.{
 }
 
 /** Dimension-scoped carrier for the mandate lattice snapshot, saved with
-  * the world via `PersistentStateManager` (the TODO carrier named in
-  * `MandateRuntime`). The manager writes dirty states on world save
-  * (autosave and shutdown), so the flow is:
+  * the world via `PersistentStateManager`. The manager writes dirty states on
+  * world save (autosave and shutdown), so the flow is:
   *
   *  - the actor publishes a fresh `MandateSnapshot` on a slow cadence and
   *    marks this state dirty;

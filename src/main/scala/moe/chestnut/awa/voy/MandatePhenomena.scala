@@ -20,10 +20,18 @@ object MandatePhenomena:
     */
   val ReInoculationMaxSustenance: Double = 0.20
 
-  /** Soil stress threshold (`s_T = 0.6`) above which acid burn kills freshly
-    * introduced fungal inoculum (design note 06 §2.1 & §7.1).
+  /** Soil stress threshold (`s_T = 0.6` by default) above which acid burn kills
+    * freshly introduced fungal inoculum (design note 06 §2.1 & §7.1). Read from
+    * the cell's own parameter set at the call site so a tuned config applies.
     */
-  val ToxicityThreshold: Double = StressParam().sustenanceBurnThreshold
+  private def toxicityThreshold(readout: CellReadout): Double =
+    readout.stressParam.sustenanceBurnThreshold
+
+  /** Minimum `c0` (baseline calming) that still shelters a cell's sensory
+    * signatures (design note 08 §5: glow and precursor spores bind to the slow
+    * `c0` anchor, not to the pulse window).
+    */
+  val C0ShelterLevel: Double = 0.01
 
   /** Minimum sustenance required for healthy night-time mycelial bioluminescence
     * (design note 06 §3 & §7.3).
@@ -124,7 +132,7 @@ object MandatePhenomena:
     // Glow and precursor spores bind to the slow `c0` anchor (a bell's lasting
     // duty), NOT to the pulse suppression window: the heartbeat governs the
     // player's `沉滞`, while these signatures describe the land's own health.
-    val c0Sheltered = readout.baselineCalming >= 0.01
+    val c0Sheltered = readout.baselineCalming >= C0ShelterLevel
     val mycelialGlow =
       !silentBlight &&
         isNight &&
@@ -145,8 +153,11 @@ object MandatePhenomena:
   /** Qualitative 3-tier word for mycelial network integrity (`M`), obeying
     * the readout discipline (design note 06 §1 constraint 5: never raw floats).
     */
-  def sustenanceWord(sustenance: Double): String =
-    if sustenance < StressParam().sustenanceFloor then "枯绝"
+  def sustenanceWord(
+      sustenance: Double,
+      floor: Double = StressParam().sustenanceFloor
+  ): String =
+    if sustenance < floor then "枯绝"
     else if sustenance < 0.60 then "受损"
     else "完好"
 
@@ -156,7 +167,7 @@ object MandatePhenomena:
   def evaluateReInoculation(readout: CellReadout): ReInoculationOutcome =
     if readout.sustenance >= ReInoculationMaxSustenance then
       ReInoculationOutcome.AlreadyViable
-    else if readout.current.stress >= ToxicityThreshold then
+    else if readout.current.stress >= toxicityThreshold(readout) then
       ReInoculationOutcome.AcidTooToxic
     else
       ReInoculationOutcome.Seeded

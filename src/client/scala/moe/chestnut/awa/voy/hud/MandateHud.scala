@@ -5,7 +5,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.render.RenderTickCounter
-import moe.chestnut.awa.voy.{MandateOverworld, MandateRuntime}
+import moe.chestnut.awa.voy.{MandateOverworld, MandatePhenomena, MandateRuntime}
 import moe.chestnut.awa.voy.inner.mandate.{CellReadout, PhaseLabel, PhaseReading, ReadoutParam, Regime}
 
 /** Development HUD overlay that visualises the mandate readout
@@ -126,7 +126,7 @@ object MandateHud:
       context.fill(tx, ty, tx + tileSize, ty + tileSize, color)
 
       // Small inner dot if the chunk carries an active c0 baseline calming source
-      if cellReadout.baselineCalming >= 0.01 then
+      if cellReadout.baselineCalming >= MandatePhenomena.C0ShelterLevel then
         val dotX = tx + tileSize / 2 - 1
         val dotY = ty + tileSize / 2 - 1
         context.fill(dotX, dotY, dotX + 2, dotY + 2, ColC0Dot)

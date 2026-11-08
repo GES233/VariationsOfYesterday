@@ -427,8 +427,9 @@ object PhaseResponse:
     * closed form `trace(J) = 1 - v^2 - eps*beta = 0` together with the fixed
     * point conditions. Returns `(v_c, a_c)`.
     *
-    * This is *not* the `a_c ~ 0.467` of the design draft: that value follows
-    * from the approximation `v_c ~ -1`, which drops the `eps*beta` term.
+    * This is *not* the old `a_c ~ 0.467` approximation (the design draft's
+    * pre-correction value): that number follows from `v_c ~ -1`, which drops
+    * the `eps*beta` term. The corrected draft value is 0.4350.
     */
   def hopfPoint(fast: MandateParam): (Double, Double) =
     val vc = -Math.sqrt(1.0 - fast.epsilon * fast.beta)

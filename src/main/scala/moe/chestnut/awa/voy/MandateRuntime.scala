@@ -20,13 +20,13 @@ import moe.chestnut.awa.voy.inner.mandate.*
   * Outbound actions are queued by the actor and drained back onto the
   * server thread at the next tick.
   *
-  * TODO: the prototype lattice is fixed to world chunks [-16, 15] in both
-  * axes, with its disturbance hotspot around chunk (0, 0). Future iterations
-  * should anchor it to the spawn point, follow the player's local region, or
-  * derive cells from real world topology. The saved snapshot records the
-  * geometry it was captured under (`MandatePersistence.geometry`), so a
-  * lattice-geometry change discards the stale save loudly instead of
-  * silently misplacing cells.
+  * TODO: the lattice defaults to world chunks [-16, 15] in both axes, with its
+  * disturbance hotspot around chunk (0, 0); geometry is injectable via
+  * `VoyConfig.lattice`. Future iterations should anchor it to the spawn point,
+  * follow the player's local region, or derive cells from real world topology.
+  * The saved snapshot records the geometry it was captured under
+  * (`MandatePersistence.geometry`), so a lattice-geometry change discards the
+  * stale save loudly instead of silently misplacing cells.
   *
   * Persistence (2026-11-07): the lattice survives restarts via the
   * dimension-scoped `PersistentState` carrier `MandatePersistence`. The
@@ -88,8 +88,13 @@ object MandateRuntime:
   def injectStressAt(chunkX: Int, chunkZ: Int, amount: Double): Unit =
     tell(EventMsg.StressInject(worldToGrid(chunkX, chunkZ), amount))
 
-  def firePulseAt(chunkX: Int, chunkZ: Int, area: Double): Unit =
-    tell(EventMsg.FirePulse(worldToGrid(chunkX, chunkZ), area))
+  def firePulseAt(
+      chunkX: Int,
+      chunkZ: Int,
+      area: Double,
+      heartbeat: Boolean = true
+  ): Unit =
+    tell(EventMsg.FirePulse(worldToGrid(chunkX, chunkZ), area, heartbeat = heartbeat))
 
   def setBaselineCalmingAt(chunkX: Int, chunkZ: Int, level: Double): Unit =
     tell(EventMsg.SetBaselineCalming(worldToGrid(chunkX, chunkZ), level))
@@ -143,8 +148,8 @@ object MandateRuntime:
         .getOrCreate(MandatePersistence.StateType, MandatePersistence.Id)
 
       // Restore only a snapshot captured under the same lattice geometry;
-      // a geometry change (the prototype lattice is still anchored to
-      // fixed chunks) discards the stale save loudly.
+      // a geometry change (default -16..15, overridable via VoyConfig) discards
+      // the stale save loudly.
       val expectedGeometry = (originX, originZ, width, height)
       val restored = persistence.snapshot.filter { _ =>
         val matches = persistence.geometry == expectedGeometry
@@ -305,12 +310,6 @@ object MandateRuntime:
             )
           else logger.debug("Persistence flushed for save.")
         finally flushLatch.set(null)
-
-  /** HUD / external read: world chunk -> state; zero state outside the
-    * lattice or while the engine is stopped.
-    */
-  def stateAt(chunkX: Int, chunkZ: Int): MandateCurrent =
-    snapshot.getOrElse((chunkX, chunkZ), MandateCurrent(0.0, 0.0, 0.0, 0.0))
 
   /** HUD / Overworld read: world chunk -> semantic readout (`Regime`,
     * `PhaseReading`, and `baselineCalming`); `CellReadout.zero` outside the

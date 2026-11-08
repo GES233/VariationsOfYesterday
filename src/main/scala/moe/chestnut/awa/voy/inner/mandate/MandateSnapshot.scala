@@ -19,7 +19,11 @@ package moe.chestnut.awa.voy.inner.mandate
   *  - transport `edges` and crystal `links` — topology is data-driven via
   *    topology events, and links are player-built wiring;
   *  - `simTime` — the actor's integration clock, so pulse delays and
-  *    phase readouts continue across a restart.
+  *    phase readouts continue across a restart;
+  *  - per-cell pulse-tolerance state (`lastPulseTime / suppressedUntil /
+  *    overloadUntil / tolerance`) — the heartbeat ledger is closed-form on
+  *    `simTime`, so it must be saved or a restart would re-open a suppression
+  *    window (design note 08 §2.4).
   *
   * What is deliberately NOT captured (transient, self-reconstructing):
   * the alpha-synapse kernel state (decays within ~5 s), the flux scratch

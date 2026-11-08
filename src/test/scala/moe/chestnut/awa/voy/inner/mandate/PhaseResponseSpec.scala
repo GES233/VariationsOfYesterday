@@ -43,7 +43,7 @@ class PhaseResponseSpec:
     assertEquals(-Math.sqrt(1.0 - fast.epsilon * fast.beta), vc, 1e-12)
     // w-nullcline/v-nullcline intersection with trace(J) = 0.
     assertEquals(fast.beta * (vc - Math.pow(vc, 3) / 3.0) - vc, ac, 1e-12)
-    assertTrue(Math.abs(ac - 0.467) > 0.02, s"the draft value 0.467 is not the exact one (got $ac)")
+    assertTrue(Math.abs(ac - 0.467) > 0.02, s"the old 0.467 approximation is not the exact value (got $ac)")
     assertTrue(Math.abs(ac - 0.434975) < 1e-5)
 
   @Test def `a pulse inside the declared dose range never fires at the slice operating point`(): Unit =

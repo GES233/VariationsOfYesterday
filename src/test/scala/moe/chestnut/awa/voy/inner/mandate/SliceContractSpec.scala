@@ -82,12 +82,14 @@ class SliceContractSpec:
 
   @Test def `every claim in the contract is generated from a measurement`(): Unit =
     val claims = data.claims
-    assertEquals(5, claims.size)
-    // The two draft numbers and the fire-window layout are refuted; the
-    // refractory-delay claim and the bare existence of window structure
-    // survive. Both verdicts are computed from measurements, above.
-    assertEquals("refuted", claims.find(_.id == "hopf.a_c").get.verdict)
+    assertEquals(6, claims.size)
+    // The draft's corrected Hopf value now matches the exact trace condition;
+    // the 40-60% rule is refuted at the saturated slice point but supported at
+    // the near-Hopf onset oscillator it was actually stated for; the singular
+    // period remains refuted. Every verdict is computed from measurements.
+    assertEquals("supported", claims.find(_.id == "hopf.a_c").get.verdict)
     assertEquals("refuted", claims.find(_.id == "prc.vulnerable_window_fires").get.verdict)
+    assertEquals("supported", claims.find(_.id == "prc.onset_window_fires").get.verdict)
     assertEquals("supported", claims.find(_.id == "prc.absolute_window_delays").get.verdict)
     assertEquals("supported", claims.find(_.id == "prc.window_structure_exists").get.verdict)
     assertEquals("refuted-at-eps=0.08", claims.find(_.id == "period.singular_limit").get.verdict)

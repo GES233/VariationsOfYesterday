@@ -208,7 +208,7 @@ class MandateReadoutSpec:
     assertFalse(burnoutOutcome.anchorsC0, "saturated cell cannot re-anchor c0 while the stress stays high")
     assertEquals(0.0, burnoutOutcome.baselineCalming, 1e-12)
     assertTrue(
-      burnoutOutcome.suppressesStagnation,
+      burnoutOutcome.bookkeepsHeartbeat,
       "a saturated but LIVING cell still answers the pulse with a heartbeat window"
     )
 
@@ -223,7 +223,7 @@ class MandateReadoutSpec:
     val outcome = MandateOverworld.evaluateBellStrike(deadCell)
     assertEquals(BellStrikeOutcome.DeadMyceliumBurnout, outcome)
     assertFalse(outcome.anchorsC0, "dead mycelium cannot carry a baseline anchor")
-    assertFalse(outcome.suppressesStagnation, "dead mycelium cannot carry a heartbeat")
+    assertFalse(outcome.bookkeepsHeartbeat, "dead mycelium cannot carry a heartbeat")
     assertFalse(outcome.triggersOverloadPenalty, "death is not the striker's fault")
 
   @Test def `striking inside the refractory interval of the previous pulse overloads the cell`(): Unit =
@@ -240,7 +240,10 @@ class MandateReadoutSpec:
     val outcome = MandateOverworld.evaluateBellStrike(overpulsed)
     assertEquals(BellStrikeOutcome.PulseOverloadBurnout, outcome)
     assertFalse(outcome.anchorsC0)
-    assertFalse(outcome.suppressesStagnation, "overload collapses the suppression window")
+    assertTrue(
+      outcome.bookkeepsHeartbeat,
+      "overload is still recorded so it can collapse the suppression window"
+    )
     assertTrue(outcome.triggersOverloadPenalty, "the striker feels the recoil")
 
   @Test def `stacked pulse drive burns a healthy cell across the knee`(): Unit =

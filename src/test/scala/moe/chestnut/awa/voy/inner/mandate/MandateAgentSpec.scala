@@ -367,6 +367,25 @@ class MandateAgentSpec:
     assertTrue(stages.last.pulseSuppressed, "a bell pulse opens the heartbeat window")
     assertTrue(stages.last.pulseTolerance > 0.0, "a pulse leaves a trace of tolerance")
 
+  @Test def swallowedStrikeDoesNotOpenAWindow(): Unit =
+    val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    val latch = new CountDownLatch(2)
+    val grid = singleCellGrid(mkCell(0.0))
+    val agent = spawnReadoutLog(grid, seen, latch)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    // Design note 08 §3: a pulse swallowed by an active spike still enters the
+    // equations, but it is not a heartbeat and must not grant shelter.
+    agent ! EventMsg.FirePulse(origin, 12.0, heartbeat = false)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+
+    val stages = seen.toArray(Array.empty[CellReadout]).toSeq
+    assertFalse(
+      stages.last.pulseSuppressed,
+      "a swallowed strike must not open a suppression window"
+    )
+    assertFalse(stages.last.isMaintained, "no heartbeat -> no shelter")
+
   @Test def rapidPulsesDriveTheCellIntoAcuteBurnout(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
     val latch = new CountDownLatch(1)

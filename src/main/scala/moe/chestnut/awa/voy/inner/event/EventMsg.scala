@@ -75,11 +75,20 @@ object EventMsg:
     * what makes a coupled replay deterministic — while giving emitters no
     * numeric knob to reshape the kernel. Applying the event sets the
     * cell's `synapseTau` to the transmitter's constant before firing,
-    * exactly as the prototype does. */
+    * exactly as the prototype does.
+    *
+    * `heartbeat` separates *physics* from *bookkeeping*: the pulse always
+    * enters the equations (the bell always sounds), but only a strike that the
+    * six-way bell dispatch allows to count may open a stagnation suppression
+    * window. `SpikeSwallowed` fires the pulse with `heartbeat = false`
+    * (design note 08 §3); crystal-link pulses, which have no dispatch, are
+    * always heartbeats.
+    */
   final case class FirePulse(
       cell: CellCoord,
       area: Double,
-      transmitter: PulseTransmitter = PulseTransmitter.Bell
+      transmitter: PulseTransmitter = PulseTransmitter.Bell,
+      heartbeat: Boolean = true
   ) extends EventDTO
 
   /** Set the sustenance level `M ∈ [0, 1]` of a cell — the endogenous

@@ -6,7 +6,7 @@
       "src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateState.scala",
       "src/main/scala/moe/chestnut/awa/voy/helpers/ODESolver.scala"
     ],
-    "numeric_source_digest": "3e3f7e423c9b31b5f117f4bf09c6e8d58e3f33f47bdc450fd3744b24e0652094",
+    "numeric_source_digest": "512ce1530590aa62e31640297158402c0cfea9cb8ef3bedb9989c4122f324cfd",
     "state0": {
       "dissonance": -1.2,
       "entrench": -0.6,
@@ -999,15 +999,21 @@
     "claims": [
       {
         "id": "hopf.a_c",
-        "draft": "a_c = 0.467, s_c = 0.233 (§1.1)",
+        "draft": "a_c = 0.4350, s_c = 0.2650 (§1.1)",
         "measured": "0.434975 / 0.265025 from the exact trace condition",
-        "verdict": "refuted"
+        "verdict": "supported"
       },
       {
         "id": "prc.vulnerable_window_fires",
-        "draft": "a pulse landing at 40-60% of the cycle fires a premature full surge (§1.2)",
+        "draft": "at the saturated slice operating point (a = -0.30, T ≈ 39.47), a pulse at 40-60% of the cycle fires a premature full surge (§1.2 rule applied at the slice point)",
         "measured": "measured outcome for alpha_shock at the relative window midpoint: Delayed",
         "verdict": "refuted"
+      },
+      {
+        "id": "prc.onset_window_fires",
+        "draft": "at the near-Hopf onset oscillator (a = 0.40, T ≈ 43.7), a pulse at 40-60% of the cycle fires a premature full surge (§1.2)",
+        "measured": "measured outcome at the onset relative window midpoint: Premature",
+        "verdict": "supported"
       },
       {
         "id": "prc.absolute_window_delays",

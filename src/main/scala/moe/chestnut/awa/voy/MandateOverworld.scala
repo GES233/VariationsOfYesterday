@@ -4,6 +4,7 @@ import scala.jdk.CollectionConverters.*
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.player.{PlayerBlockBreakEvents, UseBlockCallback}
+import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.block.{BlockState, Blocks}
 import net.minecraft.entity.effect.{StatusEffectInstance, StatusEffects}
 import net.minecraft.entity.passive.VillagerEntity
@@ -38,10 +39,11 @@ import moe.chestnut.awa.voy.inner.mandate.*
   *      the chunk's `Regime`, `PhaseReading` (with 20-division dial tick),
   *      and `c0` shelter status.
   *  - **Mandate -> Overworld (`沉滞` Stagnation & Spike actions)**:
-  *    - Chunks without an active, non-spiking `c0` maintenance source apply
-  *      our own `voy:stagnation` effect (`×0.30` block break speed; the spike
+  *    - Chunks without a fresh pulse-window shelter apply our own
+  *      `voy:stagnation` effect (`×0.30` block break speed; the spike
   *      tier `voy:stagnation_spike` is `×0.09`), plus `SLOWNESS` and ash
-  *      particles on nearby villagers;
+  *      particles on nearby villagers. `c0` no longer gates stagnation:
+  *      the source is "too long without a pulse" (heartbeat model, note 08);
   *    - Outbound `CellSpikeTriggered` and `RegimeTransitioned` actions produce
   *      audible tremors and ash plumes on the server thread.
   *  - **Sensory phenomena (design note 06 §3)**: the world itself is the
@@ -58,12 +60,26 @@ object MandateOverworld:
   /** Standard pulse area delivered when ringing a bell (matches SliceContract alpha_shock/resonance scale). */
   val BellPulseArea: Double = 12.0
 
-  /** Phase- and cadence-gated outcome of striking a bell / resonance vessel on a cell. */
+  /** Stagnation bookkeeping cadence and effect duration in server ticks
+    * (design draft §3.2: reapply outside the pulse window, short enough that
+    * a fresh window clears it immediately).
+    */
+  private val StagnationReapplyTicks = 20
+  private val StagnationEffectTicks = 55
+
+  /** Phase- and cadence-gated outcome of striking a bell / resonance vessel on a cell.
+    *
+    * `bookkeepsHeartbeat` gates the pulse-*ledger* only (not the physics):
+    * every strike fires the pulse, but a strike the dispatch refuses to count
+    * (`SpikeSwallowed`, dead mycelium) must not open a stagnation window.
+    * Overload still bookkeeps because the overload verdict itself has to be
+    * recorded (it collapses any window and locks the cell).
+    */
   enum BellStrikeOutcome(
       val anchorsC0: Boolean,
       val baselineCalming: Double,
       val pulseArea: Double,
-      val suppressesStagnation: Boolean = false,
+      val bookkeepsHeartbeat: Boolean = false,
       val triggersOverloadPenalty: Boolean = false
   ):
     /** Chronic ecological burnout (`M -> 0` or `a_slow <= burnoutA`): the
@@ -75,12 +91,12 @@ object MandateOverworld:
         extends BellStrikeOutcome(false, 0.0, BellPulseArea, false, false)
 
     /** Acute pulse overload (`BurnoutNoCycle` triggered by pulsing too fast
-      * or while tolerance-saturated): collapses stagnation suppression,
-      * deepens subsequent tolerance, and applies an immediate
-      * `voy:pulse_saturation` backlash to the player.
+      * or while tolerance-saturated): the strike is recorded (it collapses
+      * stagnation suppression, deepens subsequent tolerance, and locks the
+      * cell), and applies an immediate `voy:pulse_saturation` backlash.
       */
     case PulseOverloadBurnout
-        extends BellStrikeOutcome(false, 0.0, BellPulseArea, false, true)
+        extends BellStrikeOutcome(false, 0.0, BellPulseArea, true, true)
 
     /** Saturated incapacitation (`Regime.Burnout`, `s >= 0.95`) on living
       * mycelium: the fast system is still inside its oscillatory window and a
@@ -92,8 +108,9 @@ object MandateOverworld:
         extends BellStrikeOutcome(false, 0.0, BellPulseArea, true, false)
 
     /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck during
-      * `PhaseLabel.Excitation`: pulse is swallowed by the active positive
-      * spike and `c0` fails to re-anchor.
+      * `PhaseLabel.Excitation`: the pulse is swallowed by the active positive
+      * spike, `c0` fails to re-anchor, and the strike is **not** a heartbeat
+      * (the pulse still enters the equations).
       */
     case SpikeSwallowed
         extends BellStrikeOutcome(false, 0.0, BellPulseArea, false, false)
@@ -133,12 +150,11 @@ object MandateOverworld:
       readout: CellReadout,
       pulseParam: PulseToleranceParam = VoyConfig.current.pulseParam
   ): BellStrikeOutcome =
-    val cfg = VoyConfig.current
     if Readout.isEcologicalBurnout(
         readout,
-        cfg.fastParam,
-        cfg.stressParam.coupling,
-        cfg.stressParam.sustenanceDepth,
+        readout.fastParam,
+        readout.stressParam.coupling,
+        readout.stressParam.sustenanceDepth,
         pulseParam
       )
     then BellStrikeOutcome.DeadMyceliumBurnout
@@ -196,7 +212,9 @@ object MandateOverworld:
   def register(): Unit =
     registerBlockBreakListener()
     registerUseBlockListener()
-    registerDebugCommand()
+    // Raw-number diagnostics are a development tool only: they must never be
+    // reachable in a release build (design note 06 §1 constraint 5).
+    if FabricLoader.getInstance.isDevelopmentEnvironment then registerDebugCommand()
 
   /** `/voy debug [on|off]` — the raw `v`/`s`/`c0` numbers are diagnostics and
     * live behind this toggle instead of in the player's chat bar.
@@ -352,7 +370,14 @@ object MandateOverworld:
           val outcome = evaluateBellStrike(readout)
           if outcome.anchorsC0 then
             MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, outcome.baselineCalming)
-          MandateRuntime.firePulseAt(chunkX, chunkZ, outcome.pulseArea)
+          // Physics always applies; the heartbeat ledger is gated by the
+          // dispatch verdict (SpikeSwallowed is not counted).
+          MandateRuntime.firePulseAt(
+            chunkX,
+            chunkZ,
+            outcome.pulseArea,
+            heartbeat = outcome.bookkeepsHeartbeat
+          )
           // Acute pulse-overload backlash (design note 08): over-rapid pulsing
           // drives the cell into transient `BurnoutNoCycle`; the striker feels
           // the recoil immediately, and the chunk's tolerance makes every
@@ -403,7 +428,7 @@ object MandateOverworld:
     * (heartbeat model, design note 08).
     */
   def onServerTick(server: MinecraftServer): Unit =
-    if server.getTicks % 20 != 0 then return
+    if server.getTicks % StagnationReapplyTicks != 0 then return
     val overworld = server.getOverworld
     if overworld == null then return
 
@@ -447,7 +472,7 @@ object MandateOverworld:
         new StatusEffectInstance(
           if spikingOrBurnout then MandateEffects.StagnationSpikeEntry
           else MandateEffects.StagnationEntry,
-          55,
+          StagnationEffectTicks,
           0,
           false,
           spikingOrBurnout,
@@ -458,7 +483,7 @@ object MandateOverworld:
         player.addStatusEffect(
           new StatusEffectInstance(
             StatusEffects.SLOWNESS,
-            55,
+            StagnationEffectTicks,
             0,
             true,
             false,
@@ -490,7 +515,7 @@ object MandateOverworld:
         villager.addStatusEffect(
           new StatusEffectInstance(
             StatusEffects.SLOWNESS,
-            55,
+            StagnationEffectTicks,
             0,
             true,
             false,
@@ -671,8 +696,6 @@ object MandateOverworld:
                 )
           }
 
-      case ActionMsgPool.MandateCurrentStatus(_) => ()
-
   /** Player-facing wording for a mycelial re-inoculation attempt (note 06
     * §7.1): what the soil did with the inoculum, never raw `M`/`s` numbers
     * (note 06 §1 constraint 5).
@@ -685,11 +708,11 @@ object MandateOverworld:
   ): String =
     outcome match
       case MandatePhenomena.ReInoculationOutcome.Seeded =>
-        f"§a[接种成菌] [$chunkX%d,$chunkZ%d] 菌种落入土层，菌丝开始重新结网（菌网:${MandatePhenomena.sustenanceWord(r.sustenance)}，养复需时）"
+        f"§a[接种成菌] [$chunkX%d,$chunkZ%d] 菌种落入土层，菌丝开始重新结网（菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}，养复需时）"
       case MandatePhenomena.ReInoculationOutcome.AcidTooToxic =>
-        f"§c[接种失败] [$chunkX%d,$chunkZ%d] 土层酸毒未退，菌种落土即死——须先泄压降酸再接种（菌网:${MandatePhenomena.sustenanceWord(r.sustenance)}）"
+        f"§c[接种失败] [$chunkX%d,$chunkZ%d] 土层酸毒未退，菌种落土即死——须先泄压降酸再接种（菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}）"
       case MandatePhenomena.ReInoculationOutcome.AlreadyViable =>
-        f"§7[接种无益] [$chunkX%d,$chunkZ%d] 此区块菌网尚存活丝（${MandatePhenomena.sustenanceWord(r.sustenance)}），可自行养复"
+        f"§7[接种无益] [$chunkX%d,$chunkZ%d] 此区块菌网尚存活丝（${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}），可自行养复"
 
   /** Player-facing wording for a slow-variable regime change: what the land is
     * doing, not which enum member it moved to.
@@ -708,7 +731,7 @@ object MandateOverworld:
       if r.isMaintained then "§a脉动庇护(免除沉滞)"
       else "§c沉滞生效(太久无脉冲/尖峰/烧毁)"
     val base =
-      f"§e[验山读数] [$chunkX%d,$chunkZ%d] 态:${regimeWord(r.regime)} 相:${formatPhaseDial(r.phase)} 菌网:${MandatePhenomena.sustenanceWord(r.sustenance)} | $shelter"
+      f"§e[验山读数] [$chunkX%d,$chunkZ%d] 态:${regimeWord(r.regime)} 相:${formatPhaseDial(r.phase)} 菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)} | $shelter"
     if debugNumbers then
       val fracText = r.phase match
         case PhaseReading.Cycle(_, frac) => f" frac=$frac%.3f"
@@ -746,9 +769,6 @@ object MandateOverworld:
           case UndefinedReason.TransientNoCycle => "瞬态未定"
           case UndefinedReason.NoCycleReference => "无周期参照"
 
-  def formatBellPulse(chunkX: Int, chunkZ: Int, r: CellReadout): String =
-    formatBellPulse(chunkX, chunkZ, r, evaluateBellStrike(r))
-
   def formatBellPulse(
       chunkX: Int,
       chunkZ: Int,
@@ -768,7 +788,7 @@ object MandateOverworld:
 
       case BellStrikeOutcome.SpikeSwallowed =>
         val tick = r.dialTick.getOrElse(0)
-        f"§c[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 (Excitation) -> 正处尖峰爆发期，钟声被吞没，c0重锚与脉冲庇护均失败(需候不应期推迟窗口)"
+        f"§c[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 (Excitation) -> 正处尖峰爆发期，钟声被吞没：c0 未重锚、本次不计心跳(需候不应期推迟窗口)"
 
       case BellStrikeOutcome.RefractoryReanchored =>
         val tick = r.dialTick.getOrElse(0)

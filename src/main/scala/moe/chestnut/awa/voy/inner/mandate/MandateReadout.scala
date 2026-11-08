@@ -79,6 +79,10 @@ case class ReadoutParam(
 )
 
 object Readout:
+  /** Bisection steps for the resting fixed point: the bracket is < 8 wide, so
+    * 64 halvings reach machine precision with margin (the old 200 was a hot
+    * loop called per cell per tick in the non-oscillating branch). */
+  private val RestPointBisectionSteps = 64
   /** Slow-variable regime partition, mirroring `Voy.World.Profile.regime/3`
     * field for field. Kept as the cross-stack cross-check only. */
   def regime(cur: MandateCurrent, p: ReadoutParam = ReadoutParam()): Regime =
@@ -144,7 +148,7 @@ object Readout:
       pulseParam: PulseToleranceParam = PulseToleranceParam()
   ): Boolean =
     val slow = slowA(fast, readout.current.stress, readout.sustenance, coupling, depth)
-    readout.sustenance < StressParam().sustenanceFloor ||
+    readout.sustenance < readout.stressParam.sustenanceFloor ||
       slow <= burnoutA(fast) ||
       (readout.phase == PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) &&
         !readout.pulseState.isOverloadedAt(readout.simTime) &&
@@ -167,7 +171,7 @@ object Readout:
     var lo = -8.0
     var hi = -0.4
     var i = 0
-    while i < 200 do
+    while i < RestPointBisectionSteps do
       val mid = 0.5 * (lo + hi)
       if h(mid) > 0.0 then lo = mid else hi = mid
       i += 1
@@ -199,7 +203,7 @@ object Readout:
       p: ReadoutParam = ReadoutParam()
   ): Boolean =
     readout.pulseSuppressed &&
-      readout.sustenance >= StressParam().sustenanceFloor &&
+      readout.sustenance >= readout.stressParam.sustenanceFloor &&
       readout.phase != PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) &&
       readout.current.dissonance < p.spikeLevel
 
@@ -229,7 +233,12 @@ final case class CellReadout(
     pulseSuppressed: Boolean = false,
     pulseTolerance: Double = 0.0,
     pulseState: PulseToleranceState = PulseToleranceState.zero,
-    simTime: Double = 0.0
+    simTime: Double = 0.0,
+    // Per-cell parameter sets (save > config > core default): the game layer
+    // must judge this cell with the parameters the cell actually integrates,
+    // not with the current global config (design draft §7.3).
+    fastParam: MandateParam = MandateAgent.DefaultFastParam,
+    stressParam: StressParam = MandateAgent.DefaultStressParam
 ):
   def isMaintained: Boolean = Readout.isMaintained(this)
   def dialTick: Option[Int] = Readout.dialTick(phase)
@@ -339,7 +348,7 @@ class PhaseTracker(
         PhaseReading.Cycle(Readout.label(cur, fraction, param), fraction)
       else if !lastCross.isNaN && stale then PhaseReading.Undefined(UndefinedReason.TransientNoCycle)
       else if lastCross.isNaN then PhaseReading.Undefined(UndefinedReason.NoCycleReference)
-      else PhaseReading.Undefined(UndefinedReason.NoCycleReference)
+      else PhaseReading.Undefined(UndefinedReason.TransientNoCycle)
 
   private def isRegular: Boolean =
     intervals match

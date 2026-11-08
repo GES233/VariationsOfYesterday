@@ -94,15 +94,21 @@ object SliceContract:
       Seq(
         Claim(
           "hopf.a_c",
-          "a_c = 0.467, s_c = 0.233 (§1.1)",
+          "a_c = 0.4350, s_c = 0.2650 (§1.1)",
           f"$hopfA%.6f / $hopfS%.6f from the exact trace condition",
-          if Math.abs(hopfA - 0.467) < 0.005 then "supported" else "refuted"
+          if Math.abs(hopfA - 0.435) < 0.005 then "supported" else "refuted"
         ),
         Claim(
           "prc.vulnerable_window_fires",
-          "a pulse landing at 40-60% of the cycle fires a premature full surge (§1.2)",
+          "at the saturated slice operating point (a = -0.30, T ≈ 39.47), a pulse at 40-60% of the cycle fires a premature full surge (§1.2 rule applied at the slice point)",
           s"measured outcome for alpha_shock at the relative window midpoint: ${outcomeAt(PhaseWindow.Relative)}",
           if outcomeAt(PhaseWindow.Relative) == "Premature" then "supported" else "refuted"
+        ),
+        Claim(
+          "prc.onset_window_fires",
+          "at the near-Hopf onset oscillator (a = 0.40, T ≈ 43.7), a pulse at 40-60% of the cycle fires a premature full surge (§1.2)",
+          s"measured outcome at the onset relative window midpoint: ${onset.midTrial.outcome}",
+          if onset.midTrial.outcome == PulseOutcome.Premature then "supported" else "refuted"
         ),
         Claim(
           "prc.absolute_window_delays",

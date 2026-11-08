@@ -5,10 +5,9 @@ import moe.chestnut.awa.voy.inner.mandate.{CellCoord, MandateCurrent, PhaseReadi
 sealed trait MandateActionProtocol
 
 object ActionMsgPool:
-  final case class MandateCurrentStatus(current: MandateCurrent) extends MandateActionProtocol
-
-  /** Emitted once when a cell's fast variable crosses into a full spike
-    * excursion (`|v| >= spikeLevel`).
+  /** Emitted once when a cell's fast variable crosses into a positive spike
+    * excursion (`v >= spikeLevel`). The negative repolarisation overshoot is
+    * not a spike (design note 08).
     */
   final case class CellSpikeTriggered(
       cell: CellCoord,

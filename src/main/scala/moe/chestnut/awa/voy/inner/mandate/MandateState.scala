@@ -71,23 +71,17 @@ case class MandateCurrent(
 
 /** The mandate system state holder.
   *
-  * Equations (design draft section 1.1, sustenance from note 06 §7.1):
-  * {{{
-  * dv/dt = v - v^3/3 - w + p
-  * dw/dt = epsilon * (v + a(s, M) - beta * w)
-  * a(s, M) = alpha - depth * (1 - M) - coupling * s
-  * ds/dt = gamma * (u - delta(s) * s - rho * (c0 + c) + eta * q)
-  * dq/dt = lambda * (max(|v| - vSpike, 0) - q)
-  * delta(s) = delta0 / (1 + (s / sHalf)^2)
-  * dM/dt = r * M * (1 - M) - c * max(s - s_T, 0) * M + flux_M   (Fisher-KPP)
-  * }}}
+  * The governing equations are frozen in design draft §1.1 (sustenance from
+  * note 06 §7.1); this class only integrates them, so the formulas are not
+  * duplicated here. Code-specific points:
   *
-  * `M` (sustenance, the mycelial integrity) is the endogenous supply that
-  * holds the fast oscillation inside its window; withdrawing or burning it
-  * collapses the recovery offset into depolarization block. `M = 0` is
-  * absorbing (the logistic term vanishes), so a dead cell does not
-  * re-inoculate itself — but lattice diffusion re-seeds small dead patches
-  * from living neighbours, which is why only LARGE dead regions stay dead.
+  *  - `dq/dt` uses `|v|` for the catastrophe tracer (the acid-load equation),
+  *    while the *spike label* is positive-only `v >= spikeLevel` (note 08);
+  *  - `M` is integrated explicitly after each RK4 step, not inside the vector;
+  *  - `M = 0` is absorbing (the logistic term vanishes), so a dead cell does
+  *    not re-inoculate itself — but lattice diffusion re-seeds small dead
+  *    patches from living neighbours, which is why only LARGE dead regions
+  *    stay dead.
   */
 class MandateState(
     var state: MandateCurrent,

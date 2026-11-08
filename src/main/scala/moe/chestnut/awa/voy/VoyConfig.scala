@@ -6,7 +6,7 @@ import com.google.gson.{GsonBuilder, JsonObject, JsonParser}
 import net.fabricmc.loader.api.FabricLoader
 import org.slf4j.{Logger, LoggerFactory}
 
-import moe.chestnut.awa.voy.inner.mandate.{MandateParam, PulseToleranceParam, StressParam}
+import moe.chestnut.awa.voy.inner.mandate.{MandateAgent, MandateParam, PulseToleranceParam, StressParam}
 
 /** Geometry and tuning of the prototype lattice (formerly hardcoded in
   * `MandateRuntime`). Chunk-grained: the lattice spans chunks
@@ -123,43 +123,51 @@ object VoyConfig:
     if root.has(key) && root.get(key).isJsonObject then root.getAsJsonObject(key)
     else null
 
-  private def latticeFrom(o: JsonObject): LatticeConfig = LatticeConfig(
-    originX = int(o, "originX", -16),
-    originZ = int(o, "originZ", -16),
-    width = int(o, "width", 32),
-    height = int(o, "height", 32),
-    diffusion = dbl(o, "diffusion", 0.002),
-    hotspotRadius = dbl(o, "hotspotRadius", 2.0),
-    hotspotDisturbance = dbl(o, "hotspotDisturbance", 0.08),
-    ambientDisturbance = dbl(o, "ambientDisturbance", 0.002),
-    calmingRadius = dbl(o, "calmingRadius", 5.0),
-    baselineCalming = dbl(o, "baselineCalming", 0.03),
-    initialStressPeak = dbl(o, "initialStressPeak", 0.18),
-    initialStressFalloff = dbl(o, "initialStressFalloff", 0.004)
-  )
+  private def latticeFrom(o: JsonObject): LatticeConfig =
+    val d = LatticeConfig()
+    LatticeConfig(
+      originX = int(o, "originX", d.originX),
+      originZ = int(o, "originZ", d.originZ),
+      width = int(o, "width", d.width),
+      height = int(o, "height", d.height),
+      diffusion = dbl(o, "diffusion", d.diffusion),
+      hotspotRadius = dbl(o, "hotspotRadius", d.hotspotRadius),
+      hotspotDisturbance = dbl(o, "hotspotDisturbance", d.hotspotDisturbance),
+      ambientDisturbance = dbl(o, "ambientDisturbance", d.ambientDisturbance),
+      calmingRadius = dbl(o, "calmingRadius", d.calmingRadius),
+      baselineCalming = dbl(o, "baselineCalming", d.baselineCalming),
+      initialStressPeak = dbl(o, "initialStressPeak", d.initialStressPeak),
+      initialStressFalloff = dbl(o, "initialStressFalloff", d.initialStressFalloff)
+    )
 
-  private def fastFrom(o: JsonObject): MandateParam = MandateParam(
-    alpha = dbl(o, "alpha", 0.7),
-    beta = dbl(o, "beta", 0.8),
-    epsilon = dbl(o, "epsilon", 0.08)
-  )
+  private def fastFrom(o: JsonObject): MandateParam =
+    val d = MandateAgent.DefaultFastParam
+    MandateParam(
+      alpha = dbl(o, "alpha", d.alpha),
+      beta = dbl(o, "beta", d.beta),
+      epsilon = dbl(o, "epsilon", d.epsilon)
+    )
 
-  private def stressFrom(o: JsonObject): StressParam = StressParam(
-    gamma = dbl(o, "gamma", 0.01),
-    delta0 = dbl(o, "delta0", 0.3),
-    sHalf = dbl(o, "sHalf", 0.15),
-    rho = dbl(o, "rho", 1.0),
-    eta = dbl(o, "eta", 1.0),
-    lambda = dbl(o, "lambda", 0.2),
-    vSpike = dbl(o, "vSpike", 1.8),
-    coupling = dbl(o, "coupling", 1.0),
-    stressMax = dbl(o, "stressMax", 1.0),
-    sustenanceDepth = dbl(o, "sustenanceDepth", 1.2),
-    sustenanceGrowth = dbl(o, "sustenanceGrowth", 1e-3),
-    sustenanceBurn = dbl(o, "sustenanceBurn", 4e-3),
-    sustenanceBurnThreshold = dbl(o, "sustenanceBurnThreshold", 0.6),
-    sustenanceFloor = dbl(o, "sustenanceFloor", 1e-4)
-  )
+  private def stressFrom(o: JsonObject): StressParam =
+    // Fallbacks must be the *gameplay* defaults (M acid-burn enabled), not the
+    // dormant core `StressParam()` used by the frozen contract slice.
+    val d = VoyConfig().stressParam
+    StressParam(
+      gamma = dbl(o, "gamma", d.gamma),
+      delta0 = dbl(o, "delta0", d.delta0),
+      sHalf = dbl(o, "sHalf", d.sHalf),
+      rho = dbl(o, "rho", d.rho),
+      eta = dbl(o, "eta", d.eta),
+      lambda = dbl(o, "lambda", d.lambda),
+      vSpike = dbl(o, "vSpike", d.vSpike),
+      coupling = dbl(o, "coupling", d.coupling),
+      stressMax = dbl(o, "stressMax", d.stressMax),
+      sustenanceDepth = dbl(o, "sustenanceDepth", d.sustenanceDepth),
+      sustenanceGrowth = dbl(o, "sustenanceGrowth", d.sustenanceGrowth),
+      sustenanceBurn = dbl(o, "sustenanceBurn", d.sustenanceBurn),
+      sustenanceBurnThreshold = dbl(o, "sustenanceBurnThreshold", d.sustenanceBurnThreshold),
+      sustenanceFloor = dbl(o, "sustenanceFloor", d.sustenanceFloor)
+    )
 
   private def pulseFrom(o: JsonObject): PulseToleranceParam =
     val d = PulseToleranceParam()

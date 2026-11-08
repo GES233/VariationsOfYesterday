@@ -183,6 +183,13 @@ object SliceReplay:
     val edges = coords.sliding(2).map { case Seq(a, b) => LatticeEdge(a, b, advection = advection) }.toSeq
     MandateGrid(map, edges)
 
+  /** Bidirectional amplitude probe used ONLY by this offline chain experiment:
+    * it fires on either branch excursion to follow the period/lag of the
+    * coupled pair. It is deliberately not the runtime spike criterion (which is
+    * positive `v >= 1.8` on a section upcrossing, design note 08).
+    */
+  private val ChainProbeAmplitude = 1.9
+
   /** Ignite the upstream cell only, and watch what the chain does. */
   def chainObservation(
       advection: Double,
@@ -199,7 +206,7 @@ object SliceReplay:
       grid.step(dt)
       t += dt
       for (coord, cell) <- grid.cells do
-        val above = Math.abs(cell.getState.dissonance) > 1.9
+        val above = Math.abs(cell.getState.dissonance) > ChainProbeAmplitude
         if above && !wasAbove(coord) then spikes(coord) += t
         wasAbove(coord) = above
     val up = spikes(CellCoord(0, 0)).toSeq

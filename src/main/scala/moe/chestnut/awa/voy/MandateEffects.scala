@@ -6,8 +6,9 @@ import net.minecraft.registry.Registries
 import net.minecraft.registry.entry.RegistryEntry
 import net.minecraft.util.Identifier
 
-/** The `沉滞` (Stagnation) status effects: the only channel through which the
-  * mandate lattice is allowed to touch the player's body.
+/** The `沉滞` (Stagnation) status effects: the only *attributable* channel
+  * through which the mandate lattice touches the player's body (the spike
+  * branch also applies vanilla `SLOWNESS` as a secondary cue).
   *
   * Why these are *our* effects instead of vanilla `MINING_FATIGUE`: a vanilla
   * effect carries a vanilla name, icon and tooltip, so the pressure reads as

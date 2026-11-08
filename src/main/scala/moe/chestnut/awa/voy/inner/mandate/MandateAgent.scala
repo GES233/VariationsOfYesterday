@@ -78,7 +78,7 @@ object MandateAgent:
       case EventMsg.HoldImpulse(cell, strength) => onCell(cell)(_.impulse = strength)
       case EventMsg.SetSustenance(cell, level) =>
         onCell(cell)(c => c.sustenance = Math.min(Math.max(level, 0.0), 1.0))
-      case EventMsg.FirePulse(cell, area, transmitter) =>
+      case EventMsg.FirePulse(cell, area, transmitter, _) =>
         onCell(cell) { state =>
           state.synapseTau = transmitter.tau
           state.firePulse(area)
@@ -187,7 +187,7 @@ object MandateAgent:
         .duePulses(simTime)
         .foreach { event =>
           applyEvent(grid, event, defaultFastParam, defaultStressParam)
-          recordPulse(event.cell, event.area)
+          if event.heartbeat then recordPulse(event.cell, event.area)
         }
       grid.step(dt)
       simTime += dt
@@ -216,7 +216,9 @@ object MandateAgent:
           pulseSuppressed = ps.isSuppressedAt(simTime),
           pulseTolerance = ps.toleranceAt(simTime, pulseParam),
           pulseState = ps,
-          simTime = simTime
+          simTime = simTime,
+          fastParam = cell.getParam,
+          stressParam = cell.stressParam
         ))
 
         val spikingNow = cur.dissonance >= readoutParam.spikeLevel
@@ -278,9 +280,11 @@ object MandateAgent:
         // the active lattice are dropped deterministically (§1.4 loading
         // invariance: presence of a cell must not depend on chunk load
         // order).
-        case other @ EventMsg.FirePulse(cell, area, _) =>
+        case other @ EventMsg.FirePulse(cell, area, _, heartbeat) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
-          recordPulse(cell, area)
+          // Physics always applies; the heartbeat ledger only records strikes
+          // the six-way bell dispatch allows (SpikeSwallowed does not).
+          if heartbeat then recordPulse(cell, area)
         case other => applyEvent(grid, other, defaultFastParam, defaultStressParam)
 
     Actor.spawn("mandate")(handle)
