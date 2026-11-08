@@ -6,7 +6,7 @@ import com.google.gson.{GsonBuilder, JsonObject, JsonParser}
 import net.fabricmc.loader.api.FabricLoader
 import org.slf4j.{Logger, LoggerFactory}
 
-import moe.chestnut.awa.voy.inner.mandate.{MandateParam, StressParam}
+import moe.chestnut.awa.voy.inner.mandate.{MandateParam, PulseToleranceParam, StressParam}
 
 /** Geometry and tuning of the prototype lattice (formerly hardcoded in
   * `MandateRuntime`). Chunk-grained: the lattice spans chunks
@@ -53,7 +53,8 @@ final case class VoyConfig(
     lattice: LatticeConfig = LatticeConfig(),
     fastParam: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
     stressParam: StressParam =
-      StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
+      StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
+    pulseParam: PulseToleranceParam = PulseToleranceParam()
 )
 
 object VoyConfig:
@@ -98,7 +99,8 @@ object VoyConfig:
         tickDt = dbl(root, "tickDt", 0.05),
         lattice = latticeFrom(obj(root, "lattice")),
         fastParam = fastFrom(obj(root, "fastParam")),
-        stressParam = stressFrom(obj(root, "stressParam"))
+        stressParam = stressFrom(obj(root, "stressParam")),
+        pulseParam = pulseFrom(obj(root, "pulseParam"))
       )
     catch
       case e: Exception =>
@@ -159,6 +161,22 @@ object VoyConfig:
     sustenanceFloor = dbl(o, "sustenanceFloor", 1e-4)
   )
 
+  private def pulseFrom(o: JsonObject): PulseToleranceParam =
+    val d = PulseToleranceParam()
+    PulseToleranceParam(
+      suppressionWindow = dbl(o, "suppressionWindow", d.suppressionWindow),
+      minSafeInterval = dbl(o, "minSafeInterval", d.minSafeInterval),
+      toleranceDecayTau = dbl(o, "toleranceDecayTau", d.toleranceDecayTau),
+      normalToleranceStep = dbl(o, "normalToleranceStep", d.normalToleranceStep),
+      overpulseToleranceStep = dbl(o, "overpulseToleranceStep", d.overpulseToleranceStep),
+      invertTolerance = dbl(o, "invertTolerance", d.invertTolerance),
+      maxTolerance = dbl(o, "maxTolerance", d.maxTolerance),
+      overloadBurnoutDuration = dbl(o, "overloadBurnoutDuration", d.overloadBurnoutDuration),
+      overloadPenaltyTicks = int(o, "overloadPenaltyTicks", d.overloadPenaltyTicks),
+      singlePulsePeak = dbl(o, "singlePulsePeak", d.singlePulsePeak),
+      pulseBurnoutGain = dbl(o, "pulseBurnoutGain", d.pulseBurnoutGain)
+    )
+
   private def defaultsJson(cfg: VoyConfig): String =
     val root = JsonObject()
     root.addProperty("tickDt", cfg.tickDt)
@@ -201,5 +219,20 @@ object VoyConfig:
     s.addProperty("sustenanceBurnThreshold", sp.sustenanceBurnThreshold)
     s.addProperty("sustenanceFloor", sp.sustenanceFloor)
     root.add("stressParam", s)
+
+    val pp = cfg.pulseParam
+    val p = JsonObject()
+    p.addProperty("suppressionWindow", pp.suppressionWindow)
+    p.addProperty("minSafeInterval", pp.minSafeInterval)
+    p.addProperty("toleranceDecayTau", pp.toleranceDecayTau)
+    p.addProperty("normalToleranceStep", pp.normalToleranceStep)
+    p.addProperty("overpulseToleranceStep", pp.overpulseToleranceStep)
+    p.addProperty("invertTolerance", pp.invertTolerance)
+    p.addProperty("maxTolerance", pp.maxTolerance)
+    p.addProperty("overloadBurnoutDuration", pp.overloadBurnoutDuration)
+    p.addProperty("overloadPenaltyTicks", pp.overloadPenaltyTicks)
+    p.addProperty("singlePulsePeak", pp.singlePulsePeak)
+    p.addProperty("pulseBurnoutGain", pp.pulseBurnoutGain)
+    root.add("pulseParam", p)
 
     GsonBuilder().setPrettyPrinting().create().toJson(root)

@@ -1,8 +1,10 @@
 {
   "effect.variations-of-yesterday.stagnation": "Stagnation",
-  "effect.variations-of-yesterday.stagnation.description": "The land's mandate is unmaintained, and it weighs on your hands",
+  "effect.variations-of-yesterday.stagnation.description": "Too long without a sustaining pulse; stagnation has crept back over your hands",
   "effect.variations-of-yesterday.stagnation_spike": "Stagnation: Spike",
   "effect.variations-of-yesterday.stagnation_spike.description": "The mandate is surging through a spike; digging feels like mud",
+  "effect.variations-of-yesterday.pulse_saturation": "Pulse Overload",
+  "effect.variations-of-yesterday.pulse_saturation.description": "Over-rapid pulses drove the vein into depolarization burnout, numbing your limbs and dulling future pulses",
   "term.variations-of-yesterday.mycelial_network": "Mycelial Network",
   "term.variations-of-yesterday.mandate_vein": "Mandate Vein",
   "term.variations-of-yesterday.yellow_seep": "Iron-Yellow Seep",

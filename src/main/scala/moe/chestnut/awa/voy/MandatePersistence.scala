@@ -13,6 +13,7 @@ import moe.chestnut.awa.voy.inner.mandate.{
   MandateParam,
   MandateSnapshot,
   PulseLink,
+  PulseToleranceState,
   PulseTransmitter,
   StressParam
 }
@@ -131,6 +132,11 @@ object MandatePersistence:
       c.putDouble("sustenanceBurn", sp.sustenanceBurn)
       c.putDouble("sustenanceBurnThreshold", sp.sustenanceBurnThreshold)
       c.putDouble("sustenanceFloor", sp.sustenanceFloor)
+      val ps = cs.pulseState
+      c.putDouble("lastPulseTime", ps.lastPulseTime)
+      c.putDouble("suppressedUntil", ps.suppressedUntil)
+      c.putDouble("overloadUntil", ps.overloadUntil)
+      c.putDouble("pulseTolerance", ps.tolerance)
       cells.add(c)
     }
     nbt.put("cells", cells)
@@ -207,6 +213,20 @@ object MandatePersistence:
             sustenanceBurn = c.getDouble("sustenanceBurn"),
             sustenanceBurnThreshold = c.getDouble("sustenanceBurnThreshold"),
             sustenanceFloor = c.getDouble("sustenanceFloor")
+          ),
+          pulseState = PulseToleranceState(
+            lastPulseTime =
+              if c.contains("lastPulseTime") then c.getDouble("lastPulseTime")
+              else Double.NegativeInfinity,
+            suppressedUntil =
+              if c.contains("suppressedUntil") then c.getDouble("suppressedUntil")
+              else Double.NegativeInfinity,
+            overloadUntil =
+              if c.contains("overloadUntil") then c.getDouble("overloadUntil")
+              else Double.NegativeInfinity,
+            tolerance =
+              if c.contains("pulseTolerance") then c.getDouble("pulseTolerance")
+              else 0.0
           )
         )
     }.toSeq

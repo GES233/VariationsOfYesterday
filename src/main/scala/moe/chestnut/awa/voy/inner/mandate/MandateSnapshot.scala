@@ -38,7 +38,8 @@ final case class CellSnapshot(
     baselineCalming: Double,
     impulse: Double,
     fastParam: MandateParam,
-    stressParam: StressParam
+    stressParam: StressParam,
+    pulseState: PulseToleranceState = PulseToleranceState.zero
 )
 
 /** The full snapshot: cells, edges, links, and the integration clock. */
@@ -54,7 +55,8 @@ object MandateSnapshot:
   def capture(
       grid: MandateGrid,
       links: Seq[PulseLink],
-      simTime: Double
+      simTime: Double,
+      pulseStates: Map[CellCoord, PulseToleranceState] = Map.empty
   ): MandateSnapshot =
     val cells = grid.cells.iterator.map { case (coord, state) =>
       CellSnapshot(
@@ -66,10 +68,20 @@ object MandateSnapshot:
         state.baselineCalming,
         state.impulse,
         state.getParam,
-        state.stressParam
+        state.stressParam,
+        pulseStates.getOrElse(coord, PulseToleranceState.zero)
       )
     }.toSeq.sortBy(c => (c.coord.x, c.coord.z))
     MandateSnapshot(simTime, cells, grid.edges, links)
+
+  /** Extract the per-cell pulse-tolerance map from a captured snapshot. */
+  def restorePulseStates(
+      snapshot: MandateSnapshot
+  ): Map[CellCoord, PulseToleranceState] =
+    snapshot.cells.iterator
+      .filter(_.pulseState != PulseToleranceState.zero)
+      .map(cs => cs.coord -> cs.pulseState)
+      .toMap
 
   /** Rebuild a lattice from a snapshot. Edges whose endpoints are not
     * both present are dropped, the same determinism the mailbox applies

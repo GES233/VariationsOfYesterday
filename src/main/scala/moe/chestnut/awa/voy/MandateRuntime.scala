@@ -156,7 +156,7 @@ object MandateRuntime:
         matches
       }
 
-      val (grid, links, initialSimTime) = restored match
+      val (grid, links, initialSimTime, initialPulseStates) = restored match
         case Some(snap) =>
           logger.info(
             s"Restoring mandate lattice from saved state " +
@@ -164,6 +164,7 @@ object MandateRuntime:
               s"simTime = ${snap.simTime})."
           )
           val grid = MandateSnapshot.restoreGrid(snap)
+          val pulseStates = MandateSnapshot.restorePulseStates(snap)
           // Restore precedence: the SAVE wins for every value it carries
           // (state and per-cell parameters); the config is the fallback for
           // what the payload cannot provide, and the core default is the
@@ -171,20 +172,20 @@ object MandateRuntime:
           // registered cells only — `logSavedParameters` says so loudly,
           // because silently ignoring a knob is worse than not having one.
           logSavedParameters(snap)
-          (grid, snap.links, snap.simTime)
+          (grid, snap.links, snap.simTime, pulseStates)
         case None =>
           logger.info(
             s"Starting fresh mandate lattice (${width}x$height cells); " +
               s"parameters from config `$VoyConfig.FileName` " +
               "(core defaults if absent)."
           )
-          (buildGrid(), Nil, 0.0)
+          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, PulseToleranceState])
 
       persistence.geometry = expectedGeometry
       // Seed the carrier immediately so a save landing before the first
       // cadence publish never writes an empty payload over a valid save.
       persistence.snapshot = Some(
-        MandateSnapshot.capture(grid, links, initialSimTime)
+        MandateSnapshot.capture(grid, links, initialSimTime, initialPulseStates)
       )
       persistence.markDirty()
 
@@ -209,7 +210,9 @@ object MandateRuntime:
             // `FlushNow` request.
             val pending = flushLatch.getAndSet(null)
             if pending != null then pending.countDown()
-          }
+          },
+          pulseParam = VoyConfig.current.pulseParam,
+          initialPulseStates = initialPulseStates
         )
       )
   }

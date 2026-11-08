@@ -26,10 +26,10 @@
 - `src/main/scala/moe/chestnut/awa/voy/`
   - `VariationsOfYesterday.scala` — 模组主入口，注册生命周期、tick 与主世界监听
   - `MandateRuntime.scala` — Minecraft ↔ Mandate 桥接（引擎 actor 生命周期、tick gate、快照发布、动作回包队列）
-  - `MandateOverworld.scala` — 主世界交互接线（采掘注入应力、敲钟/拆钟控制 $c_0$ 与脉冲、钟表/指南针验山读数、自定义 `voy:stagnation` debuff（挖掘速度 ×0.30；尖峰 ×0.09）、服务端感官签名发射、菌种右键土壤再接种）
+  - `MandateOverworld.scala` — 主世界交互接线（采掘注入应力、敲钟/拆钟控制 $c_0$ 与脉冲、脉冲抵消窗与过载反噬（心跳语义，札记 08）、钟表/指南针验山读数、自定义 `voy:stagnation` debuff（挖掘速度 ×0.30；尖峰 ×0.09）、服务端感官签名发射、菌种右键土壤再接种）
   - `MandatePhenomena.scala` — 感官签名与再接种的纯映射层（黄水三档 / 夜光 / 静默枯败 / `evaluateReInoculation`，无 Minecraft 依赖、可单测）
-  - `MandateEffects.scala` — 自定义沉滞状态效果（`voy:stagnation` / `voy:stagnation_spike`）
-  - `inner/mandate/` — 核心模拟：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`、`PhaseResponse`、`PulseCoupling`、`MandateSnapshot`、`SliceReplay`、`SliceContract`
+  - `MandateEffects.scala` — 自定义状态效果（`voy:stagnation` / `voy:stagnation_spike` / `voy:pulse_saturation` 脉冲过载）
+  - `inner/mandate/` — 核心模拟：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`、`PhaseResponse`、`PulseCoupling`、`PulseTolerance`（心跳抵消窗与耐受簿记）、`MandateSnapshot`、`SliceReplay`、`SliceContract`
   - `inner/actor/Actor.scala` — 单线程 actor 内核（`ActorRef` 信箱，`tell` / `!` / `stop`）
   - `inner/event/EventMsg.scala` — 入向通道与拓扑协议 `EventDTO`（通道电平/脉冲 + 格子、输运边、链路的增删）
   - `inner/action/ActionMsg.scala` — 出向动作协议 `MandateActionProtocol`
@@ -38,13 +38,13 @@
   - `VoyConfig.scala` — 外部运行时配置（`config/variations-of-yesterday.json`：格子几何、`tickDt`、FHN/慢变量参数，默认值即原硬编码值；只注入接线层，不触契约锚）
   - `MandatePersistence.scala` + `inner/mandate/MandateSnapshot.scala` — 维度级持久化（`PersistentState`，整格快照含 `M`、通道、参数、边、链路与 `simTime`；状态与逐格参数来自存档，配置只作用于新注册格子、核心默认兜底）
 - `src/client/scala/moe/chestnut/awa/voy/` — 客户端入口与开发 HUD（`hud/MandateHud.scala`，`/voy hud [on|off]`）
-- `src/test/scala/moe/chestnut/awa/voy/` — 17 个 JUnit 5 测试规范 / 107 个用例（`GridBenchmarkSpec` 默认跳过）；`inner/mandate/` 下 13 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`
+- `src/test/scala/moe/chestnut/awa/voy/` — 18 个 JUnit 5 测试规范 / 120 个用例（`GridBenchmarkSpec` 默认跳过）；`inner/mandate/` 下 14 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
 - `tools/voy_world/` — Elixir 关系世界模型：
   - `lib/voy/kanren/` — microKanren 内核与 DSL
   - `lib/voy/world/` — `Chronicle`（地形与四纪六结局）、`Pathway + Witness + Content`（五跳局部证据与种子物化）、`Observation + Ascribe + Slice + Contract`（三方观测与 24 候选反演）、`Facts`（运行时事实日志）、`Node + Naming + Export + Canon`（节点编译、schema v2 导出与静态检查）
   - `content/documents/` — 唯一叙事散文来源（32 张主链卡 + 4 张干扰卡）
-- `docs/` — 中文设计文档：草案 01（总纲）、札记 02（世界模型）、05（五跳内容与写作）、06（生态落地）、07（脉冲耦合）与验证报告 01；原札记 03/04 已分别并入 05/02。
+- `docs/` — 中文设计文档：草案 01（总纲）、札记 02（世界模型）、05（五跳内容与写作）、06（生态落地）、07（脉冲耦合）、08（心跳脉冲语义：沉滞来源重构）与验证报告 01；原札记 03/04 已分别并入 05/02。
 
 ## 开发约定
 

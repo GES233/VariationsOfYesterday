@@ -117,7 +117,9 @@ object MandateAgent:
       defaultFastParam: MandateParam = DefaultFastParam,
       defaultStressParam: StressParam = DefaultStressParam,
       persistSink: MandateSnapshot => Unit = (_ => ()),
-      persistPeriod: Double = 1.0
+      persistPeriod: Double = 1.0,
+      pulseParam: PulseToleranceParam = PulseToleranceParam(),
+      initialPulseStates: Map[CellCoord, PulseToleranceState] = Map.empty
   ): ActorRef[EventDTO] =
     val readoutParam = ReadoutParam()
     var simTime: Double = initialSimTime
@@ -130,21 +132,48 @@ object MandateAgent:
     // "no links yet" must not mean "no way to add one". The constructor's
     // `links` are merely the initial wiring.
     val linkRunner = new PulseLinkRunner(links, criterion = spikeCriterion)
-    /** A phase tracker reading the cell's LIVE sustenance: the burnout knee
-      * is crossed when the recovery offset collapses, which the sustenance
-      * collapse drives (design note 06 §7.1). */
-    def trackerFor(cell: MandateState): PhaseTracker =
+    val pulseStates = scala.collection.mutable.HashMap.from(initialPulseStates)
+
+    def recordPulse(cell: CellCoord, area: Double): Unit =
+      if area > 0.0 then
+        grid.cells.get(cell).foreach { state =>
+          val cur = state.getState
+          val slow = Readout.slowA(
+            state.getParam,
+            cur.stress,
+            state.sustenance,
+            state.stressParam.coupling,
+            state.stressParam.sustenanceDepth
+          )
+          val ecoDead =
+            state.sustenance < state.stressParam.sustenanceFloor ||
+              slow <= Readout.burnoutA(state.getParam)
+          if !ecoDead then
+            val prev = pulseStates.getOrElse(cell, PulseToleranceState.zero)
+            val (next, _) = prev.onPulse(simTime, pulseParam)
+            pulseStates(cell) = next
+        }
+
+    /** A phase tracker reading the cell's LIVE sustenance and pulse drive:
+      * the burnout knee is crossed either when sustenance collapses (slow
+      * ecological burnout) or when rapid pulses stack above a single bell
+      * kernel (acute pulse-overload burnout).
+      */
+    def trackerFor(coord: CellCoord, cell: MandateState): PhaseTracker =
       new PhaseTracker(
         readoutParam,
         cell.param,
         cell.stressParam.coupling,
         () => cell.sustenance,
-        cell.stressParam.sustenanceDepth
+        cell.stressParam.sustenanceDepth,
+        () => cell.impulse + cell.synapseOutput,
+        () => pulseStates.getOrElse(coord, PulseToleranceState.zero).isOverloadedAt(simTime),
+        pulseParam
       )
 
     val trackers = scala.collection.mutable.HashMap.empty[CellCoord, PhaseTracker]
     grid.cells.foreach { case (coord, cell) =>
-      trackers(coord) = trackerFor(cell)
+      trackers(coord) = trackerFor(coord, cell)
     }
     var prevRegimes: Map[CellCoord, Regime] = grid.cells.map { case (coord, cell) =>
       coord -> Readout.regime(cell.getState, readoutParam)
@@ -156,7 +185,10 @@ object MandateAgent:
       // the offline harness uses (design note 07).
       linkRunner
         .duePulses(simTime)
-        .foreach(event => applyEvent(grid, event, defaultFastParam, defaultStressParam))
+        .foreach { event =>
+          applyEvent(grid, event, defaultFastParam, defaultStressParam)
+          recordPulse(event.cell, event.area)
+        }
       grid.step(dt)
       simTime += dt
       linkRunner.observe(simTime, grid.cells)
@@ -169,18 +201,25 @@ object MandateAgent:
         currentBuilder += (coord -> cur)
 
         // Cells registered after startup get their tracker on first sight.
-        val tracker = trackers.getOrElseUpdate(coord, trackerFor(cell))
+        val tracker = trackers.getOrElseUpdate(coord, trackerFor(coord, cell))
         val phase = tracker.observe(simTime, cur)
         val regime = Readout.regime(cur, readoutParam)
+        val ps = pulseStates.getOrElse(coord, PulseToleranceState.zero)
+        val pDrive = cell.impulse + cell.synapseOutput
         readoutBuilder += (coord -> CellReadout(
           cur,
           regime,
           phase,
           cell.baselineCalming,
-          cell.sustenance
+          cell.sustenance,
+          pulseDrive = pDrive,
+          pulseSuppressed = ps.isSuppressedAt(simTime),
+          pulseTolerance = ps.toleranceAt(simTime, pulseParam),
+          pulseState = ps,
+          simTime = simTime
         ))
 
-        val spikingNow = Math.abs(cur.dissonance) >= readoutParam.spikeLevel
+        val spikingNow = cur.dissonance >= readoutParam.spikeLevel
         if spikingNow && !inSpike.contains(coord) then
           inSpike += coord
           actionSink(ActionMsgPool.CellSpikeTriggered(coord, cur, regime))
@@ -202,7 +241,7 @@ object MandateAgent:
       readoutSink(readoutBuilder.result())
 
       if simTime >= nextPersistAt then
-        persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime))
+        persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, pulseStates.toMap))
         nextPersistAt = simTime + persistPeriod
 
     def handle(event: EventDTO): Unit =
@@ -216,20 +255,22 @@ object MandateAgent:
         // Save-time flush (persistence only): publish the current lattice
         // without advancing the clock, then resume the normal cadence.
         case EventMsg.FlushNow =>
-          persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime))
+          persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, pulseStates.toMap))
           nextPersistAt = simTime + persistPeriod
         case other @ EventMsg.RegisterCell(cell, _, _) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
+          pulseStates.remove(cell)
           // A (re-)registered cell restarts phase tracking — the dynamics
           // were just reset.
           grid.cells.get(cell).foreach { c =>
-            trackers(cell) = trackerFor(c)
+            trackers(cell) = trackerFor(cell, c)
           }
         case other @ EventMsg.RemoveCell(cell) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
           // Drop the per-cell bookkeeping so a stale detector cannot leak
           // into a cell later re-registered at the same coordinate.
           trackers.remove(cell)
+          pulseStates.remove(cell)
           prevRegimes = prevRegimes - cell
           inSpike = inSpike - cell
           linkRunner.forgetCell(cell)
@@ -237,6 +278,9 @@ object MandateAgent:
         // the active lattice are dropped deterministically (§1.4 loading
         // invariance: presence of a cell must not depend on chunk load
         // order).
+        case other @ EventMsg.FirePulse(cell, area, _) =>
+          applyEvent(grid, other, defaultFastParam, defaultStressParam)
+          recordPulse(cell, area)
         case other => applyEvent(grid, other, defaultFastParam, defaultStressParam)
 
     Actor.spawn("mandate")(handle)

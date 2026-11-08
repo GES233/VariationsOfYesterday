@@ -111,31 +111,53 @@ class MandateReadoutSpec:
     )
     assertTrue(tr.reading(t, cur).isInstanceOf[PhaseReading.Cycle])
 
-  @Test def `c0 shelter maintenance and 20-division dial tick semantics`(): Unit =
-    val calmUnmaintained = CellReadout(
+  @Test def `pulse window shelter and 20-division dial tick semantics`(): Unit =
+    val calmUnpulsed = CellReadout(
       MandateCurrent(-1.2, -0.6, 0.05, 0.0),
       Regime.Calm,
       PhaseReading.Basin(PhaseLabel.Resting),
       baselineCalming = 0.0
     )
-    assertFalse(calmUnmaintained.isMaintained, "no c0 baseline -> stagnant")
+    assertFalse(calmUnpulsed.isMaintained, "no fresh pulse -> stagnant")
 
-    val calmMaintained = calmUnmaintained.copy(baselineCalming = 0.03)
-    assertTrue(calmMaintained.isMaintained, "intact c0 in calm state -> sheltered")
+    val calmMaintained = calmUnpulsed.copy(baselineCalming = 0.03)
+    assertFalse(
+      calmMaintained.isMaintained,
+      "c0 alone no longer shelters: only a fresh pulse window does"
+    )
 
-    val spikingMaintained = calmMaintained.copy(
+    val pulsed = calmMaintained.copy(pulseSuppressed = true)
+    assertTrue(pulsed.isMaintained, "a fresh pulse window shelters the cell")
+
+    val spikingPulsed = pulsed.copy(
       current = MandateCurrent(1.9, 0.2, 0.6, 0.5),
       regime = Regime.Oscillating,
       phase = PhaseReading.Cycle(PhaseLabel.Excitation, 0.05)
     )
-    assertFalse(spikingMaintained.isMaintained, "spike excursion temporarily suspends c0 shelter")
+    assertFalse(spikingPulsed.isMaintained, "a positive spike excursion suspends pulse shelter")
 
-    val refractoryCycle = calmMaintained.copy(
+    val negativeOvershoot = pulsed.copy(
+      current = MandateCurrent(-1.9, 0.2, 0.6, 0.5),
+      regime = Regime.Oscillating,
+      phase = PhaseReading.Cycle(PhaseLabel.Resting, 0.75)
+    )
+    assertTrue(
+      negativeOvershoot.isMaintained,
+      "the negative repolarisation overshoot (|v| > 1.8, v < 0) is NOT a spike"
+    )
+
+    val burned = pulsed.copy(phase = PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle))
+    assertFalse(burned.isMaintained, "a burnt-out cell cannot be sheltered by pulses")
+
+    val deadMycelium = pulsed.copy(sustenance = 0.0)
+    assertFalse(deadMycelium.isMaintained, "a dead mycelial network cannot be sheltered")
+
+    val refractoryCycle = pulsed.copy(
       current = MandateCurrent(0.5, 0.8, 0.6, 0.5),
       regime = Regime.Oscillating,
       phase = PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory, 0.25)
     )
-    assertTrue(refractoryCycle.isMaintained, "between spikes, c0 shelter holds")
+    assertTrue(refractoryCycle.isMaintained, "between spikes, pulse shelter holds")
     assertEquals(Some(5), refractoryCycle.dialTick, "0.25 of 20 divisions is tick 5")
     assertEquals(None, calmMaintained.dialTick, "resting basin has no cycle dial tick")
 
@@ -185,5 +207,90 @@ class MandateReadoutSpec:
     assertEquals(BellStrikeOutcome.SaturatedNoAnchor, burnoutOutcome)
     assertFalse(burnoutOutcome.anchorsC0, "saturated cell cannot re-anchor c0 while the stress stays high")
     assertEquals(0.0, burnoutOutcome.baselineCalming, 1e-12)
+    assertTrue(
+      burnoutOutcome.suppressesStagnation,
+      "a saturated but LIVING cell still answers the pulse with a heartbeat window"
+    )
+
+  @Test def `bell strike on dead mycelium answers nothing`(): Unit =
+    val deadCell = CellReadout(
+      MandateCurrent(-1.2, -0.6, 0.3, 0.0),
+      Regime.Strained,
+      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      baselineCalming = 0.0,
+      sustenance = 0.0 // chronic ecological burnout: the network is gone
+    )
+    val outcome = MandateOverworld.evaluateBellStrike(deadCell)
+    assertEquals(BellStrikeOutcome.DeadMyceliumBurnout, outcome)
+    assertFalse(outcome.anchorsC0, "dead mycelium cannot carry a baseline anchor")
+    assertFalse(outcome.suppressesStagnation, "dead mycelium cannot carry a heartbeat")
+    assertFalse(outcome.triggersOverloadPenalty, "death is not the striker's fault")
+
+  @Test def `striking inside the refractory interval of the previous pulse overloads the cell`(): Unit =
+    // The previous pulse landed at simTime 5.0; striking again at 6.0 is
+    // faster than minSafeInterval (8.0) — acute pulse-overload burnout.
+    val overpulsed = CellReadout(
+      MandateCurrent(-1.2, -0.6, 0.05, 0.0),
+      Regime.Calm,
+      PhaseReading.Basin(PhaseLabel.Resting),
+      baselineCalming = 0.03,
+      pulseState = PulseToleranceState(lastPulseTime = 5.0),
+      simTime = 6.0
+    )
+    val outcome = MandateOverworld.evaluateBellStrike(overpulsed)
+    assertEquals(BellStrikeOutcome.PulseOverloadBurnout, outcome)
+    assertFalse(outcome.anchorsC0)
+    assertFalse(outcome.suppressesStagnation, "overload collapses the suppression window")
+    assertTrue(outcome.triggersOverloadPenalty, "the striker feels the recoil")
+
+  @Test def `stacked pulse drive burns a healthy cell across the knee`(): Unit =
+    // A healthy calm cell (a_slow = 0.65) with three overlapping bell
+    // kernels still ringing (p = 2.1): a_eff = 0.65 - 1.6*(2.1 - 0.883)
+    // ≈ -1.30, well across the right knee (burnoutA = -0.4667).
+    val tracker = new PhaseTracker(
+      ReadoutParam(),
+      fast,
+      coupling = 1.0,
+      sustenance = () => 1.0,
+      depth = StressParam().sustenanceDepth,
+      pulseDrive = () => 2.1
+    )
+    val cur = MandateCurrent(-1.2, -0.6, 0.05, 0.0)
+    assertEquals(
+      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      tracker.reading(100.0, cur),
+      "excess stacked pulse drive must push a_eff across the burnout knee"
+    )
+
+    // A single bell kernel (p = 0.88 at peak) must NOT burn the same cell.
+    val single = new PhaseTracker(
+      ReadoutParam(),
+      fast,
+      coupling = 1.0,
+      sustenance = () => 1.0,
+      depth = StressParam().sustenanceDepth,
+      pulseDrive = () => 0.8
+    )
+    assertNotEquals(
+      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      single.reading(100.0, cur),
+      "one bell strike alone never burns a healthy cell"
+    )
+
+  @Test def `an overload-locked cell reads BurnoutNoCycle regardless of state`(): Unit =
+    val tracker = new PhaseTracker(
+      ReadoutParam(),
+      fast,
+      coupling = 1.0,
+      sustenance = () => 1.0,
+      depth = StressParam().sustenanceDepth,
+      pulseDrive = () => 0.0,
+      overloaded = () => true
+    )
+    assertEquals(
+      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      tracker.reading(100.0, MandateCurrent(-1.2, -0.6, 0.05, 0.0)),
+      "the acute overload lockout must read as BurnoutNoCycle"
+    )
 
 

@@ -349,6 +349,66 @@ class MandateAgentSpec:
       "a re-registered cell starts at native sustenance"
     )
 
+  // ==== heartbeat pulse bookkeeping (design note 08) ==== //
+
+  @Test def wellSpacedPulsesOpenSuppressionWindows(): Unit =
+    val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    // One tick to publish the baseline, one after the pulse.
+    val latch = new CountDownLatch(2)
+    val grid = singleCellGrid(mkCell(0.0))
+    val agent = spawnReadoutLog(grid, seen, latch)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    agent ! EventMsg.FirePulse(origin, 12.0)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+
+    val stages = seen.toArray(Array.empty[CellReadout]).toSeq
+    assertFalse(stages.head.pulseSuppressed, "no pulse yet -> no suppression window")
+    assertTrue(stages.last.pulseSuppressed, "a bell pulse opens the heartbeat window")
+    assertTrue(stages.last.pulseTolerance > 0.0, "a pulse leaves a trace of tolerance")
+
+  @Test def rapidPulsesDriveTheCellIntoAcuteBurnout(): Unit =
+    val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    val latch = new CountDownLatch(1)
+    val grid = singleCellGrid(mkCell(0.0))
+    val agent = spawnReadoutLog(grid, seen, latch)
+    // Two strikes in the same instant: the second lands far inside the
+    // previous pulse's safe interval -> acute overload -> BurnoutNoCycle.
+    agent ! EventMsg.FirePulse(origin, 12.0)
+    agent ! EventMsg.FirePulse(origin, 12.0)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+
+    val r = seen.toArray(Array.empty[CellReadout]).last
+    assertEquals(
+      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      r.phase,
+      "over-rapid pulsing must read as acute BurnoutNoCycle"
+    )
+    assertFalse(r.pulseSuppressed, "the overload collapses the suppression window")
+    assertFalse(r.isMaintained, "an over-pulsed cell grants no shelter")
+
+  @Test def deadMyceliumIgnoresPulsesEntirely(): Unit =
+    val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    val latch = new CountDownLatch(1)
+    val grid = singleCellGrid(mkCell(0.0))
+    val agent = spawnReadoutLog(grid, seen, latch)
+    agent ! EventMsg.SetSustenance(origin, 0.0)
+    agent ! EventMsg.FirePulse(origin, 12.0)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+
+    val r = seen.toArray(Array.empty[CellReadout]).last
+    assertFalse(
+      r.pulseSuppressed,
+      "a dead network carries no pulse: no window is opened"
+    )
+    assertEquals(
+      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      r.phase,
+      "M = 0 is chronic burnout regardless of pulses"
+    )
+
   // ==== parameter provenance (save > config > default) ==== //
 
   @Test def registerCellUsesTheInjectedDefaultParameters(): Unit =

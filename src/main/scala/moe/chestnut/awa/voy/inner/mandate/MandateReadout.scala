@@ -94,11 +94,61 @@ object Readout:
     *
     * With the frozen parameters this is `a = -0.4666...`, i.e. `s = 1.1666`
     * — *outside* `stressMax = 1.0`. The clamp therefore guarantees the
-    * slice cannot reach burnout through the ordinary channels, which is
-    * exactly what §1.2 claims.
+    * slice cannot reach burnout through the ordinary stress channel alone;
+    * crossing the knee requires either slow mycelial depletion (`M -> 0`) or
+    * acute over-pulsing (`pulseDrive > singlePulsePeak`).
     */
   def burnoutA(fast: MandateParam): Double =
     fast.beta * (1.0 - 1.0 / 3.0) - 1.0
+
+  /** Slow-variable recovery offset `a(s, M) = alpha - depth * (1 - M) - coupling * s`
+    * without transient pulse drive. Crossing [[burnoutA]] here indicates
+    * chronic ecological incapacitation (mycelial depletion).
+    */
+  def slowA(
+      fast: MandateParam,
+      stress: Double,
+      sustenance: Double = 1.0,
+      coupling: Double = 1.0,
+      depth: Double = StressParam().sustenanceDepth
+  ): Double =
+    fast.alpha - depth * (1.0 - sustenance) - coupling * stress
+
+  /** Effective recovery offset including excess fast-channel pulse drive:
+    * stacked pulses above a single standard bell peak (`singlePulsePeak`)
+    * push `a_eff` downward across the right knee (`burnoutA`), producing
+    * acute pulse-overload depolarization block (`BurnoutNoCycle`).
+    */
+  def effectiveA(
+      fast: MandateParam,
+      stress: Double,
+      sustenance: Double = 1.0,
+      coupling: Double = 1.0,
+      depth: Double = StressParam().sustenanceDepth,
+      pulseDrive: Double = 0.0,
+      pulseParam: PulseToleranceParam = PulseToleranceParam()
+  ): Double =
+    val excessPulse = Math.max(pulseDrive - pulseParam.singlePulsePeak, 0.0)
+    slowA(fast, stress, sustenance, coupling, depth) -
+      pulseParam.pulseBurnoutGain * excessPulse
+
+  /** Whether a cell is in chronic ecological burnout (mycelial network
+    * depleted so that the slow offset itself sits below the burnout knee),
+    * as opposed to an acute pulse-overload lockout.
+    */
+  def isEcologicalBurnout(
+      readout: CellReadout,
+      fast: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+      coupling: Double = 1.0,
+      depth: Double = StressParam().sustenanceDepth,
+      pulseParam: PulseToleranceParam = PulseToleranceParam()
+  ): Boolean =
+    val slow = slowA(fast, readout.current.stress, readout.sustenance, coupling, depth)
+    readout.sustenance < StressParam().sustenanceFloor ||
+      slow <= burnoutA(fast) ||
+      (readout.phase == PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) &&
+        !readout.pulseState.isOverloadedAt(readout.simTime) &&
+        readout.pulseDrive <= pulseParam.singlePulsePeak)
 
   /** Whether a limit cycle exists at this recovery offset. */
   def oscillating(a: Double, fast: MandateParam): Boolean =
@@ -125,30 +175,33 @@ object Readout:
     (v, (v + a) / beta)
 
   /** The label of a cycle fraction, given the declared windows. `Excitation`
-    * is decided by the spike level, not by the fraction: the upstroke is
-    * measured, not timed.
+    * is decided by the positive spike level (`v >= spikeLevel`), not by
+    * `|v|` or the fraction: the depolarising upstroke is measured, and the
+    * negative repolarisation overshoot must not be mislabelled as a spike.
     */
   def label(cur: MandateCurrent, fraction: Double, p: ReadoutParam = ReadoutParam()): PhaseLabel =
-    if Math.abs(cur.dissonance) >= p.spikeLevel then PhaseLabel.Excitation
+    if cur.dissonance >= p.spikeLevel then PhaseLabel.Excitation
     else if fraction < p.fireWindowLo then PhaseLabel.AbsoluteRefractory
     else if fraction <= p.fireWindowHi then PhaseLabel.RelativeRefractory
     else PhaseLabel.Resting
 
-  /** Whether a cell's maintenance source (`c0`, design draft §3.2) is
-    * currently sheltering the cell from Overworld stagnation (`沉滞`).
+  /** Whether a cell is currently sheltered from Overworld stagnation (`沉滞`).
     *
-    * Shelter requires an active `c0` baseline (`baselineCalming >= minC0`)
-    * AND that the cell is neither burnt out nor in the middle of a spike
-    * excursion (`|v| >= spikeLevel`, the periodic failure window of §3.2).
+    * Under the heartbeat model (design note 08), shelter is granted for a
+    * finite window by a valid pulse (`pulseSuppressed`) and expires once too
+    * long passes without a new pulse. Shelter also requires a living
+    * mycelial network (`sustenance >= floor`), a non-burnout phase
+    * (`phase != BurnoutNoCycle`), and no active positive spike excursion
+    * (`v < spikeLevel`).
     */
   def isMaintained(
       readout: CellReadout,
-      minC0: Double = 0.01,
       p: ReadoutParam = ReadoutParam()
   ): Boolean =
-    readout.baselineCalming >= minC0 &&
-      readout.regime != Regime.Burnout &&
-      Math.abs(readout.current.dissonance) < p.spikeLevel
+    readout.pulseSuppressed &&
+      readout.sustenance >= StressParam().sustenanceFloor &&
+      readout.phase != PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) &&
+      readout.current.dissonance < p.spikeLevel
 
   /** Convert a cycle fraction `[0, 1)` into the 20-division dial index
     * `0..19` used by the field notebook and contract tick trials.
@@ -163,14 +216,20 @@ end Readout
 
 /** Combined semantic snapshot of one lattice cell published to the game
   * side: continuous state, slow-variable regime, fast-variable phase reading,
-  * and current `c0` maintenance level.
+  * `c0` baseline calming, mycelial sustenance `M`, and pulse-suppression /
+  * tolerance state.
   */
 final case class CellReadout(
     current: MandateCurrent,
     regime: Regime,
     phase: PhaseReading,
     baselineCalming: Double = 0.0,
-    sustenance: Double = 1.0
+    sustenance: Double = 1.0,
+    pulseDrive: Double = 0.0,
+    pulseSuppressed: Boolean = false,
+    pulseTolerance: Double = 0.0,
+    pulseState: PulseToleranceState = PulseToleranceState.zero,
+    simTime: Double = 0.0
 ):
   def isMaintained: Boolean = Readout.isMaintained(this)
   def dialTick: Option[Int] = Readout.dialTick(phase)
@@ -202,7 +261,10 @@ class PhaseTracker(
     fast: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
     coupling: Double = 1.0,
     sustenance: () => Double = () => 1.0,
-    depth: Double = StressParam().sustenanceDepth
+    depth: Double = StressParam().sustenanceDepth,
+    pulseDrive: () => Double = () => 0.0,
+    overloaded: () => Boolean = () => false,
+    pulseParam: PulseToleranceParam = PulseToleranceParam()
 ):
   private var tPrev = Double.NaN
   private var vPrev = Double.NaN
@@ -243,12 +305,22 @@ class PhaseTracker(
     reading(t, cur)
 
   def reading(t: Double, cur: MandateCurrent): PhaseReading =
-    val a = fast.alpha - depth * (1.0 - sustenance()) - coupling * cur.stress
-    if a <= Readout.burnoutA(fast) then PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
-    else if !Readout.oscillating(a, fast) then
+    val aSlow = Readout.slowA(fast, cur.stress, sustenance(), coupling, depth)
+    val aEff = Readout.effectiveA(
+      fast,
+      cur.stress,
+      sustenance(),
+      coupling,
+      depth,
+      pulseDrive(),
+      pulseParam
+    )
+    if aEff <= Readout.burnoutA(fast) || overloaded() then
+      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
+    else if !Readout.oscillating(aSlow, fast) then
       // No limit cycle exists here: the only phase-free reading left is the
       // resting basin itself. An excursion in flight is a transient.
-      val (vStar, wStar) = Readout.restPoint(a, fast.beta)
+      val (vStar, wStar) = Readout.restPoint(aSlow, fast.beta)
       val atRest =
         Math.abs(cur.dissonance - vStar) <= param.basinTol &&
           Math.abs(cur.entrench - wStar) <= param.basinTol

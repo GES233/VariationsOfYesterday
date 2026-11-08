@@ -20,6 +20,7 @@ object VariationsOfYesterday extends ModInitializer:
     // during mod init, before any server-driven `StatusEffectInstance` exists.
     MandateEffects.Stagnation
     MandateEffects.StagnationSpike
+    MandateEffects.PulseSaturation
     // SERVER_STARTED, not STARTING: the engine restores its lattice from
     // the overworld's PersistentStateManager, which only exists after the
     // dimensions are loaded.

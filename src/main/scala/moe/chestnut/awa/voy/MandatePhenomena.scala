@@ -121,15 +121,19 @@ object MandatePhenomena:
       readout.phase == PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) ||
         readout.sustenance <= 0.0
     val seepTier = classifySeepTier(readout)
+    // Glow and precursor spores bind to the slow `c0` anchor (a bell's lasting
+    // duty), NOT to the pulse suppression window: the heartbeat governs the
+    // player's `沉滞`, while these signatures describe the land's own health.
+    val c0Sheltered = readout.baselineCalming >= 0.01
     val mycelialGlow =
       !silentBlight &&
         isNight &&
         readout.regime == Regime.Calm &&
-        readout.isMaintained &&
+        c0Sheltered &&
         readout.sustenance >= GlowMinSustenance
     val precursorSpore =
       !silentBlight &&
-        readout.isMaintained &&
+        c0Sheltered &&
         (readout.regime == Regime.Strained || readout.regime == Regime.Oscillating)
     PhenomenonProfile(
       silentBlight = silentBlight,

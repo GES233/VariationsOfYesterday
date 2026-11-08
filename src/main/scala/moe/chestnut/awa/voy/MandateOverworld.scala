@@ -58,51 +58,94 @@ object MandateOverworld:
   /** Standard pulse area delivered when ringing a bell (matches SliceContract alpha_shock/resonance scale). */
   val BellPulseArea: Double = 12.0
 
-  /** Phase-gated outcome of striking a bell / resonance vessel on a cell. */
+  /** Phase- and cadence-gated outcome of striking a bell / resonance vessel on a cell. */
   enum BellStrikeOutcome(
       val anchorsC0: Boolean,
       val baselineCalming: Double,
-      val pulseArea: Double
+      val pulseArea: Double,
+      val suppressesStagnation: Boolean = false,
+      val triggersOverloadPenalty: Boolean = false
   ):
-    /** Saturated incapacitation (`Regime.Burnout`, `s >= 0.95`): the fast
-      * system is still inside its oscillatory window, but the cell is
-      * functionally incapacitated and the bell cannot re-anchor `c0` while
-      * the stress stays saturated. NOT a dead zone: there is no latch, so
-      * once sustained calming pulls the stress back below the threshold
-      * (c ≳ 2u, design note 07 E4b), ordinary strikes anchor again. Recovery
-      * is meant to be expensive, not impossible. */
-    case SaturatedNoAnchor extends BellStrikeOutcome(false, 0.0, BellPulseArea)
-
-    /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck during `PhaseLabel.Excitation`:
-      * pulse is swallowed by the active spike and `c0` fails to re-anchor.
+    /** Chronic ecological burnout (`M -> 0` or `a_slow <= burnoutA`): the
+      * mycelial network is dead, so ringing the bell cannot anchor `c0` or
+      * establish a heartbeat suppression window. Recovery requires relieving
+      * acid stress and re-inoculating mycelium.
       */
-    case SpikeSwallowed extends BellStrikeOutcome(false, 0.0, BellPulseArea)
+    case DeadMyceliumBurnout
+        extends BellStrikeOutcome(false, 0.0, BellPulseArea, false, false)
 
-    /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck inside the refractory delay
-      * window (`AbsoluteRefractory` | `RelativeRefractory`): re-anchors `c0` and delays the spike.
+    /** Acute pulse overload (`BurnoutNoCycle` triggered by pulsing too fast
+      * or while tolerance-saturated): collapses stagnation suppression,
+      * deepens subsequent tolerance, and applies an immediate
+      * `voy:pulse_saturation` backlash to the player.
       */
-    case RefractoryReanchored extends BellStrikeOutcome(true, BellBaselineCalming, BellPulseArea)
+    case PulseOverloadBurnout
+        extends BellStrikeOutcome(false, 0.0, BellPulseArea, false, true)
 
-    /** Calm / Strained / Resting or already-anchored cell: anchors/maintains `c0` and fires pulse. */
-    case AnchoredOrMaintained extends BellStrikeOutcome(true, BellBaselineCalming, BellPulseArea)
+    /** Saturated incapacitation (`Regime.Burnout`, `s >= 0.95`) on living
+      * mycelium: the fast system is still inside its oscillatory window and a
+      * well-spaced pulse temporarily suppresses `沉滞` for the heartbeat
+      * window, but the bell cannot permanently re-anchor `c0` while slow
+      * stress stays saturated.
+      */
+    case SaturatedNoAnchor
+        extends BellStrikeOutcome(false, 0.0, BellPulseArea, true, false)
 
-  /** Pure, phase-gated rule for re-anchoring `c0` and firing a resonance pulse
-    * when a player strikes a bell / industrial vessel in a chunk:
+    /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck during
+      * `PhaseLabel.Excitation`: pulse is swallowed by the active positive
+      * spike and `c0` fails to re-anchor.
+      */
+    case SpikeSwallowed
+        extends BellStrikeOutcome(false, 0.0, BellPulseArea, false, false)
+
+    /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck inside
+      * the refractory delay window (`AbsoluteRefractory` | `RelativeRefractory`):
+      * re-anchors `c0`, delays the spike, and grants the pulse suppression window.
+      */
+    case RefractoryReanchored
+        extends BellStrikeOutcome(true, BellBaselineCalming, BellPulseArea, true, false)
+
+    /** Calm / Strained / Resting or already-anchored cell: anchors/maintains
+      * `c0`, fires the pulse, and grants the stagnation suppression window.
+      */
+    case AnchoredOrMaintained
+        extends BellStrikeOutcome(true, BellBaselineCalming, BellPulseArea, true, false)
+
+  /** Pure rule for evaluating a bell / resonance strike on a cell (design
+    * note 08):
     *
-    *  - `Regime.Burnout`: saturated incapacitation (`失能`), not death. The
-    *    cell keeps oscillating; ringing cannot re-anchor `c0` while the stress
-    *    stays saturated (`baselineCalming` stays `0.0`), but nothing is
-    *    latched — relieving the stress re-enables anchoring.
+    *  - Ecological burnout (`M -> 0` or `a_slow <= burnoutA`): dead mycelium
+    *    cannot carry a pulse (`DeadMyceliumBurnout`).
+    *  - Pulse too fast (`dt < minSafeInterval`, tolerance saturated, or
+    *    already in acute pulse `BurnoutNoCycle`): triggers depolarization
+    *    block overload (`PulseOverloadBurnout`), spiking tolerance and
+    *    applying an immediate minor penalty.
+    *  - `Regime.Burnout`: suppresses stagnation for the heartbeat window,
+    *    but slow `c0` cannot re-anchor while stress stays saturated.
     *  - Unanchored oscillator (`baselineCalming <= 0.0` and `Regime.Oscillating`):
-    *    - `Cycle(AbsoluteRefractory | RelativeRefractory, _)`: hits the refractory
-    *      delay window (`safe_tick`), re-anchoring `c0 = BellBaselineCalming` and firing the pulse.
-    *    - `Cycle(Excitation, _)`: struck during the active spike; fails to re-anchor `c0`
-    *      while still firing the pulse (swallowed by the spike).
-    *  - `Calm` / `Strained` / `Resting` or already-intact `c0`: anchors/maintains
-    *    `c0 = BellBaselineCalming` and fires the pulse.
+    *    - `Cycle(AbsoluteRefractory | RelativeRefractory, _)`: re-anchors `c0`
+    *      and grants the pulse suppression window.
+    *    - `Cycle(Excitation, _)`: swallowed by the active positive spike.
+    *  - `Calm` / `Strained` / `Resting` or already-intact `c0`: anchors `c0`
+    *    and grants the pulse suppression window (`W_eff(T)`).
     */
-  def evaluateBellStrike(readout: CellReadout): BellStrikeOutcome =
-    if readout.regime == Regime.Burnout then
+  def evaluateBellStrike(
+      readout: CellReadout,
+      pulseParam: PulseToleranceParam = VoyConfig.current.pulseParam
+  ): BellStrikeOutcome =
+    val cfg = VoyConfig.current
+    if Readout.isEcologicalBurnout(
+        readout,
+        cfg.fastParam,
+        cfg.stressParam.coupling,
+        cfg.stressParam.sustenanceDepth,
+        pulseParam
+      )
+    then BellStrikeOutcome.DeadMyceliumBurnout
+    else if readout.pulseState.wouldOverloadAt(readout.simTime, pulseParam) ||
+      readout.phase == PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
+    then BellStrikeOutcome.PulseOverloadBurnout
+    else if readout.regime == Regime.Burnout then
       BellStrikeOutcome.SaturatedNoAnchor
     else if readout.baselineCalming <= 0.0 && readout.regime == Regime.Oscillating then
       readout.phase match
@@ -310,6 +353,41 @@ object MandateOverworld:
           if outcome.anchorsC0 then
             MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, outcome.baselineCalming)
           MandateRuntime.firePulseAt(chunkX, chunkZ, outcome.pulseArea)
+          // Acute pulse-overload backlash (design note 08): over-rapid pulsing
+          // drives the cell into transient `BurnoutNoCycle`; the striker feels
+          // the recoil immediately, and the chunk's tolerance makes every
+          // later pulse suppress stagnation for a shorter window.
+          if outcome.triggersOverloadPenalty then
+            val serverWorld = world.asInstanceOf[ServerWorld]
+            player.addStatusEffect(
+              new StatusEffectInstance(
+                MandateEffects.PulseSaturationEntry,
+                VoyConfig.current.pulseParam.overloadPenaltyTicks,
+                0,
+                false,
+                true,
+                true
+              )
+            )
+            serverWorld.playSound(
+              null,
+              pos,
+              SoundEvents.BLOCK_BELL_RESONATE,
+              SoundCategory.BLOCKS,
+              1.0f,
+              0.3f
+            )
+            serverWorld.spawnParticles(
+              ParticleTypes.ASH,
+              pos.getX + 0.5,
+              pos.getY + 0.8,
+              pos.getZ + 0.5,
+              10,
+              0.4,
+              0.4,
+              0.4,
+              0.02
+            )
           player.sendMessage(
             Text.literal(formatBellPulse(chunkX, chunkZ, readout, outcome)),
             true
@@ -321,7 +399,8 @@ object MandateOverworld:
 
   /** Periodic Overworld check (runs on server thread): applies or clears the
     * `沉滞` (Stagnation) debuff on players and nearby villagers depending on
-    * whether their chunk is sheltered by an intact `c0` maintenance source.
+    * whether their chunk is currently sheltered by a fresh pulse window
+    * (heartbeat model, design note 08).
     */
   def onServerTick(server: MinecraftServer): Unit =
     if server.getTicks % 20 != 0 then return
@@ -350,10 +429,15 @@ object MandateOverworld:
 
     announceShelterChange(player, maintained)
 
+    if maintained then
+      // A fresh pulse window swept the stagnation off: remove it actively so
+      // the heartbeat relief is felt at once instead of decaying out.
+      player.removeStatusEffect(MandateEffects.StagnationEntry)
+      player.removeStatusEffect(MandateEffects.StagnationSpikeEntry)
     if !maintained then
       val spikingOrBurnout =
         readout.regime == Regime.Burnout ||
-          Math.abs(readout.current.dissonance) >= ReadoutParam().spikeLevel
+          readout.current.dissonance >= ReadoutParam().spikeLevel
 
       // Apply `沉滞` (Stagnation) — our own effect, so the slowdown is
       // attributable to the lattice instead of to vanilla mining fatigue.
@@ -525,8 +609,8 @@ object MandateOverworld:
     val previous = lastShelter.put(player.getUuid, java.lang.Boolean.valueOf(maintained))
     if previous == null || previous.booleanValue == maintained then return
     val line =
-      if maintained then "§a地脉归位，沉滞退去，手上又利索了"
-      else "§7地脉松了：沉滞缠上来，挖掘开始发涩"
+      if maintained then "§a一记脉动荡开，沉滞退去，手上又利索了"
+      else "§7太久没有脉动：沉滞缠上来，挖掘开始发涩"
     player.sendMessage(Text.literal(line), true)
 
   /** Handle outbound actions drained from the Mandate actor on the server thread. */
@@ -620,15 +704,18 @@ object MandateOverworld:
     * mycelial integrity word, never raw continuous numbers (design note 06
     * §1 constraint 5). Raw values ride the `debugNumbers` gate only. */
   def formatInspection(chunkX: Int, chunkZ: Int, r: CellReadout): String =
-    val shelter = if r.isMaintained then "§a庇护正常(免除沉滞)" else "§c沉滞生效(缺c0或尖峰失效)"
+    val shelter =
+      if r.isMaintained then "§a脉动庇护(免除沉滞)"
+      else "§c沉滞生效(太久无脉冲/尖峰/烧毁)"
     val base =
       f"§e[验山读数] [$chunkX%d,$chunkZ%d] 态:${regimeWord(r.regime)} 相:${formatPhaseDial(r.phase)} 菌网:${MandatePhenomena.sustenanceWord(r.sustenance)} | $shelter"
     if debugNumbers then
       val fracText = r.phase match
         case PhaseReading.Cycle(_, frac) => f" frac=$frac%.3f"
         case _ => ""
+      val windowLeft = r.pulseState.remainingSuppressionAt(r.simTime)
       base +
-        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.dissonance}%.2f$fracText]"
+        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.dissonance}%.2f p=${r.pulseDrive}%.2f tol=${r.pulseTolerance}%.2f win=${windowLeft}%.1f$fracText]"
     else base
 
   /** Qualitative regime word for player-facing surfaces; enum names are
@@ -669,21 +756,30 @@ object MandateOverworld:
       outcome: BellStrikeOutcome
   ): String =
     outcome match
+      case BellStrikeOutcome.DeadMyceliumBurnout =>
+        f"§4[叩钟无应] [$chunkX%d,$chunkZ%d] 菌网枯绝，钟声如击死肉，连片回音都没有——须先泄压降酸、再接种菌丝"
+
+      case BellStrikeOutcome.PulseOverloadBurnout =>
+        f"§c[脉冲过载] [$chunkX%d,$chunkZ%d] 脉冲过密，地脉被顶入烧毁阻滞！本次未压住沉滞，且后续脉冲效力大减——让地脉缓一缓"
+
       case BellStrikeOutcome.SaturatedNoAnchor =>
-        f"§4[叩钟无应] [$chunkX%d,$chunkZ%d] 地脉饱和失能 (Burnout)，钟声无应——需先泄压方可重锚 (c0=0.00)"
+        val win = r.pulseState.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
+        f"§4[叩钟无锚] [$chunkX%d,$chunkZ%d] 地脉饱和失能 (Burnout)，无法重锚 c0；但本次脉冲仍压住沉滞约 ${win}%.0f 息——根治须持续泄压"
 
       case BellStrikeOutcome.SpikeSwallowed =>
         val tick = r.dialTick.getOrElse(0)
-        f"§c[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 (Excitation) -> 正处尖峰爆发期，钟声被吞没，c0重锚失败(需候不应期推迟窗口)"
+        f"§c[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 (Excitation) -> 正处尖峰爆发期，钟声被吞没，c0重锚与脉冲庇护均失败(需候不应期推迟窗口)"
 
       case BellStrikeOutcome.RefractoryReanchored =>
         val tick = r.dialTick.getOrElse(0)
         val label = r.phase match
           case PhaseReading.Cycle(l, _) => l.toString
           case _ => "Refractory"
-        f"§a[叩钟重锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 命中推迟刻度，c0已重锚 ($BellBaselineCalming%.2f) 且下一次尖峰延后"
+        val win = r.pulseState.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
+        f"§a[叩钟重锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 命中推迟刻度，c0已重锚 ($BellBaselineCalming%.2f)，下一次尖峰延后，沉滞退去约 ${win}%.0f 息"
 
       case BellStrikeOutcome.AnchoredOrMaintained =>
+        val win = r.pulseState.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
         r.phase match
           case PhaseReading.Cycle(label, _) =>
             val tick = r.dialTick.getOrElse(0)
@@ -694,9 +790,9 @@ object MandateOverworld:
                 "§c正处尖峰爆发期，钟声被地鸣吞没"
               case PhaseLabel.Resting =>
                 "§7处于恢复晚期，脉冲被平缓吸收"
-            f"§b[叩钟谐振] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> $effectHint"
+            f"§b[叩钟谐振] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> $effectHint，沉滞退去约 ${win}%.0f 息"
           case _ =>
-            f"§b[叩钟镇山] [$chunkX%d,$chunkZ%d] 维持源已锚定 (c0=$BellBaselineCalming%.2f)，周遭沉滞消退"
+            f"§b[叩钟镇山] [$chunkX%d,$chunkZ%d] 维持源已锚定 (c0=$BellBaselineCalming%.2f)，一记脉动荡开，沉滞退去约 ${win}%.0f 息"
 
   /** Dev rendering (HUD, `debugNumbers`): enum labels and the raw fraction.
     * Player-facing surfaces use `formatPhaseDial` instead. */

@@ -85,7 +85,7 @@ object MandateHud:
     drawBoxBorder(context, x0 - 4, y0 - 4, panelWidth + 4, panelHeight + 4, ColPanelBorder)
 
     // Header & telemetry lines
-    val shelterTag = if readout.isMaintained then "c0庇护" else "沉滞(STAGNANT)"
+    val shelterTag = if readout.isMaintained then "脉冲庇护" else "沉滞(STAGNANT)"
     context.drawTextWithShadow(
       textRenderer,
       f"VOY Mandate [$centerX%d, $centerZ%d]  [$shelterTag]",
@@ -95,7 +95,7 @@ object MandateHud:
     )
     context.drawTextWithShadow(
       textRenderer,
-      f"v=${center.dissonance}%+.2f  s=${center.stress}%.3f  q=${center.activity}%.3f  M=${readout.sustenance}%.2f  c0=${readout.baselineCalming}%.2f",
+      f"v=${center.dissonance}%+.2f  s=${center.stress}%.3f  q=${center.activity}%.3f  M=${readout.sustenance}%.2f  c0=${readout.baselineCalming}%.2f  p=${readout.pulseDrive}%.2f  tol=${readout.pulseTolerance}%.2f  win=${readout.pulseState.remainingSuppressionAt(readout.simTime)}%.1f",
       x0,
       y0 + lineHeight,
       0xFFE2E6EC
@@ -138,8 +138,8 @@ object MandateHud:
     // Color swatch legend beside the 7x7 grid
     val legendX = gridX + gridPixelSize + 10
     val legendItems = Seq(
-      (ColCalmMaintained, "Calm + c0 (庇护)"),
-      (ColCalmStagnant, "Calm (沉滞无c0)"),
+      (ColCalmMaintained, "Calm + 脉冲 (庇护)"),
+      (ColCalmStagnant, "Calm (沉滞无脉冲)"),
       (ColStrained, "Strained (承压)"),
       (ColOscillating, "Oscillating (振荡)"),
       (ColSpike, "Spike (尖峰爆发)"),
@@ -180,7 +180,7 @@ object MandateHud:
 
   private def tileColor(chunkX: Int, chunkZ: Int, r: CellReadout): Int =
     if !MandateRuntime.isLiveChunk(chunkX, chunkZ) then ColOutside
-    else if Math.abs(r.current.dissonance) >= readoutParam.spikeLevel then ColSpike
+    else if r.current.dissonance >= readoutParam.spikeLevel then ColSpike
     else
       r.regime match
         case Regime.Burnout => ColBurnout
