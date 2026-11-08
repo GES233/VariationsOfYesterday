@@ -9,7 +9,7 @@ defmodule Voy.World.Witness do
   hop; no global narrative summary is assembled here.
   """
 
-  alias Voy.World.{Chronicle, Contract, Content, Pathway, Schema}
+  alias Voy.World.{Chronicle, Contract, Content, Fields, Pathway, Schema}
 
   @relic_bronze :ancestral_bronze_zheng
   @relic_stele :carved_diversion_stele
@@ -52,7 +52,7 @@ defmodule Voy.World.Witness do
   def bind(seed, branch_id, relic, fate, opts \\ []) do
     spec = branch!(relic)
     fate = fate!(fate)
-    horizon = horizon!(fetch_opt(opts, :horizon, :locked))
+    horizon = horizon!(Fields.fetch_opt(opts, :horizon, :locked))
     dynamics = dynamics()
     relation_decoys = Pathway.decoys(relic)
 
@@ -117,24 +117,13 @@ defmodule Voy.World.Witness do
   @spec safe_ticks() :: [pos_integer()]
   def safe_ticks, do: Enum.map(dynamics().safe_ticks, & &1.tick)
 
-  @doc "Render the five main cards (or Hop 1..4 when `horizon: :open`) and two decoys from the authoring pack."
-  def render_dossier(seed, branch_id, relic, fate, names \\ []) do
-    render_dossier(seed, branch_id, relic, fate, names, Content.default_pack(), [])
-  end
+  @doc "Render the five main cards (or Hop 1..4 when `horizon: :open`) and two decoys from the authoring pack. Options: `:pack` and `:horizon`."
+  def render_dossier(seed, branch_id, relic, fate, names \\ [], opts \\ []) do
+    pack = Fields.fetch_opt(opts, :pack, nil) || Content.default_pack()
 
-  @doc "Render a dossier with an explicit pack or options."
-  def render_dossier(seed, branch_id, relic, fate, names, %Content.Pack{} = pack) do
-    render_dossier(seed, branch_id, relic, fate, names, pack, [])
-  end
+    horizon_opt =
+      Fields.fetch_opt(opts, :horizon, nil) || Fields.fetch_opt(names, :horizon, :locked)
 
-  def render_dossier(seed, branch_id, relic, fate, names, opts)
-      when is_list(opts) or is_map(opts) do
-    pack = fetch_opt(opts, :pack, nil) || Content.default_pack()
-    render_dossier(seed, branch_id, relic, fate, names, pack, opts)
-  end
-
-  def render_dossier(seed, branch_id, relic, fate, names, %Content.Pack{} = pack, opts) do
-    horizon_opt = fetch_opt(opts, :horizon, nil) || fetch_opt(names, :horizon, :locked)
     horizon = horizon!(horizon_opt)
     binding = bind(seed, branch_id, relic, fate, horizon: horizon)
     {:ok, %{chain: chain}} = Pathway.compile_chain(relic, binding.fate)
@@ -185,20 +174,21 @@ defmodule Voy.World.Witness do
   Hop 5 council ordinance for the resulting `target_fate`.
   """
   def settle_open_dossier(dossier, intervention, opts \\ []) when is_map(dossier) do
-    pack = fetch_opt(opts, :pack, nil) || Content.default_pack()
-    names = fetch_opt(opts, :names, [])
+    pack = Fields.fetch_opt(opts, :pack, nil) || Content.default_pack()
+    names = Fields.fetch_opt(opts, :names, [])
 
-    with {:ok, horizon} <- Schema.normalize_horizon(fetch_opt(dossier, :horizon, :locked)),
+    with {:ok, horizon} <- Schema.normalize_horizon(Fields.fetch_opt(dossier, :horizon, :locked)),
          :ok <- ensure_open(horizon),
-         :ok <- ensure_unsettled(fetch_opt(dossier, :settled, false)),
+         :ok <- ensure_unsettled(Fields.fetch_opt(dossier, :settled, false)),
          {:ok, normalized_intervention} <- Schema.normalize_intervention(intervention),
-         {:ok, relic} <- normalize_relic(fetch_opt(dossier, :relic, nil)),
+         {:ok, relic} <- normalize_relic(Fields.fetch_opt(dossier, :relic, nil)),
          {:ok, baseline_fate} <-
            Schema.normalize_fate(
-             fetch_opt(dossier, :baseline_fate, nil) || fetch_opt(dossier, :fate, nil)
+             Fields.fetch_opt(dossier, :baseline_fate, nil) ||
+               Fields.fetch_opt(dossier, :fate, nil)
            ),
          {:ok, binding} <-
-           normalize_binding(fetch_opt(dossier, :binding, nil), relic, baseline_fate),
+           normalize_binding(Fields.fetch_opt(dossier, :binding, nil), relic, baseline_fate),
          transitions =
            build_reachable_transitions(
              baseline_fate,
@@ -227,7 +217,7 @@ defmodule Voy.World.Witness do
 
       existing_docs =
         dossier
-        |> fetch_opt(:documents, [])
+        |> Fields.fetch_opt(:documents, [])
         |> Enum.map(&normalize_doc/1)
 
       main_1_to_4 =
@@ -238,8 +228,8 @@ defmodule Voy.World.Witness do
       decoy_docs = Enum.filter(existing_docs, &(&1.role == :decoy))
 
       settled_dossier = %{
-        seed: fetch_opt(dossier, :seed, settled_binding.seed),
-        branch_id: fetch_opt(dossier, :branch_id, settled_binding.branch_id),
+        seed: Fields.fetch_opt(dossier, :seed, settled_binding.seed),
+        branch_id: Fields.fetch_opt(dossier, :branch_id, settled_binding.branch_id),
         relic: relic,
         baseline_fate: baseline_fate,
         fate: target_fate,
@@ -298,37 +288,37 @@ defmodule Voy.World.Witness do
 
   defp normalize_binding(binding, relic, fate) when is_map(binding) do
     dyn = dynamics()
-    decoys = fetch_opt(binding, :decoys, %{})
-    mm = fetch_opt(decoys, :material_mismatch, %{})
-    dd = fetch_opt(decoys, :destination_dead_end, %{})
+    decoys = Fields.fetch_opt(binding, :decoys, %{})
+    mm = Fields.fetch_opt(decoys, :material_mismatch, %{})
+    dd = Fields.fetch_opt(decoys, :destination_dead_end, %{})
 
     {:ok,
      %{
-       seed: fetch_opt(binding, :seed, nil),
-       branch_id: fetch_opt(binding, :branch_id, nil),
+       seed: Fields.fetch_opt(binding, :seed, nil),
+       branch_id: Fields.fetch_opt(binding, :branch_id, nil),
        relic: relic,
        fate: fate,
        horizon: :open,
        settled: false,
-       batch_id: fetch_opt(binding, :batch_id, nil),
-       vessel_name: fetch_opt(binding, :vessel_name, nil),
-       vessel_code: fetch_opt(binding, :vessel_code, nil),
-       safe_tick: fetch_opt(binding, :safe_tick, nil),
-       safe_phase: fetch_opt(binding, :safe_phase, nil),
-       safe_delay: fetch_opt(binding, :safe_delay, nil),
-       safe_window: fetch_opt(binding, :safe_window, :relative),
+       batch_id: Fields.fetch_opt(binding, :batch_id, nil),
+       vessel_name: Fields.fetch_opt(binding, :vessel_name, nil),
+       vessel_code: Fields.fetch_opt(binding, :vessel_code, nil),
+       safe_tick: Fields.fetch_opt(binding, :safe_tick, nil),
+       safe_phase: Fields.fetch_opt(binding, :safe_phase, nil),
+       safe_delay: Fields.fetch_opt(binding, :safe_delay, nil),
+       safe_window: Fields.fetch_opt(binding, :safe_window, :relative),
        decoys: %{
          material_mismatch: %{
-           batch_id: fetch_opt(mm, :batch_id, ""),
-           vessel_name: fetch_opt(mm, :vessel_name, ""),
-           vessel_code: fetch_opt(mm, :vessel_code, ""),
-           material: fetch_opt(mm, :material, nil),
-           anchor: fetch_opt(mm, :anchor, nil)
+           batch_id: Fields.fetch_opt(mm, :batch_id, ""),
+           vessel_name: Fields.fetch_opt(mm, :vessel_name, ""),
+           vessel_code: Fields.fetch_opt(mm, :vessel_code, ""),
+           material: Fields.fetch_opt(mm, :material, nil),
+           anchor: Fields.fetch_opt(mm, :anchor, nil)
          },
          destination_dead_end: %{
-           batch_id: fetch_opt(dd, :batch_id, ""),
-           material: fetch_opt(dd, :material, nil),
-           disposition: fetch_opt(dd, :disposition, nil)
+           batch_id: Fields.fetch_opt(dd, :batch_id, ""),
+           material: Fields.fetch_opt(dd, :material, nil),
+           disposition: Fields.fetch_opt(dd, :disposition, nil)
          }
        },
        dynamics: dyn
@@ -339,7 +329,7 @@ defmodule Voy.World.Witness do
 
   defp normalize_doc(doc) when is_map(doc) do
     role =
-      case fetch_opt(doc, :role, nil) do
+      case Fields.fetch_opt(doc, :role, nil) do
         r when r in [:main, :decoy] -> r
         "main" -> :main
         "decoy" -> :decoy
@@ -347,7 +337,7 @@ defmodule Voy.World.Witness do
       end
 
     decoy_class =
-      case fetch_opt(doc, :decoy_class, nil) do
+      case Fields.fetch_opt(doc, :decoy_class, nil) do
         nil -> nil
         c when is_atom(c) -> c
         "material_mismatch" -> :material_mismatch
@@ -356,13 +346,13 @@ defmodule Voy.World.Witness do
       end
 
     %{
-      hop: fetch_opt(doc, :hop, nil),
+      hop: Fields.fetch_opt(doc, :hop, nil),
       role: role,
-      doc_kind: normalize_atom_if_known(fetch_opt(doc, :doc_kind, nil)),
-      lens: normalize_atom_if_known(fetch_opt(doc, :lens, nil)),
+      doc_kind: normalize_atom_if_known(Fields.fetch_opt(doc, :doc_kind, nil)),
+      lens: normalize_atom_if_known(Fields.fetch_opt(doc, :lens, nil)),
       decoy_class: decoy_class,
-      title: fetch_opt(doc, :title, ""),
-      body: fetch_opt(doc, :body, "")
+      title: Fields.fetch_opt(doc, :title, ""),
+      body: Fields.fetch_opt(doc, :body, "")
     }
   end
 
@@ -375,19 +365,6 @@ defmodule Voy.World.Witness do
       ArgumentError -> val
     end
   end
-
-  defp fetch_opt(opts, key, default) when is_list(opts) do
-    Keyword.get(opts, key, default)
-  end
-
-  defp fetch_opt(opts, key, default) when is_map(opts) do
-    case Map.fetch(opts, key) do
-      {:ok, val} -> val
-      :error -> Map.get(opts, Atom.to_string(key), default)
-    end
-  end
-
-  defp fetch_opt(_opts, _key, default), do: default
 
   # ==== deterministic skolemization ==== //
 

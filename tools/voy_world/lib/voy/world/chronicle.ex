@@ -3,7 +3,7 @@ defmodule Voy.World.Chronicle do
 
   use Voy.Kanren
 
-  alias Voy.World.{Dynamics, Projection, Schema}
+  alias Voy.World.{Dynamics, Fields, Projection, Schema}
 
   def interventions, do: Schema.interventions()
 
@@ -464,15 +464,15 @@ defmodule Voy.World.Chronicle do
 
   defp normalize_query_opts(opts) when is_list(opts) or is_map(opts) do
     with {:ok, intervention} <-
-           opt_intervention(fetch_opt(opts, [:intervention], :any)),
+           opt_intervention(Fields.fetch_opt(opts, [:intervention], :any)),
          {:ok, target_fate} <-
-           opt_fate(fetch_opt(opts, [:target_fate, :fate], :any)),
+           opt_fate(Fields.fetch_opt(opts, [:target_fate, :fate], :any)),
          {:ok, target_regime} <-
-           opt_regime(fetch_opt(opts, [:target_regime, :regime, :final_regime], :any)),
+           opt_regime(Fields.fetch_opt(opts, [:target_regime, :regime, :final_regime], :any)),
          {:ok, target_c0} <-
-           opt_c0(fetch_opt(opts, [:target_c0, :effective_c0], :any)),
+           opt_c0(Fields.fetch_opt(opts, [:target_c0, :effective_c0], :any)),
          {:ok, target_pulse} <-
-           opt_pulse(fetch_opt(opts, [:target_pulse, :effective_pulse], :any)) do
+           opt_pulse(Fields.fetch_opt(opts, [:target_pulse, :effective_pulse], :any)) do
       {:ok,
        %{
          intervention: intervention,
@@ -521,12 +521,12 @@ defmodule Voy.World.Chronicle do
 
   defp classify_source(fields) when is_list(fields) or is_map(fields) do
     cond do
-      has_field?(fields, :era2b) ->
-        classify_source(get_field(fields, :era2b))
+      Fields.has?(fields, :era2b) ->
+        classify_source(Fields.get(fields, :era2b))
 
-      has_field?(fields, :c0_status) and has_field?(fields, :pulse) ->
-        with {:ok, c0} <- opt_c0(get_field(fields, :c0_status)),
-             {:ok, pulse} <- opt_pulse(get_field(fields, :pulse)),
+      Fields.has?(fields, :c0_status) and Fields.has?(fields, :pulse) ->
+        with {:ok, c0} <- opt_c0(Fields.get(fields, :c0_status)),
+             {:ok, pulse} <- opt_pulse(Fields.get(fields, :pulse)),
              true <- c0 != :any and pulse != :any do
           {:ok, {:era2b, [c0_status: c0, pulse: pulse]}}
         else
@@ -546,36 +546,15 @@ defmodule Voy.World.Chronicle do
 
       topo =
         [
-          branch_id: get_field(fields, :branch_id) || :query_branch,
-          up_name: get_field(fields, :up_name) || "上游",
-          pass_name: get_field(fields, :pass_name) || "隘口",
-          down_name: get_field(fields, :down_name) || "谷地"
+          branch_id: Fields.get(fields, :branch_id) || :query_branch,
+          up_name: Fields.get(fields, :up_name) || "上游",
+          pass_name: Fields.get(fields, :pass_name) || "隘口",
+          down_name: Fields.get(fields, :down_name) || "谷地"
         ] ++ features
 
       {:ok, {:topo, topo}}
     rescue
       _ in [KeyError, ArgumentError] -> {:error, :unsupported_topography}
-    end
-  end
-
-  defp fetch_opt(opts, keys, default) do
-    Enum.find_value(keys, default, fn key ->
-      if has_field?(opts, key), do: get_field(opts, key)
-    end)
-  end
-
-  defp has_field?(fields, key) when is_list(fields), do: Keyword.has_key?(fields, key)
-
-  defp has_field?(fields, key) when is_map(fields) do
-    Map.has_key?(fields, key) or Map.has_key?(fields, Atom.to_string(key))
-  end
-
-  defp get_field(fields, key) when is_list(fields), do: Keyword.get(fields, key)
-
-  defp get_field(fields, key) when is_map(fields) do
-    case Map.fetch(fields, key) do
-      {:ok, v} -> v
-      :error -> Map.get(fields, Atom.to_string(key))
     end
   end
 end

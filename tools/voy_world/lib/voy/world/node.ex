@@ -3,7 +3,7 @@ defmodule Voy.World.Node do
 
   use Voy.Kanren
 
-  alias Voy.World.{Chronicle, Naming, Schema}
+  alias Voy.World.{Chronicle, Fields, Naming, Schema}
 
   @name_keys [:node, :up, :pass, :down]
 
@@ -138,14 +138,14 @@ defmodule Voy.World.Node do
   end
 
   defp candidate_topography(candidate) do
-    case fetch_field(candidate, :topography) do
+    case Fields.fetch(candidate, :topography) do
       {:ok, topo} when is_list(topo) or is_map(topo) -> {:ok, topo}
       _ -> {:error, :invalid_node_candidate}
     end
   end
 
   defp required_id(fields, key) do
-    case fetch_field(fields, key) do
+    case Fields.fetch(fields, key) do
       {:ok, value} when is_binary(value) and value != "" -> {:ok, value}
       {:ok, value} when is_atom(value) -> {:ok, Atom.to_string(value)}
       _ -> {:error, {:missing_or_invalid_id, key}}
@@ -191,7 +191,7 @@ defmodule Voy.World.Node do
   defp require_seed(_spec), do: {:error, :missing_seed}
 
   defp normalize_names(fields) do
-    case fetch_field(fields, :names) do
+    case Fields.fetch(fields, :names) do
       :error -> {:ok, nil}
       {:ok, nil} -> {:ok, nil}
       {:ok, names} when is_list(names) or is_map(names) -> normalize_name_book(names)
@@ -201,7 +201,7 @@ defmodule Voy.World.Node do
 
   defp normalize_name_book(names) do
     Enum.reduce_while(@name_keys, {:ok, %{}}, fn key, {:ok, acc} ->
-      case fetch_field(names, key) do
+      case Fields.fetch(names, key) do
         :error ->
           {:cont, {:ok, acc}}
 
@@ -225,20 +225,6 @@ defmodule Voy.World.Node do
   defp validate_names(_spec), do: {:error, :incomplete_name_book}
 
   defp value(fields, key, default) do
-    case fetch_field(fields, key) do
-      {:ok, value} -> value
-      :error -> default
-    end
+    Fields.fetch_opt(fields, key, default)
   end
-
-  defp fetch_field(fields, key) when is_list(fields), do: Keyword.fetch(fields, key)
-
-  defp fetch_field(fields, key) when is_map(fields) do
-    case Map.fetch(fields, key) do
-      {:ok, value} -> {:ok, value}
-      :error -> Map.fetch(fields, Atom.to_string(key))
-    end
-  end
-
-  defp fetch_field(_fields, _key), do: :error
 end

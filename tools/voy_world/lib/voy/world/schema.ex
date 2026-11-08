@@ -2,6 +2,7 @@ defmodule Voy.World.Schema do
   @moduledoc "Canonical topography attributes and JSON-safe boundary conversion."
 
   alias Voy.Kanren.ReifiedVar
+  alias Voy.World.Fields
 
   @topology_keys [
     :branch_id,
@@ -78,13 +79,13 @@ defmodule Voy.World.Schema do
 
   def topology(fields) do
     Enum.map(@topology_keys, fn key ->
-      {key, normalize(key, fetch_field!(fields, key))}
+      {key, normalize(key, Fields.fetch!(fields, key))}
     end)
   end
 
   def features(fields) do
     Enum.flat_map(@feature_keys, fn key ->
-      case fetch_field(fields, key) do
+      case Fields.fetch(fields, key) do
         {:ok, value} -> [{key, normalize(key, value)}]
         :error -> []
       end
@@ -93,24 +94,8 @@ defmodule Voy.World.Schema do
 
   def complete_features(fields) do
     Enum.map(@feature_keys, fn key ->
-      {key, normalize(key, fetch_field!(fields, key))}
+      {key, normalize(key, Fields.fetch!(fields, key))}
     end)
-  end
-
-  defp fetch_field(fields, key) when is_list(fields), do: Keyword.fetch(fields, key)
-
-  defp fetch_field(fields, key) when is_map(fields) do
-    case Map.fetch(fields, key) do
-      {:ok, value} -> {:ok, value}
-      :error -> Map.fetch(fields, Atom.to_string(key))
-    end
-  end
-
-  defp fetch_field!(fields, key) do
-    case fetch_field(fields, key) do
-      {:ok, value} -> value
-      :error -> raise KeyError, key: key, term: fields
-    end
   end
 
   defp normalize(key, value) when key in @feature_keys and is_binary(value) do

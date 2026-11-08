@@ -18,7 +18,7 @@ defmodule Voy.World.ContentTest do
     pack = Content.default_pack()
 
     for relic <- Pathway.relics(), fate <- Schema.fates() do
-      dossier = Witness.render_dossier(101, @branch, relic, fate, @names, pack)
+      dossier = Witness.render_dossier(101, @branch, relic, fate, @names, pack: pack)
       assert Enum.count(dossier.documents, &(&1.role == :main)) == 5
       assert Enum.count(dossier.documents, &(&1.role == :decoy)) == 2
       refute Enum.any?(dossier.documents, &String.contains?(&1.body, "{{"))
@@ -44,7 +44,7 @@ defmodule Voy.World.ContentTest do
         :ancestral_bronze_zheng,
         :Fate_Assimilated_NewZhai,
         @names,
-        %{pack | documents: documents}
+        pack: %{pack | documents: documents}
       )
 
     assert hd(dossier.documents).body == "【作者改稿】白水坝仅存此一跳。"
