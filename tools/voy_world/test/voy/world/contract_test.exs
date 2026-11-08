@@ -65,6 +65,7 @@ defmodule Voy.World.ContractTest do
     assert is_number(threshold)
     assert threshold > declared
     assert {:ok, "refuted"} = Contract.claim(contract, "prc.vulnerable_window_fires")
+    assert {:ok, "supported"} = Contract.claim(contract, "prc.onset_window_fires")
     assert {:ok, "supported"} = Contract.claim(contract, "prc.absolute_window_delays")
   end
 

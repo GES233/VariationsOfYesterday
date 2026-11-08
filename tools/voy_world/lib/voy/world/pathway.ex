@@ -21,7 +21,6 @@ defmodule Voy.World.Pathway do
   @max_depth 5
   @window :measured_delay_window
   @ritual_outcome :spike_delayed_or_stabilized
-  @shipped_out :shipped_out_to_provincial_smelter
 
   @relic_specs [
     %{
@@ -34,7 +33,8 @@ defmodule Voy.World.Pathway do
       workshop_lens: :workshop_tech,
       decoy_material: :plain_grey_iron,
       decoy_anchor: {:tau_breaths, 0},
-      decoy_vessel_kind: :grey_iron_casting
+      decoy_vessel_kind: :grey_iron_casting,
+      shipped_out: :shipped_out_to_provincial_smelter
     },
     %{
       relic: :carved_diversion_stele,
@@ -46,7 +46,8 @@ defmodule Voy.World.Pathway do
       workshop_lens: :hydro_tech,
       decoy_material: :plain_limestone_block,
       decoy_anchor: {:siphon_head_m, 0},
-      decoy_vessel_kind: :plain_ashlar_lining
+      decoy_vessel_kind: :plain_ashlar_lining,
+      shipped_out: :shipped_out_to_provincial_water_bureau
     }
   ]
 
@@ -264,14 +265,14 @@ defmodule Voy.World.Pathway do
         lens: :official_logistics,
         from: {:precedent_omen, spec.omen, spec.anchor},
         relation: :requisitioned_as_scrap,
-        to: {:scrap_shipment, {:batch, :decoy_b}, spec.material, @shipped_out, spec.anchor},
+        to: {:scrap_shipment, {:batch, :decoy_b}, spec.material, spec.shipped_out, spec.anchor},
         attrs: [
           decoy_class: :destination_dead_end,
           breaks_at: {2, 3},
           batch: {:batch, :decoy_b},
           material: spec.material,
           anchor: spec.anchor,
-          disposition: @shipped_out
+          disposition: spec.shipped_out
         ]
       }
     ]

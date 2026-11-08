@@ -189,7 +189,14 @@ defmodule Voy.World.PathwayTest do
       assert destination.attrs[:decoy_class] == :destination_dead_end
       assert destination.attrs[:breaks_at] == {2, 3}
       assert destination.attrs[:batch] == {:batch, :decoy_b}
-      assert destination.attrs[:disposition] == :shipped_out_to_provincial_smelter
+
+      expected_disposition =
+        case relic do
+          :ancestral_bronze_zheng -> :shipped_out_to_provincial_smelter
+          :carved_diversion_stele -> :shipped_out_to_provincial_water_bureau
+        end
+
+      assert destination.attrs[:disposition] == expected_disposition
     end
   end
 
