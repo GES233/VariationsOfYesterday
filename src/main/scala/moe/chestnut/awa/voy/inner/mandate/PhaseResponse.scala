@@ -193,9 +193,15 @@ object PhaseResponse:
     kind.foreach(k => st.synapseTau = k.shape.tau)
     val out = ArrayBuffer.empty[Spike]
     var t = 0.0
-    var prev = st.getState.dissonance
-    var candidate = Double.NaN
-    var peak = Double.MinValue
+    // The contract measures the crossing at the step end (no interpolation) and
+    // confirms a spike only when the excursion returns through zero.
+    val detector = new SpikeDetector(
+      section = section,
+      spikeLevel = spikeLevel,
+      confirm = SpikeConfirm.AtZeroCrossing,
+      interpolateCrossing = false
+    )
+    detector.observe(0.0, st.getState.dissonance)
     var taps = 0
     var vMin = Double.MaxValue
     while t < tWindow do
@@ -209,16 +215,7 @@ object PhaseResponse:
       t += dt
       val v = st.getState.dissonance
       vMin = Math.min(vMin, v)
-      if prev <= section && v > section then
-        // A new candidate excursion opens at this crossing.
-        candidate = t
-        peak = v
-      else if !candidate.isNaN then
-        peak = Math.max(peak, v)
-        if v < 0.0 then
-          if peak >= spikeLevel then out += Spike(candidate, peak)
-          candidate = Double.NaN
-      prev = v
+      detector.observe(t, v).foreach(s => out += Spike(s.at, s.peak))
     out.toSeq
 
   /** The first genuine spike after the pulse, and the excursion extremes of

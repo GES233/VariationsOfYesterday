@@ -126,46 +126,23 @@ final class PulseLinkRunner(
       order: Long
   )
 
-  /** Running detector for one cell. Mirrors the genuine-spike rule of
-    * [[PhaseResponse]]: a section upcrossing opens a candidate, which is a
-    * spike only if its running peak reaches `spikeLevel` — promptly. The
-    * crossing time is linearly interpolated between probes, the same
-    * discipline `PhaseTracker` uses, so coarse steps do not quantize the
-    * phase a link reports. */
+  /** Running detector for one cell, delegating the spike state machine to
+    * [[SpikeDetector]]. Links confirm within a window (ghost-relay weld) and
+    * interpolate the crossing time, so coarse steps do not quantize the phase a
+    * link reports; the prototype fingerprint mode still emits at the crossing.
+    */
   private final class CellTrend:
-    private var prev: Double = Double.NaN
-    private var prevT: Double = Double.NaN
-    private var candidate: Double = Double.NaN
-    private var peak: Double = Double.MinValue
-    private var fired: Boolean = false
+    private val detector = new SpikeDetector(
+      section = section,
+      spikeLevel = spikeLevel,
+      confirm = criterion match
+        case SpikeCriterion.SectionCrossing => SpikeConfirm.AtSectionCrossing
+        case SpikeCriterion.PeakConfirmed => SpikeConfirm.WithinWindow(confirmWindow),
+      interpolateCrossing = true
+    )
 
     def observe(t: Double, v: Double): Option[Double] =
-      var out: Option[Double] = None
-      if !prev.isNaN then
-        if prev <= section && v > section then
-          // Interpolated upcrossing time (frac of this step).
-          val frac = if v == prev then 0.0 else (section - prev) / (v - prev)
-          candidate = prevT + frac * (t - prevT)
-          peak = v
-          fired = criterion == SpikeCriterion.SectionCrossing
-          if criterion == SpikeCriterion.SectionCrossing then out = Some(candidate)
-        else if !candidate.isNaN then
-          peak = Math.max(peak, v)
-          if criterion == SpikeCriterion.PeakConfirmed && !fired && peak >= spikeLevel then
-            if t - candidate <= confirmWindow then
-              fired = true
-              out = Some(candidate)
-            else
-              // Ghost-relay weld: a genuine upstroke crosses 1.2 -> 1.8 in
-              // about a time unit (0.6 saturated, 1.2 near-critical); a
-              // level reached only after the window is a driven creep, not
-              // an action potential, and the candidate is abandoned for
-              // good — it must not become fireable again later.
-              candidate = Double.NaN
-          if v < 0.0 then candidate = Double.NaN
-      prev = v
-      prevT = t
-      out
+      detector.observe(t, v).map(_.at)
 
   private var pending: Vector[Scheduled] = Vector.empty
   private var nextOrder: Long = 0L
