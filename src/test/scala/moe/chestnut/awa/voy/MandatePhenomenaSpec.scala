@@ -179,6 +179,39 @@ class MandatePhenomenaSpec:
       "a network with living threads regrows on its own once stress drops"
     )
 
+  @Test def `economy tiers follow the heartbeat window, with spiking as the acute tier`(): Unit =
+    assertEquals(
+      MandatePhenomena.EconomyMaintained,
+      MandatePhenomena.classifyEconomy(readout().copy(pulseSuppressed = true)),
+      "a fresh pulse window leaves the vanilla economy untouched"
+    )
+    assertEquals(
+      MandatePhenomena.EconomyStagnant,
+      MandatePhenomena.classifyEconomy(readout()),
+      "no fresh pulse -> the economy sags at the baseline tier"
+    )
+    assertEquals(
+      MandatePhenomena.EconomySpiking,
+      MandatePhenomena.classifyEconomy(readout(v = 1.9)),
+      "a live spike excursion escalates to the acute tier"
+    )
+    assertEquals(
+      MandatePhenomena.EconomySpiking,
+      MandatePhenomena.classifyEconomy(readout(s = 0.98, regime = Regime.Burnout)),
+      "saturated burnout holds the acute tier"
+    )
+    assertEquals(
+      MandatePhenomena.EconomyStagnant,
+      MandatePhenomena.classifyEconomy(CellReadout.zero),
+      "chunks outside the live lattice are barren by mechanism (draft-01 §7.8)"
+    )
+    // Golden values: the whole point is legible severity, so pin the numbers.
+    assertEquals(0, MandatePhenomena.EconomyMaintained.tradePriceBonus)
+    assertEquals(2, MandatePhenomena.EconomyStagnant.tradePriceBonus)
+    assertEquals(5, MandatePhenomena.EconomySpiking.tradePriceBonus)
+    assertEquals(0.5, MandatePhenomena.EconomyStagnant.cropKeepChance, 1e-12)
+    assertEquals(0.15, MandatePhenomena.EconomySpiking.breedingKeepChance, 1e-12)
+
   @Test def `sustenance word stays qualitative`(): Unit =
     assertEquals("枯绝", MandatePhenomena.sustenanceWord(0.0))
     assertEquals("受损", MandatePhenomena.sustenanceWord(0.3))

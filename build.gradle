@@ -42,6 +42,19 @@ loom {
 
 }
 
+// The mixins reference Scala classes (MandateEconomy), so Java must compile
+// jointly with Scala instead of in the earlier standalone compileJava pass.
+// Point the (now source-less) java output at the scala output too, or loom's
+// run classpath references a build/classes/java/main directory that is never
+// created and the game launch warns about it.
+sourceSets {
+	main {
+		java.srcDirs = []
+		scala.srcDirs = ['src/main/scala', 'src/main/java']
+		java.destinationDirectory = scala.destinationDirectory
+	}
+}
+
 fabricApi {
 	configureDataGeneration {
 		client = true

@@ -2,6 +2,8 @@ package moe.chestnut.awa.voy
 
 import java.nio.file.{Files, Path}
 
+import scala.compiletime.uninitialized
+
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -12,7 +14,7 @@ import org.junit.jupiter.api.io.TempDir
   * falls back to defaults whole.
   */
 class VoyConfigSpec:
-  @TempDir var tempDir: Path = _
+  @TempDir var tempDir: Path = uninitialized
 
   private def configPath: Path = tempDir.resolve(VoyConfig.FileName)
 

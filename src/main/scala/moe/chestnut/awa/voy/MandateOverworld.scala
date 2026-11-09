@@ -39,11 +39,15 @@ import moe.chestnut.awa.voy.inner.mandate.*
   *      the chunk's `Regime`, `PhaseReading` (with 20-division dial tick),
   *      and `c0` shelter status.
   *  - **Mandate -> Overworld (`沉滞` Stagnation & Spike actions)**:
-  *    - Chunks without a fresh pulse-window shelter apply our own
-  *      `voy:stagnation` effect (`×0.30` block break speed; the spike
-  *      tier `voy:stagnation_spike` is `×0.09`), plus `SLOWNESS` and ash
-  *      particles on nearby villagers. `c0` no longer gates stagnation:
-  *      the source is "too long without a pulse" (heartbeat model, note 08);
+  *    - Chunks without a fresh pulse-window shelter are stagnated: the
+  *      vanilla *economy* sags (trade prices, breeding, golem summons, crop
+  *      growth — see `MandateEconomy` and the mixins), and nearby villagers
+  *      visibly wear `voy:stagnation`. The baseline tier never touches the
+  *      player's body; while the ground spikes (or sits in saturated
+  *      burnout) the pressure turns bodily: players get
+  *      `voy:stagnation_spike` (`×0.09` block break speed), plus `SLOWNESS`
+  *      and ash particles. `c0` no longer gates stagnation: the source is
+  *      "too long without a pulse" (heartbeat model, note 08);
   *    - Outbound `CellSpikeTriggered` and `RegimeTransitioned` actions produce
   *      audible tremors and ash plumes on the server thread.
   *  - **Sensory phenomena (design note 06 §3)**: the world itself is the
@@ -464,22 +468,21 @@ object MandateOverworld:
         readout.regime == Regime.Burnout ||
           readout.current.dissonance >= ReadoutParam().spikeLevel
 
-      // Apply `沉滞` (Stagnation) — our own effect, so the slowdown is
-      // attributable to the lattice instead of to vanilla mining fatigue.
-      // Particles are shown only during a spike: the baseline state is a
-      // permanent condition and must not become visual noise.
-      player.addStatusEffect(
-        new StatusEffectInstance(
-          if spikingOrBurnout then MandateEffects.StagnationSpikeEntry
-          else MandateEffects.StagnationEntry,
-          StagnationEffectTicks,
-          0,
-          false,
-          spikingOrBurnout,
-          true
-        )
-      )
+      // The baseline tier never touches the player: stagnation's bite lands
+      // on the vanilla economy (see the mixins). Only the acute tier turns
+      // bodily — `voy:stagnation_spike` plus `SLOWNESS` and ash while the
+      // ground is spiking or burnout-saturated.
       if spikingOrBurnout then
+        player.addStatusEffect(
+          new StatusEffectInstance(
+            MandateEffects.StagnationSpikeEntry,
+            StagnationEffectTicks,
+            0,
+            false,
+            true,
+            true
+          )
+        )
         player.addStatusEffect(
           new StatusEffectInstance(
             StatusEffects.SLOWNESS,
@@ -502,7 +505,9 @@ object MandateOverworld:
           0.01
         )
 
-      // Apply Stagnation to nearby vanilla villagers (§3.2)
+      // Nearby villagers visibly wear the stagnation (§3.2): the marker with
+      // ambient particles reads as the settlement going listless; the
+      // economic bite itself lives in the mixins (`MandateEconomy`).
       val box = new Box(
         player.getX - 24.0,
         player.getY - 12.0,
@@ -514,25 +519,26 @@ object MandateOverworld:
       world.getEntitiesByClass(classOf[VillagerEntity], box, _ => true).asScala.foreach { villager =>
         villager.addStatusEffect(
           new StatusEffectInstance(
-            StatusEffects.SLOWNESS,
+            MandateEffects.StagnationEntry,
             StagnationEffectTicks,
             0,
             true,
-            false,
+            true,
             false
           )
         )
-        world.spawnParticles(
-          ParticleTypes.ASH,
-          villager.getX,
-          villager.getY + 1.5,
-          villager.getZ,
-          2,
-          0.2,
-          0.2,
-          0.2,
-          0.0
-        )
+        if spikingOrBurnout then
+          world.spawnParticles(
+            ParticleTypes.ASH,
+            villager.getX,
+            villager.getY + 1.5,
+            villager.getZ,
+            2,
+            0.2,
+            0.2,
+            0.2,
+            0.0
+          )
       }
 
     // Sensory phenomenon layer (design note 06 §3): the world itself is the
@@ -634,8 +640,8 @@ object MandateOverworld:
     val previous = lastShelter.put(player.getUuid, java.lang.Boolean.valueOf(maintained))
     if previous == null || previous.booleanValue == maintained then return
     val line =
-      if maintained then "§a一记脉动荡开，沉滞退去，手上又利索了"
-      else "§7太久没有脉动：沉滞缠上来，挖掘开始发涩"
+      if maintained then "§a一记脉动荡开，沉滞退去，寨里的营生又活络了"
+      else "§7太久没有脉动：沉滞漫上来，寨里的营生蔫了下去"
     player.sendMessage(Text.literal(line), true)
 
   /** Handle outbound actions drained from the Mandate actor on the server thread. */

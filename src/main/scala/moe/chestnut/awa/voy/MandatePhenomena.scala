@@ -2,14 +2,57 @@ package moe.chestnut.awa.voy
 
 import moe.chestnut.awa.voy.inner.mandate.*
 
-/** Pure sensory phenomenon classification and mycelial re-inoculation rules
-  * (design note 06 §1 constraint 5, §2.1, §3, §7.1, §7.3, §7.4).
+/** Pure sensory phenomenon classification, economic pressure tiers, and
+  * mycelial re-inoculation rules (design note 06 §1 constraint 5, §2.1, §3,
+  * §7.1, §7.3, §7.4; design draft §3.2).
   *
   * Every function here is a pure projection of [[CellReadout]] (no Minecraft
-  * classes, no mutation) so the sensory bindings and narrative re-inoculation
-  * gates can be unit-tested deterministically.
+  * classes, no mutation) so the sensory bindings, economy tiers and narrative
+  * re-inoculation gates can be unit-tested deterministically.
   */
 object MandatePhenomena:
+  /** Economic pressure tier of a chunk (design draft §3.2, 2026-11-09 revision:
+    * stagnation's primary target returns to the vanilla economy per the
+    * original §7.8 decision — trade, breeding, golem spawn, crop growth —
+    * while the player's body only suffers during spikes).
+    *
+    * `*KeepChance` is the probability that one vanilla attempt proceeds; a
+    * stagnated chunk rolls against it per attempt, so the degradation reads
+    * as sluggishness rather than a hard stop.
+    */
+  final case class EconomyProfile(
+      tradePriceBonus: Int,
+      breedingKeepChance: Double,
+      golemKeepChance: Double,
+      cropKeepChance: Double
+  )
+
+  /** Sheltered chunk: vanilla economy runs untouched. */
+  val EconomyMaintained: EconomyProfile = EconomyProfile(0, 1.0, 1.0, 1.0)
+
+  /** Stagnant chunk (no fresh pulse window): the economy sags at half
+    * strength. Chunks outside the live lattice land here as well — the
+    * "safe but barren" outskirts are barren by mechanism, not by rhetoric
+    * (draft-01 §7.8).
+    */
+  val EconomyStagnant: EconomyProfile = EconomyProfile(2, 0.5, 0.5, 0.5)
+
+  /** Spiking or saturated-burnout chunk: the acute tier (§3.2). Transient for
+    * spikes, persistent for `Regime.Burnout`.
+    */
+  val EconomySpiking: EconomyProfile = EconomyProfile(5, 0.15, 0.25, 0.25)
+
+  /** Project a cell's semantic readout into its economic pressure tier. */
+  def classifyEconomy(
+      readout: CellReadout,
+      p: ReadoutParam = ReadoutParam()
+  ): EconomyProfile =
+    if readout.isMaintained then EconomyMaintained
+    else if readout.regime == Regime.Burnout ||
+      readout.current.dissonance >= p.spikeLevel
+    then EconomySpiking
+    else EconomyStagnant
+
   /** Narrative seed sustenance level (`M`) restored when re-inoculating a
     * depleted cell (matches `MandateSustenanceSpec` logistic regrowth seed).
     */
