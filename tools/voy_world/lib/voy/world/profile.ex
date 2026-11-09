@@ -31,7 +31,11 @@ defmodule Voy.World.Profile do
               heavy_kick: {0.5, 6.0},
               alpha_shock: {1.0, 12.0},
               alpha_metal_resonance: {1.0, 12.0},
-              OverwhelmingNegativeSuppression: {12.0, 40.0}
+              # Signed, mirroring the JVM shape area: suppression drives are
+              # negative (`PulseShape(area = -25.0)`), so the accepted window
+              # is negative too. Magnitude-only intervals here would never
+              # match a measured area.
+              OverwhelmingNegativeSuppression: {-40.0, -12.0}
             }
 
   @doc "The stock the frozen rule tables were written against."

@@ -59,6 +59,21 @@ defmodule Voy.World.ProfileTest do
     refute Profile.within_dose?(profile, :unknown_pulse, 5.0)
   end
 
+  test "suppression doses are signed windows mirroring the JVM shape area" do
+    profile = Profile.default()
+    contract = Contract.load!()
+
+    {:ok, measured} = Contract.pulse(contract, :OverwhelmingNegativeSuppression)
+
+    # The JVM fires this pulse with a negative area (`PulseShape(area = -25.0)`),
+    # and the contract records that signed value. The declared dose window must
+    # accept the measured negative area and reject its positive mirror image.
+    assert measured.area < 0
+    assert Profile.within_dose?(profile, :OverwhelmingNegativeSuppression, measured.area)
+    assert Profile.within_dose?(profile, :OverwhelmingNegativeSuppression, -25.0)
+    refute Profile.within_dose?(profile, :OverwhelmingNegativeSuppression, 25.0)
+  end
+
   test "the regime projection only emits the rule vocabulary" do
     profile = Profile.default()
 

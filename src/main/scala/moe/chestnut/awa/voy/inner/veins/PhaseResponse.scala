@@ -18,7 +18,8 @@ final case class PulseShape(area: Double, tau: Double, taps: Int = 1, gap: Doubl
 /** The pulse identities the author layer already names, with their doses
   * drawn from the ranges `Voy.World.Profile` declares (`alpha_shock:
   * {1, 12}`, `heavy_kick: {0.5, 6}`, `alpha_metal_resonance: {1, 12}`,
-  * `OverwhelmingNegativeSuppression: {12, 40}`).
+  * `OverwhelmingNegativeSuppression: {-40, -12}` — signed, the suppression
+  * drive is negative).
   *
   * `AlphaShockWeak` is deliberately outside the story content: it exists so
   * the naive rule "a pulse in the vulnerable window fires" can be tested
