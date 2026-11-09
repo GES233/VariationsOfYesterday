@@ -1,6 +1,8 @@
 package moe.chestnut.awa.voy
 
 import net.fabricmc.api.ModInitializer
+
+import moe.chestnut.awa.voy.mandate.{MandateEffects, MandateOverworld, MandateRuntime}
 import net.fabricmc.fabric.api.event.lifecycle.v1.{ServerLifecycleEvents, ServerTickEvents}
 import org.slf4j.{Logger, LoggerFactory}
 

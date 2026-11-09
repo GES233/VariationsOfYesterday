@@ -43,7 +43,7 @@
   `W_eff(T) = W_0 · max(0, 1 − T/T_invert)`；敲钟分派为 `SpikeSwallowed` 的
   那一击由分派置 `heartbeat = false`（见 §3），脉冲照常进方程但不记账；
 - 窗内 `沉滞`（`voy:stagnation`）**主动移除**（不再等 55 tick 自然衰减）；窗外每 20 tick
-  重新施加。`isMaintained` 的新定义（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateReadout.scala)）：
+  重新施加。`isMaintained` 的新定义（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala)）：
 
   ```
   isMaintained = pulseSuppressed && sustenance ≥ floor && phase ≠ BurnoutNoCycle && v < spikeLevel
@@ -62,7 +62,7 @@
 
 ### 2.3 两条烧毁路径共用同一膝点
 
-读数层把突触核的脉冲驱动纳入有效恢复偏移（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateReadout.scala) `Readout.effectiveA`）：
+读数层把突触核的脉冲驱动纳入有效恢复偏移（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala) `Readout.effectiveA`）：
 
 ```
 a_slow = α − Δ(1−M) − k·s                      （慢路径：菌竭烧毁）
@@ -128,13 +128,13 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
 
 ## 5. 落地修改面（2026-11-08 实施事实）
 
-- **改（机制核，读数层）**：[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateReadout.scala)
+- **改（机制核，读数层）**：[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala)
   —— `Readout.slowA` / `effectiveA` / `isEcologicalBurnout` 新增；`label` 与 `isMaintained`
   改正向尖峰判据；`CellReadout` 增加 `pulseDrive / pulseSuppressed / pulseTolerance /
   pulseState / simTime`；`PhaseTracker` 接受 `pulseDrive` 与 `overloaded` 探针。
-  [MandateAgent.scala](../src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateAgent.scala)
+  [MandateAgent.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateAgent.scala)
   —— 正脉冲簿记（`recordPulse`）、尖峰事件改正向判据、读数投影携带心跳状态。
-  [MandateSnapshot.scala](../src/main/scala/moe/chestnut/awa/voy/inner/mandate/MandateSnapshot.scala)
+  [MandateSnapshot.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateSnapshot.scala)
   / [MandatePersistence.scala](../src/main/scala/moe/chestnut/awa/voy/MandatePersistence.scala)
   —— 耐受四元组随格落盘（缺省读取，schemaVersion 不变）。
 - **改（游戏接线）**：[MandateOverworld.scala](../src/main/scala/moe/chestnut/awa/voy/MandateOverworld.scala)
@@ -143,7 +143,7 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
   [MandateEffects.scala](../src/main/scala/moe/chestnut/awa/voy/MandateEffects.scala)
   —— 新增 `voy:pulse_saturation`；lang 双语同步（键集一致性由
   `MandatePhenomenaSpec` 断言）。
-- **增**：[PulseTolerance.scala](../src/main/scala/moe/chestnut/awa/voy/inner/mandate/PulseTolerance.scala)
+- **增**：[PulseTolerance.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/PulseTolerance.scala)
   （纯函数耐受簿记）+ `PulseToleranceSpec`；`MandateReadoutSpec` / `MandateAgentSpec`
   增加心跳/过载/死菌/吞没四组行为测试。
 - **协议二修（2026-11-08）**：`EventMsg.FirePulse` 增加 `heartbeat` 位（默认 true）；

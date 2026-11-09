@@ -1,6 +1,6 @@
 package moe.chestnut.awa.voy.mixin;
 
-import moe.chestnut.awa.voy.MandateEconomy;
+import moe.chestnut.awa.voy.mandate.MandateEconomy;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.CropBlock;
 import net.minecraft.server.world.ServerWorld;

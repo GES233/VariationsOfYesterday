@@ -5,8 +5,8 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.render.RenderTickCounter
-import moe.chestnut.awa.voy.{MandateOverworld, MandatePhenomena, MandateRuntime}
-import moe.chestnut.awa.voy.inner.mandate.{CellReadout, PhaseLabel, PhaseReading, ReadoutParam, Regime}
+import moe.chestnut.awa.voy.mandate.{MandateOverworld, MandatePhenomena, MandateRuntime}
+import moe.chestnut.awa.voy.inner.veins.{CellReadout, PhaseLabel, PhaseReading, ReadoutParam, Regime}
 
 /** Development HUD overlay that visualises the mandate readout
   * (`Regime`, `PhaseReading`, `c0` maintenance status, and continuous

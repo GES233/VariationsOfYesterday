@@ -3,8 +3,9 @@ package moe.chestnut.awa.voy
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-import moe.chestnut.awa.voy.MandatePhenomena.{ReInoculationOutcome, YellowSeepTier}
-import moe.chestnut.awa.voy.inner.mandate.*
+import moe.chestnut.awa.voy.mandate.MandatePhenomena
+import moe.chestnut.awa.voy.mandate.MandatePhenomena.{ReInoculationOutcome, YellowSeepTier}
+import moe.chestnut.awa.voy.inner.veins.*
 
 /** Golden mapping of the sensory phenomenon signatures and the mycelial
   * re-inoculation gate (design note 06 §3, §7.1; work orders WO-1/WO-3/WO-4).

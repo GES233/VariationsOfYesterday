@@ -1,6 +1,6 @@
 package moe.chestnut.awa.voy.inner.action
 
-import moe.chestnut.awa.voy.inner.mandate.{CellCoord, MandateCurrent, PhaseReading, Regime}
+import moe.chestnut.awa.voy.inner.veins.{CellCoord, MandateCurrent, PhaseReading, Regime}
 
 sealed trait MandateActionProtocol
 

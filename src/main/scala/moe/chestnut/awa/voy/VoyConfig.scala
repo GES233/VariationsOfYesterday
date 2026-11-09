@@ -6,7 +6,7 @@ import com.google.gson.{GsonBuilder, JsonObject, JsonParser}
 import net.fabricmc.loader.api.FabricLoader
 import org.slf4j.{Logger, LoggerFactory}
 
-import moe.chestnut.awa.voy.inner.mandate.{MandateAgent, MandateParam, PulseToleranceParam, StressParam}
+import moe.chestnut.awa.voy.inner.veins.{MandateAgent, MandateParam, PulseToleranceParam, StressParam}
 
 /** Geometry and tuning of the prototype lattice (formerly hardcoded in
   * `MandateRuntime`). Chunk-grained: the lattice spans chunks

@@ -1,6 +1,6 @@
 package moe.chestnut.awa.voy.inner.event
 
-import moe.chestnut.awa.voy.inner.mandate.{
+import moe.chestnut.awa.voy.inner.veins.{
   CellCoord,
   LatticeEdge,
   MandateCurrent,

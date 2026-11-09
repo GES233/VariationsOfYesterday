@@ -1,6 +1,6 @@
 package moe.chestnut.awa.voy.mixin;
 
-import moe.chestnut.awa.voy.MandateEconomy;
+import moe.chestnut.awa.voy.mandate.MandateEconomy;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.world.ServerWorld;

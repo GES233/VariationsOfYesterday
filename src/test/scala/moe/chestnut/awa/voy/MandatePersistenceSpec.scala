@@ -3,6 +3,8 @@ package moe.chestnut.awa.voy
 import java.nio.file.{Files, Path}
 
 import com.mojang.datafixers.{DSL, DataFixer}
+
+import moe.chestnut.awa.voy.mandate.MandatePersistence
 import com.mojang.datafixers.schemas.Schema
 import com.mojang.serialization.Dynamic
 import org.junit.jupiter.api.Assertions.*
@@ -11,7 +13,7 @@ import org.junit.jupiter.api.Test
 import net.minecraft.SharedConstants
 import net.minecraft.world.PersistentStateManager
 
-import moe.chestnut.awa.voy.inner.mandate.{
+import moe.chestnut.awa.voy.inner.veins.{
   CellCoord,
   CellSnapshot,
   LatticeEdge,

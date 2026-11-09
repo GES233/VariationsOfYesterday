@@ -1,6 +1,6 @@
 # 设计札记 07 — 脉冲耦合链路（水晶链路）与相位同步
 
-> 状态：**事件层现行规范，数值已与原型对齐**。实现见 `src/main/scala/moe/chestnut/awa/voy/inner/mandate/PulseCoupling.scala`，数值指纹见 `src/test/scala/moe/chestnut/awa/voy/inner/mandate/PulseCouplingSpec.scala`。来源：云端 Agent 对 `inner/mandate` 的 Python 复现（`mandate/coupling.py` 与《脉冲耦合同步实验》笔记），本札记把它的结论固化进本仓库。
+> 状态：**事件层现行规范，数值已与原型对齐**。实现见 `src/main/scala/moe/chestnut/awa/voy/inner/veins/PulseCoupling.scala`，数值指纹见 `src/test/scala/moe/chestnut/awa/voy/inner/veins/PulseCouplingSpec.scala`。来源：云端 Agent 对 `inner/veins` 的 Python 复现（`mandate/coupling.py` 与《脉冲耦合同步实验》笔记），本札记把它的结论固化进本仓库。
 
 ## 0. 一句话
 
