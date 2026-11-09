@@ -10,6 +10,16 @@ import moe.chestnut.awa.voy.mandate.BellRitual.{BellBaselineCalming, BellStrikeO
   * continuous floats (design note 06 §1 constraint 5). Keeping every message
   * in one place makes the voice auditable and gives the future content
   * pipeline a single surface to localize.
+  *
+  * i18n convention (2026-11-09): gameplay text is deliberately hardcoded
+  * Simplified Chinese for now — the narrative corpus (the 32+4 dossier
+  * cards) is Chinese prose, and the wording is still in flux. The price of
+  * deferring is kept at zero by a discipline: NO user-facing string may be
+  * written outside this file, so the eventual migration is a mechanical
+  * `Text.literal` -> `Text.translatable` pass plus lang entries (the
+  * zh_cn/en_us key-parity test already guards the lang files). Migrate when
+  * the first non-Chinese playtester appears or the wording freezes,
+  * whichever comes first.
   */
 object MandateWording:
 
