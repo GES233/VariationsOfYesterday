@@ -57,7 +57,22 @@ object MandateHud:
           enabled = false
           1
         })
-      dispatcher.register(ClientCommandManager.literal("voy").`then`(hud))
+      // The client-registered `voy` root CONSUMES same-root commands whose
+      // parse fails client-side (Fabric swallows them instead of forwarding),
+      // so the server-side `/voy debug` (MandateOverworld) would be
+      // unreachable without an explicit forwarder node here. The forwarder
+      // must send the command packet directly: `sendChatCommand` is itself
+      // intercepted by Fabric and would re-enter this very node forever.
+      def forward(command: String): Int =
+        val handler = MinecraftClient.getInstance.getNetworkHandler
+        if handler != null then
+          handler.sendPacket(net.minecraft.network.packet.c2s.play.CommandExecutionC2SPacket(command))
+        1
+      val debug = ClientCommandManager.literal("debug")
+        .executes(_ => forward("voy debug"))
+        .`then`(ClientCommandManager.literal("on").executes(_ => forward("voy debug on")))
+        .`then`(ClientCommandManager.literal("off").executes(_ => forward("voy debug off")))
+      dispatcher.register(ClientCommandManager.literal("voy").`then`(hud).`then`(debug))
     }
 
   private def render(context: DrawContext): Unit =
