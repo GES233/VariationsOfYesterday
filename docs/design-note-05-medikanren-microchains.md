@@ -85,7 +85,7 @@
 ### 4.3 种子物化与实测安全刻度
 
 1. **实测安全刻度（`safe_ticks`）**：Scala `PhaseResponse` 对每个整数 tick 实测 `alpha_metal_resonance` 的尖峰响应，仅将结果为 `Delayed` 的刻度写入 `contracts/mandate-slice-v1.json`。
-2. **种子绑定（`Witness.bind/4`）**：按 `(seed, branch_id, relic, fate)` 确定性哈希选出互不冲突的真链批号、工业载体与 `safe_tick`，以及两套同车间干扰批号（材质不符卡另附干扰载体），渲染占位符后填入 `Export`（schema v2）的 `dossier` 字段。
+2. **种子绑定（`Witness.bind/5`）**：按 `(seed, branch_id, relic, fate)` 确定性哈希选出互不冲突的真链批号、工业载体与 `safe_tick`，以及两套同车间干扰批号（材质不符卡另附干扰载体），渲染占位符后填入 `Export`（schema v2）的 `dossier` 字段。
 
 ---
 

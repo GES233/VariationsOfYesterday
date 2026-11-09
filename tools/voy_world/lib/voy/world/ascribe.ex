@@ -517,7 +517,7 @@ defmodule Voy.World.Ascribe do
   Both worlds in the slice file the same cause tag, so this classifier must
   return the same answer for two different hidden explanations. If it ever
   looks right, it is right by accident -- which is exactly what
-  `Voy.World.AscribeSpec` asserts against.
+  `Voy.World.AscribeTest` asserts against.
   """
   @spec official_only([map()]) :: {:unique, map()} | tuple()
   def official_only(evidence) do

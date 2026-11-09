@@ -251,7 +251,7 @@ def fate_matrix_figure():
         for (x, w, _), text in zip(columns, texts):
             box(ax, x, y, w, 14, text, fc=color, fontsize=8.8)
 
-    ax.text(2, 19.5, "原先 era3 无规则的两格：已由设计札记 04 补齐为「未爆发的世界」", fontsize=12, fontweight="bold", color=INK)
+    ax.text(2, 19.5, "原先 era3 无规则的两格：已由设计札记 02（原札记 04 并入）补齐为「未爆发的世界」", fontsize=12, fontweight="bold", color=INK)
     box(
         ax, 2, 5, 47, 12.5,
         "陡裂隙 + 微裂隙 + 机耕道\n→ c0_collapsed + heavy_kick\n→ 慢性渗漏 Fate_Deferred_ChronicSeep（Strained）\n阻尼已毁，但扰动始终不足以点火",

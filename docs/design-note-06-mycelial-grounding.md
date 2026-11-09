@@ -2,7 +2,7 @@
 
 > 状态：**实施规格（WO-1/3/4 已落地，WO-2 待排期）**。本文档面向实现者（含编码代理）：第 1–4 节是不可违背的设计约束与映射，第 5 节是分阶段工单（WO-1…WO-4），第 6 节是考据与证据分级。
 >
-> 前置阅读：`docs/design-draft-01-living-world.md` §1（动力学层）、`docs/design-note-02-kanren-worldview-engine.md`（世界模型）、`docs/design-note-05-medikanren-microchains.md`（五跳卷宗）、`docs/verification-report-01-mandate-slice.md`。脉冲耦合链路见 `docs/design-note-07-pulse-coupling.md`；可编程晶盘见札记 09（待写）。
+> 前置阅读：`docs/design-draft-01-living-world.md` §1（动力学层）、`docs/design-note-02-kanren-worldview-engine.md`（世界模型）、`docs/design-note-05-medikanren-microchains.md`（五跳卷宗）、`docs/verification-report-01-mandate-slice.md`。脉冲耦合链路见 `docs/design-note-07-pulse-coupling.md`；制式验山盘见札记 09（已成稿但挂起，第一阶段不实现）。
 
 ---
 
@@ -51,7 +51,7 @@
 ### 2.3 黑箱声明（只许这三条）
 
 1. 菌网电活动与地质灾变的宏观耦合方式不明（黑箱，类比 HH 当年的「载流子」）；
-2. 仪式声波（铜钲）经压电效应/振动影响菌网——弱证据档，按黑箱使用。**晶体换能器（札记 07 的谐振件；可编程晶盘见札记 09）也归入本条**，不新增第四条；
+2. 仪式声波（铜钲）经压电效应/振动影响菌网——弱证据档，按黑箱使用。**晶体换能器（札记 07 的谐振件；制式验山盘见札记 09，挂起）也归入本条**，不新增第四条；
 3. 红石走线遵循 MC 原生规则，不解释。器件只在边界上读写原版红石信号，内部介质是菌网生物电，不是「新红石物理」。
 
 **禁止**再发明第四条（不许给菌网加「意识」「能量场」等第二属性）。
@@ -140,7 +140,7 @@
 
 ### WO-4 回归与金样（已完成）
 - ~~为 §3 签名映射加金样测试~~ **已完成**：`MandatePhenomenaSpec` 构造 `CellReadout` 断言签名档位与语言键集；
-- `./gradlew test` 全量 125 项（含 1 项默认跳过的 benchmark）通过，确认数值指纹测试（`SliceContractSpec` 等）未受影响。
+- `./gradlew test` 全量 126 项（含 1 项默认跳过的 benchmark）通过，确认数值指纹测试（`SliceContractSpec` 等）未受影响。
 - 验收：CI（`.github/workflows/build.yml`）通过。
 
 ### 明确不做（本工单范围外）

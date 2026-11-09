@@ -95,7 +95,7 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
 
 ## 3. 敲钟分派表（`evaluateBellStrike`，定稿）
 
-按序判定，先到先得（[MandateOverworld.scala](../src/main/scala/moe/chestnut/awa/voy/MandateOverworld.scala)）：
+按序判定，先到先得（[BellRitual.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/BellRitual.scala)，原在 `MandateOverworld.scala`，其后抽出为无 Minecraft 依赖的纯函数层）：
 
 | # | 条件 | Outcome | 效果 |
 |---|---|---|---|
@@ -135,12 +135,12 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
   [MandateAgent.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateAgent.scala)
   —— 正脉冲簿记（`recordPulse`）、尖峰事件改正向判据、读数投影携带心跳状态。
   [MandateSnapshot.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateSnapshot.scala)
-  / [MandatePersistence.scala](../src/main/scala/moe/chestnut/awa/voy/MandatePersistence.scala)
+  / [MandatePersistence.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandatePersistence.scala)
   —— 耐受四元组随格落盘（缺省读取，schemaVersion 不变）。
-- **改（游戏接线）**：[MandateOverworld.scala](../src/main/scala/moe/chestnut/awa/voy/MandateOverworld.scala)
-  —— 六分派 `evaluateBellStrike`、过载即刻反噬（效果 + 失谐钟声 + 灰烬）、
+- **改（游戏接线）**：[MandateOverworld.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandateOverworld.scala)
+  —— 六分派 `evaluateBellStrike`（其后已抽至 [BellRitual.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/BellRitual.scala)）、过载即刻反噬（效果 + 失谐钟声 + 灰烬）、
   窗内主动移除沉滞、文案与验山读数改「脉动庇护」口径；
-  [MandateEffects.scala](../src/main/scala/moe/chestnut/awa/voy/MandateEffects.scala)
+  [MandateEffects.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandateEffects.scala)
   —— 新增 `voy:pulse_saturation`；lang 双语同步（键集一致性由
   `MandatePhenomenaSpec` 断言）。
 - **增**：[PulseTolerance.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/PulseTolerance.scala)
@@ -150,7 +150,7 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
   六分派的 `SpikeSwallowed` 置 false，`BellStrikeOutcome.bookkeepsHeartbeat` 取代
   原先未接线的 `suppressesStagnation`；`recordPulse` 只在 `heartbeat = true` 时记账
   （链路脉冲无分派，恒为 true）。
-- **感官签名口径微调**：[MandatePhenomena.scala](../src/main/scala/moe/chestnut/awa/voy/MandatePhenomena.scala)
+- **感官签名口径微调**：[MandatePhenomena.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandatePhenomena.scala)
   的菌光与前兆孢子改绑 **`c0` 庇护**（`baselineCalming ≥ 0.01`）而非 `isMaintained`——
   心跳管玩家的身体，签名管土地自己的健康；札记 06 §3 签名表因此不破。
 - **不动**：四维 RK4 方程（`MandateState.scala` / `ODESolver.scala` 数值实现）、契约数值 oracle、`Regime`/`PhaseReading` 枚举线级名与 `Voy.World.Profile` 阈值镜像（同分支对 `tools/voy_world` 的改动均为独立去重重构，不涉心跳机制）。
