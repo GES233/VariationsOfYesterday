@@ -1,0 +1,61 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1.0,
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:alternatives",
+          "children": [
+            {
+              "type": "minecraft:item",
+              "name": "minecraft:coarse_dirt",
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "variations-of-yesterday:gastrodia_bed",
+                  "properties": {
+                    "condition": "2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "variations-of-yesterday:gastrodia_bed"
+            }
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ]
+    },
+    {
+      "rolls": 2.0,
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "variations-of-yesterday:fresh_gastrodia"
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        },
+        {
+          "condition": "minecraft:block_state_property",
+          "block": "variations-of-yesterday:gastrodia_bed",
+          "properties": {
+            "age": "3",
+            "condition": "0"
+          }
+        }
+      ]
+    }
+  ]
+}

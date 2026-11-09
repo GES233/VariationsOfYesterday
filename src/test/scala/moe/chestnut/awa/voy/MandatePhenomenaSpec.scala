@@ -3,6 +3,7 @@ package moe.chestnut.awa.voy
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
+import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
 import moe.chestnut.awa.voy.mandate.MandatePhenomena
 import moe.chestnut.awa.voy.mandate.MandatePhenomena.{ReInoculationOutcome, YellowSeepTier}
 import moe.chestnut.awa.voy.inner.veins.*
@@ -217,6 +218,44 @@ class MandatePhenomenaSpec:
     assertEquals("枯绝", MandatePhenomena.sustenanceWord(0.0))
     assertEquals("受损", MandatePhenomena.sustenanceWord(0.3))
     assertEquals("完好", MandatePhenomena.sustenanceWord(1.0))
+
+  @Test def `gastrodia bed grows only under calm stress and intact mycelial network`(): Unit =
+    // Healthy calm cell -> Growing
+    val healthy = readout(s = 0.20, regime = Regime.Calm, sustenance = 0.85)
+    assertEquals(GastrodiaBedVerdict.Growing, MandatePhenomena.evaluateGastrodiaBed(healthy))
+    assertTrue(MandatePhenomena.canInoculateTimberInField(healthy))
+
+    // Strained stress (s >= 0.45) -> Stalled (note 06 §4.3)
+    val strained = readout(s = 0.45, regime = Regime.Strained, sustenance = 1.0)
+    assertEquals(GastrodiaBedVerdict.Stalled, MandatePhenomena.evaluateGastrodiaBed(strained))
+    assertFalse(MandatePhenomena.canInoculateTimberInField(strained))
+    assertTrue(
+      MandatePhenomena.canRefurbishGastrodiaBed(strained),
+      "a sub-toxic strained cell can still accept fresh timber bedding"
+    )
+
+    // Damaged mycelial network (floor <= M < 0.60) -> Stalled
+    val damaged = readout(s = 0.10, regime = Regime.Calm, sustenance = 0.35)
+    assertEquals(GastrodiaBedVerdict.Stalled, MandatePhenomena.evaluateGastrodiaBed(damaged))
+    assertFalse(MandatePhenomena.canInoculateTimberInField(damaged))
+
+    // Deep incapacitation (BurnoutNoCycle) -> Withered (note 06 §4.3)
+    val burnoutNoCycle = readout(
+      s = 0.30,
+      phase = PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      sustenance = 0.80
+    )
+    assertEquals(GastrodiaBedVerdict.Withered, MandatePhenomena.evaluateGastrodiaBed(burnoutNoCycle))
+    assertFalse(MandatePhenomena.canRefurbishGastrodiaBed(burnoutNoCycle))
+
+    // Dead mycelial network (M = 0) -> Withered
+    val deadMycelium = readout(s = 0.10, sustenance = 0.0)
+    assertEquals(GastrodiaBedVerdict.Withered, MandatePhenomena.evaluateGastrodiaBed(deadMycelium))
+    assertFalse(MandatePhenomena.canRefurbishGastrodiaBed(deadMycelium))
+
+    // Rich timber inoculum seed stays strictly between wild seed and viable threshold
+    assertTrue(MandatePhenomena.RichReInoculationSeed > MandatePhenomena.ReInoculationSeed)
+    assertTrue(MandatePhenomena.RichReInoculationSeed < MandatePhenomena.ReInoculationMaxSustenance)
 
   @Test def `zh_cn and en_us language files keep identical key sets`(): Unit =
     import com.google.gson.JsonParser

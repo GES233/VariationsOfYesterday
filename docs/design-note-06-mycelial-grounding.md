@@ -102,9 +102,19 @@
 
 现实链条：天麻（Gastrodia elata）无根无叶，全靠蜜环菌供养。菌网完整 = 菌子收成，保护土地从道德劝诫变成经济利益。
 
-- 天麻床方块：读所在 Cell 快照——`s < 0.45`（Strained 以下）生长；`0.45 ≤ s` 停滞；`BurnoutNoCycle` 枯死；
-- 收获物：天麻（交易/药材），老寨经济来源；
-- 叙事钩子：垦殖破坏菌网 → 天麻绝收 + 土地失稳，**经济与地质共用同一底层**。
+- **天麻床方块（`gastrodia_bed`）**：无独立动力学状态，每次随机刻与交互均为所在 Cell 快照的无状态投影（`MandatePhenomena.evaluateGastrodiaBed`）：
+  - `Growing`（`condition = 0`）：`s < 0.45`（`Calm`）且 `M ≥ 0.60`（菌网完好），推进 `age = 0..3`；同时受沉滞经济档（`MandateEconomy.suppressCropGrowth`）调制；
+  - `Stalled`（`condition = 1`）：`s ≥ 0.45`（`Strained` 及以上）或 `floor ≤ M < 0.60`（菌网受损），菌索失水停滞；
+  - `Withered`（`condition = 2`）：`BurnoutNoCycle` 或 `M < floor`（菌网枯绝），菌丝黑腐枯死并锁存为死塘，须待地脉脱离失能且 `s < 0.60` 后手持**蜜环菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。
+- **段木伴栽与菌材（`inoculated_timber`）**：
+  - 在健康区块（`Growing`）手持野生菌种右键去皮原木可就地「段木发菌」转化为蜜环菌材（或工作台合制）；
+  - 紧贴天麻床四周或正下方放置蜜环菌材构成「段木伴栽」，生长概率翻倍（`1/4 → 1/2`）、成熟起挖产量提升（`1–2 → 3–4`）；
+  - 手持蜜环菌材右键枯竭土壤（不潜行）执行高活性再接种，播入 `M = 0.12`（`RichReInoculationSeed`，野生菌种为 `0.05`）。
+- **收获物与药食闭环**：**鲜天麻（`fresh_gastrodia`）**为老寨礼物经济物产；烤制得**煨天麻（`roasted_gastrodia`）**，玩家食用后清除身体上的 `脉冲过载`（`voy:pulse_saturation`）与尖峰震麻带来的 `SLOWNESS` / `NAUSEA`（只作用于玩家身体，不改地脉 `s` / `M`）。
+- **可选软联动（农夫乐事 Farmer's Delight，零硬依赖）**：
+  - **沃土与堆肥互通**：`farmersdelight:rich_soil` / `rich_soil_farmland` 纳入可接种土壤（`isInoculableSoil`），垫于天麻床正下方时视作伴栽基底；后续可让有机堆肥（`organic_compost`）的熟化速率受所在区块 `M` 调制（`BurnoutNoCycle` 静默期失活停转），且沃土作物同样受 `MandateEconomy` 沉滞压制，绝不架空地脉约束；
+  - **小刀起麻与砧板/厨锅扩展**：「起麻动刀不动锄」——手持小刀（`#c:tools/knife` / `#farmersdelight:tools/knives`）起挖成熟天麻床额外多产 1 枚鲜天麻；后续可通过带 `fabric:load_conditions` 的数据包配方扩展砧板劈菌材、鲜天麻切片留白麻种芽，以及厨锅炖「老寨天麻汤」（提供短暂「定风」豁免一次尖峰震麻硬直）与伴生榛蘑（蜜环菌子实体）菜肴。
+- **叙事钩子**：垦殖破坏菌网 → 天麻绝收 + 土地失稳，**经济与地质共用同一底层**。
 
 ## 5. 实现工单
 
@@ -122,11 +132,11 @@
 - 参数全部进 config（`c_drain`、`k_armor`、`q₀`、`armorMax`、`c_wetland`）。
 - 验收：新单元测试（mock 快照 → 断言总线求和值与装甲累积）；既有测试全绿。
 
-### WO-3 天麻床与感官签名（**签名与再接种已落地，2026-11-07；天麻床方块待 WO-2 方块框架**）
+### WO-3 天麻床与感官签名（**已落地，签名/再接种 2026-11-07，天麻床/菌材闭环 2026-11-09**）
 - 感官签名（§3）已由 `MandatePhenomena`（纯映射，可单测）+ `MandateOverworld.emitChunkPhenomena`（服务端统一发射，不进客户端逻辑）落地：黄水三档（铁锈色 `DustParticleEffect` 扫表层水体，计数按档）、健康夜光（`GLOW`，低密度封顶）、深度失能静默（`WHITE_ASH`，绑 `BurnoutNoCycle` 而非 `Regime.Burnout`）；
-- **菌网再接种**：手持菌种（发光地衣/蘑菇/菌丝体）右键土壤 → `evaluateReInoculation` 纯判定（`Seeded` / `AcidTooToxic` / `AlreadyViable`）→ `EventMsg.SetSustenance(M = 0.05)`；酸毒未退（s ≥ 0.6）时接种失败且菌种照常消耗——失败是身体证据，不是禁令；
-- 天麻床方块：待 WO-2 的方块框架落地后接入。
-- 验收：签名映射金样测试见 `MandatePhenomenaSpec`（全量测试数见 `AGENTS.md` 构建与测试）；服务器侧无渲染引用；专用服务器可用。
+- **菌网再接种**：手持菌种（发光地衣/蘑菇/菌丝体/蜜环菌材）右键土壤 → `evaluateReInoculation` 纯判定（`Seeded` / `AcidTooToxic` / `AlreadyViable`）→ `EventMsg.SetSustenance`（野生菌种 `M = 0.05`，蜜环菌材 `M = 0.12`）；酸毒未退（s ≥ 0.6）时接种失败且菌种照常消耗——失败是身体证据，不是禁令；
+- **天麻床与共生闭环（`blocks/VoyBlocks`、`GastrodiaBedBlock`）**：已落地 `gastrodia_bed`（天麻床）、`inoculated_timber`（蜜环菌材）、`fresh_gastrodia`（鲜天麻）、`roasted_gastrodia`（煨天麻），以及农夫乐事沃土基底/小刀起麻零依赖软兼容钩子。
+- 验收：签名与天麻床裁决金样测试见 `MandatePhenomenaSpec`（全量测试数见 `AGENTS.md` 构建与测试）；服务器侧无渲染引用；专用服务器可用。
 
 ### WO-4 回归与金样（已完成）
 - ~~为 §3 签名映射加金样测试~~ **已完成**：`MandatePhenomenaSpec` 构造 `CellReadout` 断言签名档位与语言键集；

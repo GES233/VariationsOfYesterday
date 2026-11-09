@@ -10,5 +10,9 @@
   "term.variations-of-yesterday.yellow_seep": "黄水",
   "block.variations-of-yesterday.limestone_drain": "石灰石沟",
   "block.variations-of-yesterday.constructed_wetland": "人工湿地",
-  "block.variations-of-yesterday.gastrodia_bed": "天麻床"
+  "block.variations-of-yesterday.gastrodia_bed": "天麻床",
+  "block.variations-of-yesterday.inoculated_timber": "蜜环菌材",
+  "item.variations-of-yesterday.fresh_gastrodia": "鲜天麻",
+  "item.variations-of-yesterday.roasted_gastrodia": "煨天麻",
+  "itemGroup.variations-of-yesterday.main": "旧日变奏曲"
 }

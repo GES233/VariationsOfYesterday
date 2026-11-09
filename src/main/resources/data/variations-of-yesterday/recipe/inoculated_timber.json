@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "#minecraft:logs",
+    [
+      "minecraft:brown_mushroom",
+      "minecraft:red_mushroom",
+      "minecraft:glow_lichen",
+      "minecraft:mycelium"
+    ]
+  ],
+  "result": {
+    "id": "variations-of-yesterday:inoculated_timber",
+    "count": 1
+  }
+}

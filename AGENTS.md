@@ -35,11 +35,12 @@
     - `MandateEconomy.scala` — 沉滞经济档的 mixin 桥接（交易加价 / 繁殖 / 铁傀儡 / 作物 keep 概率，概率判定集中在此）
     - `MandateEffects.scala` — 自定义状态效果（`voy:stagnation` 基础档=无属性标记 / `voy:stagnation_spike` 尖峰档 ×0.09 / `voy:pulse_saturation` 脉冲过载）
     - `MandatePersistence.scala` + `inner/veins/MandateSnapshot.scala` — 维度级持久化（`PersistentState`，整格快照含 `M`、通道、参数、边、链路与 `simTime`；状态与逐格参数来自存档，配置只作用于新注册格子、核心默认兜底）
+  - `blocks/` — 菌网共生与设施方块层（`VoyBlocks` 注册表与创造栏、`GastrodiaBedBlock` 天麻床及蜜环菌材/鲜天麻/煨天麻，含农夫乐事沃土与小刀零依赖软兼容钩子）
   - `inner/veins/` — 核心模拟（「地脉」= 山的身体，`mandate/` = 人间制度的授命）：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`、`PhaseResponse`、`PulseCoupling`、`PulseTolerance`（心跳抵消窗与耐受簿记）、`MandateSnapshot`
   - `inner/actor/Actor.scala` — 单线程 actor 内核（`ActorRef` 信箱，`tell` / `!` / `stop`）
   - `inner/event/EventMsg.scala` — 入向通道与拓扑协议 `EventDTO`（通道电平/脉冲 + 格子、输运边、链路的增删）
   - `inner/action/ActionMsg.scala` — 出向动作协议 `MandateActionProtocol`
-  - `inner/plant/PlantDTO.scala` — 植物侧 DTO 占位（天麻床等，待 WO-2 方块框架）
+  - `inner/plant/PlantDTO.scala` — 植物与菌塘共生纯值词表（`GastrodiaBedVerdict`、`PlantDTO`）
   - `helpers/ODESolver.scala` — RK4 / Euler 求解器
 - `src/client/scala/moe/chestnut/awa/voy/` — 客户端入口与开发 HUD（`hud/MandateHud.scala`，`/voy hud [on|off]`）
 - `src/main/java/moe/chestnut/awa/voy/mixin/` — mixin 层（`VillagerEntityMixin` 交易/繁殖/铁傀儡、`CropBlockMixin` 作物生长，均委托 `MandateEconomy`；Java 源与 Scala 联合编译，见 `build.gradle` 的 sourceSets 配置）

@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "variations-of-yesterday:block/inoculated_timber_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
+      "model": "variations-of-yesterday:block/inoculated_timber"
+    },
+    "axis=z": {
+      "model": "variations-of-yesterday:block/inoculated_timber_horizontal",
+      "x": 90
+    }
+  }
+}

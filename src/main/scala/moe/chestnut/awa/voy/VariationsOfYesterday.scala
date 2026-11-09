@@ -2,6 +2,7 @@ package moe.chestnut.awa.voy
 
 import net.fabricmc.api.ModInitializer
 
+import moe.chestnut.awa.voy.blocks.VoyBlocks
 import moe.chestnut.awa.voy.mandate.{MandateEffects, MandateOverworld, MandateRuntime}
 import net.fabricmc.fabric.api.event.lifecycle.v1.{ServerLifecycleEvents, ServerTickEvents}
 import org.slf4j.{Logger, LoggerFactory}
@@ -23,6 +24,7 @@ object VariationsOfYesterday extends ModInitializer:
     MandateEffects.Stagnation
     MandateEffects.StagnationSpike
     MandateEffects.PulseSaturation
+    VoyBlocks.register()
     // SERVER_STARTED, not STARTING: the engine restores its lattice from
     // the overworld's PersistentStateManager, which only exists after the
     // dimensions are loaded.

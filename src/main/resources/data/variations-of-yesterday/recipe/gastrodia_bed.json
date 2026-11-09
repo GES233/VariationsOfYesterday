@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "FDF",
+    "TDT"
+  ],
+  "key": {
+    "F": [
+      "minecraft:brown_mushroom",
+      "minecraft:red_mushroom",
+      "minecraft:glow_lichen",
+      "variations-of-yesterday:fresh_gastrodia"
+    ],
+    "D": "#minecraft:dirt",
+    "T": "variations-of-yesterday:inoculated_timber"
+  },
+  "result": {
+    "id": "variations-of-yesterday:gastrodia_bed",
+    "count": 2
+  }
+}

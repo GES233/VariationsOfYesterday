@@ -7,7 +7,7 @@ import scala.jdk.CollectionConverters.*
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.player.{PlayerBlockBreakEvents, UseBlockCallback}
 import net.fabricmc.loader.api.FabricLoader
-import net.minecraft.block.{BlockState, Blocks}
+import net.minecraft.block.{BlockState, Blocks, PillarBlock}
 import net.minecraft.entity.effect.{StatusEffectInstance, StatusEffects}
 import net.minecraft.entity.passive.VillagerEntity
 import net.minecraft.item.Items
@@ -24,6 +24,7 @@ import net.minecraft.util.math.Box
 import net.minecraft.util.{ActionResult, Hand}
 import net.minecraft.world.World
 
+import moe.chestnut.awa.voy.blocks.VoyBlocks
 import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.veins.*
 
@@ -90,19 +91,35 @@ object MandateOverworld:
       state.isOf(Blocks.DIAMOND_ORE) || state.isOf(Blocks.DEEPSLATE_DIAMOND_ORE) ||
       state.isOf(Blocks.EMERALD_ORE) || state.isOf(Blocks.DEEPSLATE_EMERALD_ORE)
 
+  /** Wild fungal inoculum items that seed baseline mycelial sustenance (`M = 0.05`)
+    * or colonize stripped timber in the field (design note 06 §7.1).
+    */
+  private def isWildInoculum(stack: net.minecraft.item.ItemStack): Boolean =
+    stack.isOf(Items.GLOW_LICHEN) || stack.isOf(Items.BROWN_MUSHROOM) ||
+      stack.isOf(Items.RED_MUSHROOM) || stack.isOf(Items.MYCELIUM)
+
   /** Fungal inoculum items that can seed mycelial sustenance (`M`) into a
     * depleted chunk (design note 06 §7.1, narrative "re-inoculation").
     */
   private def isInoculum(stack: net.minecraft.item.ItemStack): Boolean =
-    stack.isOf(Items.GLOW_LICHEN) || stack.isOf(Items.BROWN_MUSHROOM) ||
-      stack.isOf(Items.RED_MUSHROOM) || stack.isOf(Items.MYCELIUM)
+    isWildInoculum(stack) || stack.isOf(VoyBlocks.InoculatedTimberItem)
+
+  /** Debarked timber blocks that can be colonized in-situ into `菌材`
+    * (`VoyBlocks.InoculatedTimber`) when the chunk's mycelial network is intact.
+    */
+  private def isStrippedTimber(state: BlockState): Boolean =
+    state.isOf(Blocks.STRIPPED_OAK_LOG) || state.isOf(Blocks.STRIPPED_SPRUCE_LOG) ||
+      state.isOf(Blocks.STRIPPED_BIRCH_LOG) || state.isOf(Blocks.STRIPPED_JUNGLE_LOG) ||
+      state.isOf(Blocks.STRIPPED_ACACIA_LOG) || state.isOf(Blocks.STRIPPED_DARK_OAK_LOG) ||
+      state.isOf(Blocks.STRIPPED_MANGROVE_LOG) || state.isOf(Blocks.STRIPPED_CHERRY_LOG)
 
   /** Ground blocks that accept inoculum (the soil/wetland continuity the
-    * mycelium lives in, note 06 §2.1).
+    * mycelium lives in, note 06 §2.1, plus optional Farmer's Delight rich soil).
     */
   private def isInoculableSoil(state: BlockState): Boolean =
     state.isIn(BlockTags.DIRT) || state.isOf(Blocks.FARMLAND) ||
-      state.isOf(Blocks.MUD) || state.isOf(Blocks.MOSS_BLOCK)
+      state.isOf(Blocks.MUD) || state.isOf(Blocks.MOSS_BLOCK) ||
+       moe.chestnut.awa.voy.blocks.GastrodiaBedBlock.isCompatRichSoil(state)
 
   def register(): Unit =
     registerBlockBreakListener()
@@ -212,11 +229,67 @@ object MandateOverworld:
           val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
           player.sendMessage(Text.literal(MandateWording.formatInspection(chunkX, chunkZ, readout, debugNumbers)), true)
           ActionResult.PASS
-        else if isInoculum(held) && isInoculableSoil(state) &&
+        else if !player.isSneaking && isWildInoculum(held) && isStrippedTimber(state) &&
+          MandateRuntime.isLiveChunk(chunkX, chunkZ)
+        then
+          val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
+          val serverWorld = world.asInstanceOf[ServerWorld]
+          if MandatePhenomena.canInoculateTimberInField(readout) then
+            val axis =
+              if state.contains(PillarBlock.AXIS) then state.get(PillarBlock.AXIS)
+              else net.minecraft.util.math.Direction.Axis.Y
+            serverWorld.setBlockState(
+              pos,
+              VoyBlocks.InoculatedTimber.getDefaultState.`with`(PillarBlock.AXIS, axis)
+            )
+            if !player.isCreative then held.decrement(1)
+            serverWorld.spawnParticles(
+              ParticleTypes.MYCELIUM,
+              pos.getX + 0.5,
+              pos.getY + 0.8,
+              pos.getZ + 0.5,
+              14,
+              0.4,
+              0.4,
+              0.4,
+              0.01
+            )
+            serverWorld.spawnParticles(
+              ParticleTypes.SPORE_BLOSSOM_AIR,
+              pos.getX + 0.5,
+              pos.getY + 0.8,
+              pos.getZ + 0.5,
+              10,
+              0.4,
+              0.4,
+              0.4,
+              0.02
+            )
+            serverWorld.playSound(
+              null,
+              pos,
+              SoundEvents.BLOCK_MOSS_PLACE,
+              SoundCategory.BLOCKS,
+              0.9f,
+              0.95f
+            )
+            player.sendMessage(
+              Text.literal(MandateWording.formatTimberFieldInoculation(success = true, readout)),
+              true
+            )
+          else
+            player.sendMessage(
+              Text.literal(MandateWording.formatTimberFieldInoculation(success = false, readout)),
+              true
+            )
+          ActionResult.SUCCESS
+        else if !(held.isOf(VoyBlocks.InoculatedTimberItem) && player.isSneaking) &&
+          isInoculum(held) && isInoculableSoil(state) &&
           MandateRuntime.isLiveChunk(chunkX, chunkZ)
         then
           val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
           val outcome = MandatePhenomena.evaluateReInoculation(readout)
+          val richTimber = held.isOf(VoyBlocks.InoculatedTimberItem)
           outcome match
             case MandatePhenomena.ReInoculationOutcome.AlreadyViable =>
               // Living threads remain: let vanilla placement proceed, no spam.
@@ -225,13 +298,16 @@ object MandateOverworld:
               // The inoculum dies in acid soil: say so, then let vanilla
               // placement consume the item as an honest cost.
               player.sendMessage(
-                Text.literal(MandateWording.formatReInoculation(chunkX, chunkZ, readout, outcome)),
+                Text.literal(MandateWording.formatReInoculation(chunkX, chunkZ, readout, outcome, richTimber)),
                 true
               )
               ActionResult.PASS
             case MandatePhenomena.ReInoculationOutcome.Seeded =>
               val serverWorld = world.asInstanceOf[ServerWorld]
-              MandateRuntime.setSustenanceAt(chunkX, chunkZ, outcome.targetLevel)
+              val targetSeed =
+                if richTimber then MandatePhenomena.RichReInoculationSeed
+                else outcome.targetLevel
+              MandateRuntime.setSustenanceAt(chunkX, chunkZ, targetSeed)
               if !player.isCreative then held.decrement(1)
               serverWorld.spawnParticles(
                 ParticleTypes.SPORE_BLOSSOM_AIR,
@@ -264,7 +340,7 @@ object MandateOverworld:
                 1.1f
               )
               player.sendMessage(
-                Text.literal(MandateWording.formatReInoculation(chunkX, chunkZ, readout, outcome)),
+                Text.literal(MandateWording.formatReInoculation(chunkX, chunkZ, readout, outcome, richTimber)),
                 true
               )
               ActionResult.SUCCESS

@@ -1,5 +1,6 @@
 package moe.chestnut.awa.voy.mandate
 
+import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
 import moe.chestnut.awa.voy.inner.veins.*
 
 /** Pure sensory phenomenon classification, economic pressure tiers, and
@@ -57,6 +58,17 @@ object MandatePhenomena:
     * depleted cell (matches `MandateSustenanceSpec` logistic regrowth seed).
     */
   val ReInoculationSeed: Double = 0.05
+
+  /** Richer seed sustenance level (`M`) restored when re-inoculating soil with
+    * prepared `菌材` (Inoculated Timber): skips the slowest initial lag of
+    * logistic regrowth while staying strictly below [[ReInoculationMaxSustenance]].
+    */
+  val RichReInoculationSeed: Double = 0.12
+
+  /** Minimum sustenance (`M`) for an intact mycelial network ("完好") capable
+    * of feeding symbiotic Gastrodia tubers at full vigour.
+    */
+  val GastrodiaHealthySustenance: Double = 0.60
 
   /** Above this sustenance level, living mycelial threads remain viable and
     * will self-regrow logistically once stress drops below the burn threshold.
@@ -214,3 +226,48 @@ object MandatePhenomena:
       ReInoculationOutcome.AcidTooToxic
     else
       ReInoculationOutcome.Seeded
+
+  /** Pure symbiotic growth rule for a `天麻床` (Gastrodia bed, design note 06
+    * §4.3 & WO-3):
+    *
+    *  - `BurnoutNoCycle` or dead mycelial network (`M < sustenanceFloor`) ->
+    *    [[GastrodiaBedVerdict.Withered]];
+    *  - Else `s >= 0.45` (`Strained`+) or damaged mycelial network
+    *    (`M < 0.60`) -> [[GastrodiaBedVerdict.Stalled]];
+    *  - Else (`s < 0.45` and `M >= 0.60`) -> [[GastrodiaBedVerdict.Growing]].
+    */
+  def evaluateGastrodiaBed(
+      readout: CellReadout,
+      p: ReadoutParam = ReadoutParam()
+  ): GastrodiaBedVerdict =
+    val floor = Math.max(readout.stressParam.sustenanceFloor, 1e-9)
+    val deepDead =
+      readout.phase == PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) ||
+        readout.sustenance < floor
+    if deepDead then GastrodiaBedVerdict.Withered
+    else if readout.current.stress >= p.strained ||
+      readout.sustenance < GastrodiaHealthySustenance
+    then GastrodiaBedVerdict.Stalled
+    else GastrodiaBedVerdict.Growing
+
+  /** Whether a withered `天麻床` can be refurbished with fresh `菌材`
+    * (Inoculated Timber): requires the cell to have exited deep incapacitation
+    * (`Withered`) and soil stress to be below the acid toxicity threshold.
+    */
+  def canRefurbishGastrodiaBed(
+      readout: CellReadout,
+      p: ReadoutParam = ReadoutParam()
+  ): Boolean =
+    evaluateGastrodiaBed(readout, p) != GastrodiaBedVerdict.Withered &&
+      readout.current.stress < toxicityThreshold(readout)
+
+  /** Whether a stripped log in the world can be colonized in-situ into `菌材`
+    * (Inoculated Timber) by applying fungal inoculum: requires a healthy,
+    * calm mycelial network ([[GastrodiaBedVerdict.Growing]]).
+    */
+  def canInoculateTimberInField(
+      readout: CellReadout,
+      p: ReadoutParam = ReadoutParam()
+  ): Boolean =
+    evaluateGastrodiaBed(readout, p) == GastrodiaBedVerdict.Growing
+

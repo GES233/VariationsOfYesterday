@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "variations-of-yesterday:block/inoculated_timber_top",
+    "side": "variations-of-yesterday:block/inoculated_timber_side"
+  }
+}

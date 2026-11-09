@@ -1,6 +1,7 @@
 package moe.chestnut.awa.voy.mandate
 
 import moe.chestnut.awa.voy.VoyConfig
+import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
 import moe.chestnut.awa.voy.inner.veins.*
 import moe.chestnut.awa.voy.mandate.BellRitual.{BellBaselineCalming, BellStrikeOutcome}
 
@@ -31,15 +32,74 @@ object MandateWording:
       chunkX: Int,
       chunkZ: Int,
       r: CellReadout,
-      outcome: MandatePhenomena.ReInoculationOutcome
+      outcome: MandatePhenomena.ReInoculationOutcome,
+      richTimber: Boolean = false
   ): String =
     outcome match
       case MandatePhenomena.ReInoculationOutcome.Seeded =>
-        f"§a[接种成菌] [$chunkX%d,$chunkZ%d] 菌种落入土层，菌丝开始重新结网（菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}，养复需时）"
+        if richTimber then
+          f"§a[段木发菌] [$chunkX%d,$chunkZ%d] 熟化菌材埋入土层，琥珀色菌索迅速扎根结网（菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}，起步更稳）"
+        else
+          f"§a[接种成菌] [$chunkX%d,$chunkZ%d] 菌种落入土层，菌丝开始重新结网（菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}，养复需时）"
       case MandatePhenomena.ReInoculationOutcome.AcidTooToxic =>
         f"§c[接种失败] [$chunkX%d,$chunkZ%d] 土层酸毒未退，菌种落土即死——须先泄压降酸再接种（菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}）"
       case MandatePhenomena.ReInoculationOutcome.AlreadyViable =>
         f"§7[接种无益] [$chunkX%d,$chunkZ%d] 此区块菌网尚存活丝（${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}），可自行养复"
+
+  /** Player-facing wording when inspecting or tending a `天麻床` (Gastrodia bed,
+    * design note 06 §4.3).
+    */
+  def formatGastrodiaInspection(
+      age: Int,
+      maxAge: Int,
+      verdict: GastrodiaBedVerdict,
+      hasCompanionTimber: Boolean,
+      r: CellReadout
+  ): String =
+    val stageWord = age match
+      case 0 => "初下种·菌丝搭桥"
+      case 1 => "白麻结珠·菌索缠结"
+      case 2 => "箭麻饱浆·将熟"
+      case _ => "箭麻丰熟·可起挖"
+    val timberNote = if hasCompanionTimber then "段木伴栽" else "无伴栽菌材"
+    val netWord = MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)
+    verdict match
+      case GastrodiaBedVerdict.Growing =>
+        f"§a[翻看菌塘] $stageWord ($age%d/$maxAge%d · $timberNote) — 地脉平静、菌网$netWord，蜜环菌正持续供养天麻"
+      case GastrodiaBedVerdict.Stalled =>
+        f"§e[翻看菌塘] $stageWord ($age%d/$maxAge%d · $timberNote) — 地脉${regimeWord(r.regime)}、菌网$netWord，菌索失水停滞，须安抚地脉或养复菌网"
+      case GastrodiaBedVerdict.Withered =>
+        f"§4[翻看菌塘] 菌塘枯死 (菌网:$netWord) — 蜜环菌黑腐断绝，须待地脉脱离失能并降酸后，持菌材重铺菌塘"
+
+  /** Player-facing wording when harvesting mature tubers from a `天麻床`. */
+  def formatGastrodiaHarvest(count: Int, hasCompanionTimber: Boolean): String =
+    if hasCompanionTimber then
+      f"§a[起麻入篓] 伴栽菌材菌索肥厚，起出鲜天麻 $count%d 枚，菌塘留种重发"
+    else
+      f"§a[起麻入篓] 拨开腐殖土起出鲜天麻 $count%d 枚，菌塘留种重发（旁置菌材可增产提速）"
+
+  /** Player-facing wording when attempting to refurbish a withered `天麻床`. */
+  def formatGastrodiaRefurbish(success: Boolean, r: CellReadout): String =
+    val netWord = MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)
+    if success then
+      f"§a[重铺菌塘] 剔去黑腐死丝、换入新菌材，菌塘重新下种（菌网:$netWord）"
+    else
+      f"§c[重铺无果] 土层尚处深度失能或酸毒未退（态:${regimeWord(r.regime)} 菌网:$netWord），此时换入菌材亦会黑腐"
+
+  /** Player-facing wording when inoculating a stripped log into `菌材` in the field. */
+  def formatTimberFieldInoculation(success: Boolean, r: CellReadout): String =
+    val netWord = MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)
+    if success then
+      f"§a[段木发菌] 借土层完好菌网引菌入木，去皮原木已发成蜜环菌材"
+    else
+      f"§e[发菌未成] 野外段木发菌需地脉平静且菌网完好（当前 态:${regimeWord(r.regime)} 菌网:$netWord；亦可由工作台合制）"
+
+  /** Player-facing wording when eating `煨天麻` (Roasted Gastrodia) to steady the body. */
+  def formatRoastedGastrodiaRelief(clearedEffects: Boolean): String =
+    if clearedEffects then
+      "§b[煨麻定风] 温热药气散入四肢，地脉震麻与迟滞消退了"
+    else
+      "§7[煨麻入腹] 焦香温润，神思安定了些许"
 
   /** Player-facing wording for a slow-variable regime change: what the land is
     * doing, not which enum member it moved to.

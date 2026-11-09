@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "bottom": "variations-of-yesterday:block/gastrodia_bed_bottom",
+    "side": "variations-of-yesterday:block/gastrodia_bed_side",
+    "top": "variations-of-yesterday:block/gastrodia_bed_top_stage2"
+  }
+}
