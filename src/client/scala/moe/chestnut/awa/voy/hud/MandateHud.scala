@@ -5,7 +5,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.render.RenderTickCounter
-import moe.chestnut.awa.voy.mandate.{MandateOverworld, MandatePhenomena, MandateRuntime}
+import moe.chestnut.awa.voy.mandate.{MandateOverworld, MandatePhenomena, MandateRuntime, MandateWording}
 import moe.chestnut.awa.voy.inner.veins.{CellReadout, PhaseLabel, PhaseReading, ReadoutParam, Regime}
 
 /** Development HUD overlay that visualises the mandate readout
@@ -117,7 +117,7 @@ object MandateHud:
     )
     context.drawTextWithShadow(
       textRenderer,
-      s"regime=${readout.regime}  phase=${MandateOverworld.formatPhaseShort(readout.phase)}",
+      s"regime=${readout.regime}  phase=${MandateWording.formatPhaseShort(readout.phase)}",
       x0,
       y0 + 2 * lineHeight,
       tileColor(centerX, centerZ, readout)

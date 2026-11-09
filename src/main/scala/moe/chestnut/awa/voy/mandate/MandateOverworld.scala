@@ -28,7 +28,9 @@ import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.veins.*
 
 /** Minimal Overworld reference wiring for the Mandate Engine (design draft
-  * §1.1, §1.4, §3.2):
+  * §1.1, §1.4, §3.2). This object is wiring only: bell-strike adjudication
+  * lives in [[BellRitual]], all player-facing wording in [[MandateWording]],
+  * and the pure readout mappings in [[MandatePhenomena]].
   *
   *  - **World -> Mandate (1:N channel mapping)**:
   *    - Breaking stone / ore blocks injects land stress (`StressInject`)
@@ -60,125 +62,12 @@ import moe.chestnut.awa.voy.inner.veins.*
   *    to depleted, sub-toxic soil seeds `M` via `EventMsg.SetSustenance`.
   */
 object MandateOverworld:
-  /** Standard c0 level provided by an intact village bell (§1.2, SliceContract.c0Intact). */
-  val BellBaselineCalming: Double = 0.03
-
-  /** Standard pulse area delivered when ringing a bell (matches SliceContract alpha_shock/resonance scale). */
-  val BellPulseArea: Double = 12.0
-
   /** Stagnation bookkeeping cadence and effect duration in server ticks
     * (design draft §3.2: reapply outside the pulse window, short enough that
     * a fresh window clears it immediately).
     */
   private val StagnationReapplyTicks = 20
   private val StagnationEffectTicks = 55
-
-  /** Phase- and cadence-gated outcome of striking a bell / resonance vessel on a cell.
-    *
-    * `bookkeepsHeartbeat` gates the pulse-*ledger* only (not the physics):
-    * every strike fires the pulse, but a strike the dispatch refuses to count
-    * (`SpikeSwallowed`, dead mycelium) must not open a stagnation window.
-    * Overload still bookkeeps because the overload verdict itself has to be
-    * recorded (it collapses any window and locks the cell).
-    */
-  enum BellStrikeOutcome(
-      val anchorsC0: Boolean,
-      val baselineCalming: Double,
-      val pulseArea: Double,
-      val bookkeepsHeartbeat: Boolean = false,
-      val triggersOverloadPenalty: Boolean = false
-  ):
-    /** Chronic ecological burnout (`M -> 0` or `a_slow <= burnoutA`): the
-      * mycelial network is dead, so ringing the bell cannot anchor `c0` or
-      * establish a heartbeat suppression window. Recovery requires relieving
-      * acid stress and re-inoculating mycelium.
-      */
-    case DeadMyceliumBurnout
-        extends BellStrikeOutcome(false, 0.0, BellPulseArea, false, false)
-
-    /** Acute pulse overload (`BurnoutNoCycle` triggered by pulsing too fast
-      * or while tolerance-saturated): the strike is recorded (it collapses
-      * stagnation suppression, deepens subsequent tolerance, and locks the
-      * cell), and applies an immediate `voy:pulse_saturation` backlash.
-      */
-    case PulseOverloadBurnout
-        extends BellStrikeOutcome(false, 0.0, BellPulseArea, true, true)
-
-    /** Saturated incapacitation (`Regime.Burnout`, `s >= 0.95`) on living
-      * mycelium: the fast system is still inside its oscillatory window and a
-      * well-spaced pulse temporarily suppresses `沉滞` for the heartbeat
-      * window, but the bell cannot permanently re-anchor `c0` while slow
-      * stress stays saturated.
-      */
-    case SaturatedNoAnchor
-        extends BellStrikeOutcome(false, 0.0, BellPulseArea, true, false)
-
-    /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck during
-      * `PhaseLabel.Excitation`: the pulse is swallowed by the active positive
-      * spike, `c0` fails to re-anchor, and the strike is **not** a heartbeat
-      * (the pulse still enters the equations).
-      */
-    case SpikeSwallowed
-        extends BellStrikeOutcome(false, 0.0, BellPulseArea, false, false)
-
-    /** Unanchored oscillator (`c0 <= 0`, `Regime.Oscillating`) struck inside
-      * the refractory delay window (`AbsoluteRefractory` | `RelativeRefractory`):
-      * re-anchors `c0`, delays the spike, and grants the pulse suppression window.
-      */
-    case RefractoryReanchored
-        extends BellStrikeOutcome(true, BellBaselineCalming, BellPulseArea, true, false)
-
-    /** Calm / Strained / Resting or already-anchored cell: anchors/maintains
-      * `c0`, fires the pulse, and grants the stagnation suppression window.
-      */
-    case AnchoredOrMaintained
-        extends BellStrikeOutcome(true, BellBaselineCalming, BellPulseArea, true, false)
-
-  /** Pure rule for evaluating a bell / resonance strike on a cell (design
-    * note 08):
-    *
-    *  - Ecological burnout (`M -> 0` or `a_slow <= burnoutA`): dead mycelium
-    *    cannot carry a pulse (`DeadMyceliumBurnout`).
-    *  - Pulse too fast (`dt < minSafeInterval`, tolerance saturated, or
-    *    already in acute pulse `BurnoutNoCycle`): triggers depolarization
-    *    block overload (`PulseOverloadBurnout`), spiking tolerance and
-    *    applying an immediate minor penalty.
-    *  - `Regime.Burnout`: suppresses stagnation for the heartbeat window,
-    *    but slow `c0` cannot re-anchor while stress stays saturated.
-    *  - Unanchored oscillator (`baselineCalming <= 0.0` and `Regime.Oscillating`):
-    *    - `Cycle(AbsoluteRefractory | RelativeRefractory, _)`: re-anchors `c0`
-    *      and grants the pulse suppression window.
-    *    - `Cycle(Excitation, _)`: swallowed by the active positive spike.
-    *  - `Calm` / `Strained` / `Resting` or already-intact `c0`: anchors `c0`
-    *    and grants the pulse suppression window (`W_eff(T)`).
-    */
-  def evaluateBellStrike(
-      readout: CellReadout,
-      pulseParam: PulseToleranceParam = VoyConfig.current.pulseParam
-  ): BellStrikeOutcome =
-    if Readout.isEcologicalBurnout(
-        readout,
-        readout.fastParam,
-        readout.stressParam.coupling,
-        readout.stressParam.sustenanceDepth,
-        pulseParam
-      )
-    then BellStrikeOutcome.DeadMyceliumBurnout
-    else if readout.pulseState.wouldOverloadAt(readout.simTime, pulseParam) ||
-      readout.phase == PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
-    then BellStrikeOutcome.PulseOverloadBurnout
-    else if readout.regime == Regime.Burnout then
-      BellStrikeOutcome.SaturatedNoAnchor
-    else if readout.baselineCalming <= 0.0 && readout.regime == Regime.Oscillating then
-      readout.phase match
-        case PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory, _) =>
-          BellStrikeOutcome.RefractoryReanchored
-        case PhaseReading.Cycle(PhaseLabel.Excitation, _) =>
-          BellStrikeOutcome.SpikeSwallowed
-        case _ =>
-          BellStrikeOutcome.AnchoredOrMaintained
-    else
-      BellStrikeOutcome.AnchoredOrMaintained
 
   /** Compute the stress injection dose for breaking a block in the Overworld. */
   def stressDoseForBlock(state: BlockState): Double =
@@ -321,7 +210,7 @@ object MandateOverworld:
 
         if held.isOf(Items.CLOCK) || held.isOf(Items.COMPASS) then
           val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-          player.sendMessage(Text.literal(formatInspection(chunkX, chunkZ, readout)), true)
+          player.sendMessage(Text.literal(MandateWording.formatInspection(chunkX, chunkZ, readout, debugNumbers)), true)
           ActionResult.PASS
         else if isInoculum(held) && isInoculableSoil(state) &&
           MandateRuntime.isLiveChunk(chunkX, chunkZ)
@@ -336,7 +225,7 @@ object MandateOverworld:
               // The inoculum dies in acid soil: say so, then let vanilla
               // placement consume the item as an honest cost.
               player.sendMessage(
-                Text.literal(formatReInoculation(chunkX, chunkZ, readout, outcome)),
+                Text.literal(MandateWording.formatReInoculation(chunkX, chunkZ, readout, outcome)),
                 true
               )
               ActionResult.PASS
@@ -375,13 +264,13 @@ object MandateOverworld:
                 1.1f
               )
               player.sendMessage(
-                Text.literal(formatReInoculation(chunkX, chunkZ, readout, outcome)),
+                Text.literal(MandateWording.formatReInoculation(chunkX, chunkZ, readout, outcome)),
                 true
               )
               ActionResult.SUCCESS
         else if state.isOf(Blocks.BELL) then
           val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-          val outcome = evaluateBellStrike(readout)
+          val outcome = BellRitual.evaluateBellStrike(readout)
           if outcome.anchorsC0 then
             MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, outcome.baselineCalming)
           // Physics always applies; the heartbeat ledger is gated by the
@@ -428,7 +317,7 @@ object MandateOverworld:
               0.02
             )
           player.sendMessage(
-            Text.literal(formatBellPulse(chunkX, chunkZ, readout, outcome)),
+            Text.literal(MandateWording.formatBellPulse(chunkX, chunkZ, readout, outcome)),
             true
           )
           ActionResult.PASS
@@ -704,140 +593,10 @@ object MandateOverworld:
             val dx = Math.abs(player.getChunkPos.x - chunkX)
             val dz = Math.abs(player.getChunkPos.z - chunkZ)
             if dx <= 3 && dz <= 3 then
-              player.sendMessage(Text.literal(s"§e[验山示警] ${regimeHerald(to)}"), true)
+              player.sendMessage(Text.literal(s"§e[验山示警] ${MandateWording.regimeHerald(to)}"), true)
               if debugNumbers then
                 player.sendMessage(
                   Text.literal(f"§8[$chunkX%d, $chunkZ%d] $from -> $to"),
                   true
                 )
           }
-
-  /** Player-facing wording for a mycelial re-inoculation attempt (note 06
-    * §7.1): what the soil did with the inoculum, never raw `M`/`s` numbers
-    * (note 06 §1 constraint 5).
-    */
-  def formatReInoculation(
-      chunkX: Int,
-      chunkZ: Int,
-      r: CellReadout,
-      outcome: MandatePhenomena.ReInoculationOutcome
-  ): String =
-    outcome match
-      case MandatePhenomena.ReInoculationOutcome.Seeded =>
-        f"§a[接种成菌] [$chunkX%d,$chunkZ%d] 菌种落入土层，菌丝开始重新结网（菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}，养复需时）"
-      case MandatePhenomena.ReInoculationOutcome.AcidTooToxic =>
-        f"§c[接种失败] [$chunkX%d,$chunkZ%d] 土层酸毒未退，菌种落土即死——须先泄压降酸再接种（菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}）"
-      case MandatePhenomena.ReInoculationOutcome.AlreadyViable =>
-        f"§7[接种无益] [$chunkX%d,$chunkZ%d] 此区块菌网尚存活丝（${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)}），可自行养复"
-
-  /** Player-facing wording for a slow-variable regime change: what the land is
-    * doing, not which enum member it moved to.
-    */
-  def regimeHerald(regime: Regime): String = regime match
-    case Regime.Burnout => "这一带的地脉饱和失能了，得花大力气泄压才能缓回来"
-    case Regime.Oscillating => "这一带的地脉开始跳，压不住了"
-    case Regime.Strained => "这一带的地脉绷紧了，像要出事"
-    case Regime.Calm => "这一带的地脉松下来了"
-
-  /** Clock/compass readout (验山): the institutional dial plus the 3-tier
-    * mycelial integrity word, never raw continuous numbers (design note 06
-    * §1 constraint 5). Raw values ride the `debugNumbers` gate only. */
-  def formatInspection(chunkX: Int, chunkZ: Int, r: CellReadout): String =
-    val shelter =
-      if r.isMaintained then "§a脉动庇护(免除沉滞)"
-      else "§c沉滞生效(太久无脉冲/尖峰/烧毁)"
-    val base =
-      f"§e[验山读数] [$chunkX%d,$chunkZ%d] 态:${regimeWord(r.regime)} 相:${formatPhaseDial(r.phase)} 菌网:${MandatePhenomena.sustenanceWord(r.sustenance, r.stressParam.sustenanceFloor)} | $shelter"
-    if debugNumbers then
-      val fracText = r.phase match
-        case PhaseReading.Cycle(_, frac) => f" frac=$frac%.3f"
-        case _ => ""
-      val windowLeft = r.pulseState.remainingSuppressionAt(r.simTime)
-      base +
-        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.dissonance}%.2f p=${r.pulseDrive}%.2f tol=${r.pulseTolerance}%.2f win=${windowLeft}%.1f$fracText]"
-    else base
-
-  /** Qualitative regime word for player-facing surfaces; enum names are
-    * debug vocabulary. */
-  def regimeWord(regime: Regime): String = regime match
-    case Regime.Calm => "平静"
-    case Regime.Strained => "绷紧"
-    case Regime.Oscillating => "起振"
-    case Regime.Burnout => "饱和失能"
-
-  /** The institutional dial: 20 ticks per cycle, resolution-limited by
-    * design (note 06 §1 constraint 5). Enum labels and fractions stay in
-    * `formatPhaseShort` for the dev HUD. */
-  def formatPhaseDial(phase: PhaseReading): String =
-    phase match
-      case PhaseReading.Cycle(label, _) =>
-        val tick = Readout.dialTick(phase).getOrElse(0)
-        val word = label match
-          case PhaseLabel.Excitation => "激发"
-          case PhaseLabel.AbsoluteRefractory => "绝对不应"
-          case PhaseLabel.RelativeRefractory => "相对不应"
-          case PhaseLabel.Resting => "静息"
-        f"${word}·第$tick%02d/20格"
-      case PhaseReading.Basin(_) => "静息域"
-      case PhaseReading.Undefined(reason) =>
-        reason match
-          case UndefinedReason.BurnoutNoCycle => "静默·深度失能"
-          case UndefinedReason.TransientNoCycle => "瞬态未定"
-          case UndefinedReason.NoCycleReference => "无周期参照"
-
-  def formatBellPulse(
-      chunkX: Int,
-      chunkZ: Int,
-      r: CellReadout,
-      outcome: BellStrikeOutcome
-  ): String =
-    outcome match
-      case BellStrikeOutcome.DeadMyceliumBurnout =>
-        f"§4[叩钟无应] [$chunkX%d,$chunkZ%d] 菌网枯绝，钟声如击死肉，连片回音都没有——须先泄压降酸、再接种菌丝"
-
-      case BellStrikeOutcome.PulseOverloadBurnout =>
-        f"§c[脉冲过载] [$chunkX%d,$chunkZ%d] 脉冲过密，地脉被顶入烧毁阻滞！本次未压住沉滞，且后续脉冲效力大减——让地脉缓一缓"
-
-      case BellStrikeOutcome.SaturatedNoAnchor =>
-        val win = r.pulseState.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
-        f"§4[叩钟无锚] [$chunkX%d,$chunkZ%d] 地脉饱和失能 (Burnout)，无法重锚 c0；但本次脉冲仍压住沉滞约 ${win}%.0f 息——根治须持续泄压"
-
-      case BellStrikeOutcome.SpikeSwallowed =>
-        val tick = r.dialTick.getOrElse(0)
-        f"§c[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 (Excitation) -> 正处尖峰爆发期，钟声被吞没：c0 未重锚、本次不计心跳(需候不应期推迟窗口)"
-
-      case BellStrikeOutcome.RefractoryReanchored =>
-        val tick = r.dialTick.getOrElse(0)
-        val label = r.phase match
-          case PhaseReading.Cycle(l, _) => l.toString
-          case _ => "Refractory"
-        val win = r.pulseState.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
-        f"§a[叩钟重锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 命中推迟刻度，c0已重锚 ($BellBaselineCalming%.2f)，下一次尖峰延后，沉滞退去约 ${win}%.0f 息"
-
-      case BellStrikeOutcome.AnchoredOrMaintained =>
-        val win = r.pulseState.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
-        r.phase match
-          case PhaseReading.Cycle(label, _) =>
-            val tick = r.dialTick.getOrElse(0)
-            val effectHint = label match
-              case PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory =>
-                "§a命中推迟刻度，下一次地鸣尖峰延后"
-              case PhaseLabel.Excitation =>
-                "§c正处尖峰爆发期，钟声被地鸣吞没"
-              case PhaseLabel.Resting =>
-                "§7处于恢复晚期，脉冲被平缓吸收"
-            f"§b[叩钟谐振] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> $effectHint，沉滞退去约 ${win}%.0f 息"
-          case _ =>
-            f"§b[叩钟镇山] [$chunkX%d,$chunkZ%d] 维持源已锚定 (c0=$BellBaselineCalming%.2f)，一记脉动荡开，沉滞退去约 ${win}%.0f 息"
-
-  /** Dev rendering (HUD, `debugNumbers`): enum labels and the raw fraction.
-    * Player-facing surfaces use `formatPhaseDial` instead. */
-  def formatPhaseShort(phase: PhaseReading): String =
-    phase match
-      case PhaseReading.Cycle(label, frac) =>
-        val tick = Readout.dialTick(phase).getOrElse(0)
-        f"$label($frac%.2f/第$tick%02d格)"
-      case PhaseReading.Basin(label) =>
-        s"Basin($label)"
-      case PhaseReading.Undefined(reason) =>
-        s"Undef($reason)"

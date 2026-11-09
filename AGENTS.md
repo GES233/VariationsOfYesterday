@@ -28,7 +28,9 @@
   - `VoyConfig.scala` — 外部运行时配置（`config/variations-of-yesterday.json`：格子几何、`tickDt`、FHN/慢变量参数，默认值即原硬编码值；只注入接线层，不触契约锚）
   - `mandate/` — Mandate 游戏侧接线层：
     - `MandateRuntime.scala` — Minecraft ↔ Mandate 桥接（引擎 actor 生命周期、tick gate、快照发布、动作回包队列）
-    - `MandateOverworld.scala` — 主世界交互接线（采掘注入应力、敲钟/拆钟控制 $c_0$ 与脉冲、脉冲抵消窗与过载反噬（心跳语义，札记 08）、钟表/指南针验山读数、沉滞施加（基础档只压经济+村民显形、尖峰档玩家挖掘 ×0.09）、服务端感官签名发射、菌种右键土壤再接种）
+    - `MandateOverworld.scala` — 主世界事件接线（采掘注入应力、敲钟/拆钟、验山读数、沉滞施加、感官签名发射、再接种；纯接线，裁决与文案外置）
+    - `BellRitual.scala` — 敲钟/共振裁决（`BellStrikeOutcome` + `evaluateBellStrike`，无 Minecraft 依赖、可单测）
+    - `MandateWording.scala` — 全部玩家可见文案（验山读数 / 叩钟六裁决 / 接种 / Regime 示警 / 相位盘，纯函数）
     - `MandatePhenomena.scala` — 感官签名、经济压力档与再接种的纯映射层（黄水三档 / 夜光 / 静默枯败 / `classifyEconomy` / `evaluateReInoculation`，无 Minecraft 依赖、可单测）
     - `MandateEconomy.scala` — 沉滞经济档的 mixin 桥接（交易加价 / 繁殖 / 铁傀儡 / 作物 keep 概率，概率判定集中在此）
     - `MandateEffects.scala` — 自定义状态效果（`voy:stagnation` 基础档=无属性标记 / `voy:stagnation_spike` 尖峰档 ×0.09 / `voy:pulse_saturation` 脉冲过载）

@@ -3,8 +3,8 @@ package moe.chestnut.awa.voy.inner.veins
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-import moe.chestnut.awa.voy.mandate.MandateOverworld
-import moe.chestnut.awa.voy.mandate.MandateOverworld.BellStrikeOutcome
+import moe.chestnut.awa.voy.mandate.BellRitual
+import moe.chestnut.awa.voy.mandate.BellRitual.BellStrikeOutcome
 
 /** Defined-domain behaviour of the readout (design draft §1.4 + §1.2).
   *
@@ -168,10 +168,10 @@ class MandateReadoutSpec:
       PhaseReading.Basin(PhaseLabel.Resting),
       baselineCalming = 0.0
     )
-    val calmOutcome = MandateOverworld.evaluateBellStrike(calmUnanchored)
+    val calmOutcome = BellRitual.evaluateBellStrike(calmUnanchored)
     assertEquals(BellStrikeOutcome.AnchoredOrMaintained, calmOutcome)
     assertTrue(calmOutcome.anchorsC0)
-    assertEquals(MandateOverworld.BellBaselineCalming, calmOutcome.baselineCalming, 1e-12)
+    assertEquals(BellRitual.BellBaselineCalming, calmOutcome.baselineCalming, 1e-12)
 
     val oscExcitationUnanchored = CellReadout(
       MandateCurrent(1.9, 0.2, 0.65, 0.55),
@@ -179,7 +179,7 @@ class MandateReadoutSpec:
       PhaseReading.Cycle(PhaseLabel.Excitation, 0.05),
       baselineCalming = 0.0
     )
-    val spikeOutcome = MandateOverworld.evaluateBellStrike(oscExcitationUnanchored)
+    val spikeOutcome = BellRitual.evaluateBellStrike(oscExcitationUnanchored)
     assertEquals(BellStrikeOutcome.SpikeSwallowed, spikeOutcome)
     assertFalse(spikeOutcome.anchorsC0, "striking during Excitation must fail to re-anchor c0")
     assertEquals(0.0, spikeOutcome.baselineCalming, 1e-12)
@@ -190,10 +190,10 @@ class MandateReadoutSpec:
       PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory, 0.25),
       baselineCalming = 0.0
     )
-    val reanchorOutcome = MandateOverworld.evaluateBellStrike(oscRefractoryUnanchored)
+    val reanchorOutcome = BellRitual.evaluateBellStrike(oscRefractoryUnanchored)
     assertEquals(BellStrikeOutcome.RefractoryReanchored, reanchorOutcome)
     assertTrue(reanchorOutcome.anchorsC0, "striking in refractory window re-anchors c0")
-    assertEquals(MandateOverworld.BellBaselineCalming, reanchorOutcome.baselineCalming, 1e-12)
+    assertEquals(BellRitual.BellBaselineCalming, reanchorOutcome.baselineCalming, 1e-12)
 
     val burnoutCell = CellReadout(
       MandateCurrent(1.1, 0.4, 0.98, 0.0),
@@ -203,7 +203,7 @@ class MandateReadoutSpec:
       PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory, 0.25),
       baselineCalming = 0.0
     )
-    val burnoutOutcome = MandateOverworld.evaluateBellStrike(burnoutCell)
+    val burnoutOutcome = BellRitual.evaluateBellStrike(burnoutCell)
     assertEquals(BellStrikeOutcome.SaturatedNoAnchor, burnoutOutcome)
     assertFalse(burnoutOutcome.anchorsC0, "saturated cell cannot re-anchor c0 while the stress stays high")
     assertEquals(0.0, burnoutOutcome.baselineCalming, 1e-12)
@@ -220,7 +220,7 @@ class MandateReadoutSpec:
       baselineCalming = 0.0,
       sustenance = 0.0 // chronic ecological burnout: the network is gone
     )
-    val outcome = MandateOverworld.evaluateBellStrike(deadCell)
+    val outcome = BellRitual.evaluateBellStrike(deadCell)
     assertEquals(BellStrikeOutcome.DeadMyceliumBurnout, outcome)
     assertFalse(outcome.anchorsC0, "dead mycelium cannot carry a baseline anchor")
     assertFalse(outcome.bookkeepsHeartbeat, "dead mycelium cannot carry a heartbeat")
@@ -237,7 +237,7 @@ class MandateReadoutSpec:
       pulseState = PulseToleranceState(lastPulseTime = 5.0),
       simTime = 6.0
     )
-    val outcome = MandateOverworld.evaluateBellStrike(overpulsed)
+    val outcome = BellRitual.evaluateBellStrike(overpulsed)
     assertEquals(BellStrikeOutcome.PulseOverloadBurnout, outcome)
     assertFalse(outcome.anchorsC0)
     assertTrue(
