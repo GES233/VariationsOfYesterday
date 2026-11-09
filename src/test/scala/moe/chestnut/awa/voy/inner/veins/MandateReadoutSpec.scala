@@ -98,6 +98,16 @@ class MandateReadoutSpec:
     val (t, cur, tr) = settle(st, 600.0, coupling = 2.0)
     assertEquals(PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle), tr.reading(t, cur))
 
+  @Test def `the spike threshold has a single source`(): Unit =
+    // Three consumers read "is this a spike": the agent's tremor edge
+    // (`readoutParam.spikeLevel`), the link relay's confirmation, and the
+    // offline PRC harness. The latter two default to
+    // `PhaseDetection.SpikeLevel`; the readout parameter must keep pointing
+    // at the same constant, or the player-facing tremor and the crystal
+    // links silently diverge.
+    assertEquals(PhaseDetection.SpikeLevel, ReadoutParam().spikeLevel, 0.0)
+    assertEquals(PhaseDetection.SpikeLevel, PhaseResponse.spikeLevel, 0.0)
+
   @Test def `the declared stress partition calls a spiking cell burnt out`(): Unit =
     // Measured fact, recorded against the *stock* partition: at s = 1.0 the
     // cell is labelled Burnout and still spikes every ~50 time units.

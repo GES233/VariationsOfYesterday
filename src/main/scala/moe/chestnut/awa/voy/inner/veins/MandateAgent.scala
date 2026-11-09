@@ -35,6 +35,12 @@ import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
   *   for world persistence; the saved copy may lag the live lattice by at
   *   most `persistPeriod` without losing anything a player can feel.
   * @param persistPeriod snapshot cadence in simulation-time units.
+  * @param regimeDwell minimum simulation time a reclassified regime must
+  *   hold before it becomes the published one. The regime classifier is a
+  *   pure threshold function of the slow variables, so a cell hovering on a
+  *   boundary would otherwise flap the player-facing herald — and every
+  *   consumer of the readout's regime (economy tiers, sensory signatures) —
+  *   on consecutive ticks. `0` restores immediate publication.
   */
 object MandateAgent:
   /** Core parameter sets used for a cell registered without explicit
@@ -119,7 +125,8 @@ object MandateAgent:
       persistSink: MandateSnapshot => Unit = (_ => ()),
       persistPeriod: Double = 1.0,
       pulseParam: PulseToleranceParam = PulseToleranceParam(),
-      initialPulseStates: Map[CellCoord, PulseToleranceState] = Map.empty
+      initialPulseStates: Map[CellCoord, PulseToleranceState] = Map.empty,
+    regimeDwell: Double = 5.0
   ): ActorRef[EventDTO] =
     val readoutParam = ReadoutParam()
     var simTime: Double = initialSimTime
@@ -178,6 +185,10 @@ object MandateAgent:
     var prevRegimes: Map[CellCoord, Regime] = grid.cells.map { case (coord, cell) =>
       coord -> Readout.regime(cell.getState, readoutParam)
     }
+    // Candidate reclassifications awaiting their dwell: a new regime must
+    // hold for `regimeDwell` before it is published, so a cell hovering on a
+    // classification threshold cannot flap the herald every tick.
+    var regimeCandidates: Map[CellCoord, (Regime, Double)] = Map.empty
     var inSpike: Set[CellCoord] = Set.empty
 
     def integrate(dt: Double): Unit =
@@ -203,7 +214,30 @@ object MandateAgent:
         // Cells registered after startup get their tracker on first sight.
         val tracker = trackers.getOrElseUpdate(coord, trackerFor(coord, cell))
         val phase = tracker.observe(simTime, cur)
-        val regime = Readout.regime(cur, readoutParam)
+
+        // Debounce the raw classification into the published regime: a
+        // reclassification becomes official only after holding for
+        // `regimeDwell` simulation time; a relapse drops the candidate.
+        val rawRegime = Readout.regime(cur, readoutParam)
+        prevRegimes.get(coord) match
+          case Some(oldRegime) if oldRegime == rawRegime =>
+            regimeCandidates = regimeCandidates - coord
+          case Some(oldRegime) =>
+            val since = regimeCandidates.get(coord) match
+              case Some((candidate, t)) if candidate == rawRegime => t
+              case _                                              => simTime
+            if simTime - since >= regimeDwell then
+              prevRegimes = prevRegimes.updated(coord, rawRegime)
+              regimeCandidates = regimeCandidates - coord
+              actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, rawRegime, phase))
+            else
+              regimeCandidates = regimeCandidates.updated(coord, (rawRegime, since))
+          case None =>
+            // A cell registered after startup: adopt its current regime as
+            // the baseline instead of fabricating a transition.
+            prevRegimes = prevRegimes.updated(coord, rawRegime)
+        val regime = prevRegimes(coord)
+
         val ps = pulseStates.getOrElse(coord, PulseToleranceState.zero)
         val pDrive = cell.impulse + cell.synapseOutput
         readoutBuilder += (coord -> CellReadout(
@@ -227,16 +261,6 @@ object MandateAgent:
           actionSink(ActionMsgPool.CellSpikeTriggered(coord, cur, regime))
         else if !spikingNow && inSpike.contains(coord) then
           inSpike -= coord
-
-        prevRegimes.get(coord) match
-          case Some(oldRegime) if oldRegime != regime =>
-            prevRegimes = prevRegimes.updated(coord, regime)
-            actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, regime, phase))
-          case None =>
-            // A cell registered after startup: adopt its current regime as
-            // the baseline instead of fabricating a transition.
-            prevRegimes = prevRegimes.updated(coord, regime)
-          case _ => ()
       }
 
       snapshotSink(currentBuilder.result())
@@ -261,7 +285,13 @@ object MandateAgent:
           nextPersistAt = simTime + persistPeriod
         case other @ EventMsg.RegisterCell(cell, _, _) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
+          // Re-registration resets the dynamics, and the heartbeat ledger
+          // goes with it: pulse tolerance is part of the cell state this
+          // event replaces. Pinned by MandateAgentSpec — nothing game-side
+          // re-registers live cells today, so any future feature that does
+          // must re-decide whether the land forgets being pulsed.
           pulseStates.remove(cell)
+          regimeCandidates = regimeCandidates - cell
           // A (re-)registered cell restarts phase tracking — the dynamics
           // were just reset.
           grid.cells.get(cell).foreach { c =>
@@ -274,6 +304,7 @@ object MandateAgent:
           trackers.remove(cell)
           pulseStates.remove(cell)
           prevRegimes = prevRegimes - cell
+          regimeCandidates = regimeCandidates - cell
           inSpike = inSpike - cell
           linkRunner.forgetCell(cell)
         // Channel events apply to a single cell; events addressed outside

@@ -4,11 +4,12 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters.*
 
 import org.junit.jupiter.api.{AfterEach, Test}
 import org.junit.jupiter.api.Assertions.*
 
-import moe.chestnut.awa.voy.inner.action.MandateActionProtocol
+import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.actor.ActorRef
 import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 
@@ -147,7 +148,10 @@ class MandateAgentSpec:
         singleCellGrid(mkCell(0.0)),
         _ => (),
         actions.add(_),
-        r => { readouts.set(r); latch.countDown() }
+        r => { readouts.set(r); latch.countDown() },
+        // This case asserts the immediate-announce semantics; the dwell
+        // debounce has its own cases below.
+        regimeDwell = 0.0
       )
     )
 
@@ -162,6 +166,125 @@ class MandateAgentSpec:
     assertEquals(0.03, r.baselineCalming, 1e-12)
     assertEquals(Regime.Strained, r.regime)
     assertFalse(actions.isEmpty, "regime transition from Calm to Strained should emit an outbound action")
+
+  /** Stress 0.5 classifies Strained (threshold 0.45) and decays negligibly
+    * over the test horizon, so the raw classification stays Strained
+    * throughout. */
+  @Test def regimeTransitionsAreDebouncedByDwell(): Unit =
+    val dwell = 0.5 // candidate recorded at simTime 0.05 announces at 0.55
+    val readouts =
+      new AtomicReference[Map[CellCoord, CellReadout]](Map.empty)
+    val actions = new java.util.concurrent.ConcurrentLinkedQueue[
+      MandateActionProtocol
+    ]()
+    // Swap in a fresh latch per phase so each phase's publication count is
+    // awaited exactly.
+    val latchRef = new AtomicReference[CountDownLatch](new CountDownLatch(9))
+    val agent = track(
+      MandateAgent(
+        singleCellGrid(mkCell(0.0)),
+        _ => (),
+        actions.add(_),
+        r => { readouts.set(r); latchRef.get().countDown() },
+        regimeDwell = dwell
+      )
+    )
+
+    agent ! EventMsg.StressInject(origin, 0.50)
+    // simTime 0.45: 0.40 into the dwell — the crossing must not announce yet,
+    // and the published readout must still show the previous regime.
+    for _ <- 1 to 9 do agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(awaitPhase(latchRef))
+    assertTrue(
+      actions.asScala.forall(!_.isInstanceOf[ActionMsgPool.RegimeTransitioned]),
+      "a reclassification younger than the dwell must not emit a transition"
+    )
+    assertEquals(
+      Regime.Calm,
+      readouts.get()(origin).regime,
+      "the published regime lags the raw classification until the dwell elapses"
+    )
+
+    // simTime 0.70: the candidate has held for 0.65 >= dwell; it announces
+    // exactly once and the readout follows.
+    latchRef.set(new CountDownLatch(5))
+    for _ <- 1 to 5 do agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(awaitPhase(latchRef))
+
+    val transitions = actions.asScala.collect {
+      case t: ActionMsgPool.RegimeTransitioned => t
+    }.toList
+    assertEquals(1, transitions.size, "the crossing must announce exactly once")
+    assertEquals(Regime.Calm, transitions.head.from)
+    assertEquals(Regime.Strained, transitions.head.to)
+    assertEquals(Regime.Strained, readouts.get()(origin).regime)
+
+  @Test def relapsedRegimeCandidateNeverAnnounces(): Unit =
+    val readouts =
+      new AtomicReference[Map[CellCoord, CellReadout]](Map.empty)
+    val actions = new java.util.concurrent.ConcurrentLinkedQueue[
+      MandateActionProtocol
+    ]()
+    val latch = new CountDownLatch(44)
+    val agent = track(
+      MandateAgent(
+        singleCellGrid(mkCell(0.0)),
+        _ => (),
+        actions.add(_),
+        r => { readouts.set(r); latch.countDown() },
+        regimeDwell = 1.0
+      )
+    )
+
+    agent ! EventMsg.StressInject(origin, 0.50)
+    // The candidate is recorded but the dwell (1.0) is not met within 4 ticks.
+    for _ <- 1 to 4 do agent ! EventMsg.TickArrived(0.05, 20.0f)
+    // Strong calming drains stress back below the threshold (~0.25s at
+    // ds/dt ≈ -0.2) well before the dwell elapses: the candidate must be
+    // dropped, not announced late.
+    agent ! EventMsg.SetCalming(origin, 20.0)
+    for _ <- 1 to 40 do agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+
+    assertTrue(
+      actions.asScala.forall(!_.isInstanceOf[ActionMsgPool.RegimeTransitioned]),
+      "a reclassification that relapses inside the dwell must never announce"
+    )
+    assertEquals(Regime.Calm, readouts.get()(origin).regime)
+
+  @Test def reRegisteringCellClearsPulseBookkeeping(): Unit =
+    val readouts =
+      new AtomicReference[Map[CellCoord, CellReadout]](Map.empty)
+    val latchRef = new AtomicReference[CountDownLatch](new CountDownLatch(1))
+    val agent = track(
+      MandateAgent(
+        singleCellGrid(mkCell(0.0)),
+        _ => (),
+        _ => (),
+        r => { readouts.set(r); latchRef.get().countDown() }
+      )
+    )
+
+    agent ! EventMsg.FirePulse(origin, 25.0)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(awaitPhase(latchRef))
+    assertTrue(
+      readouts.get()(origin).pulseTolerance > 0.05,
+      "a heartbeat pulse must open the tolerance ledger"
+    )
+
+    latchRef.set(new CountDownLatch(1))
+    agent ! EventMsg.RegisterCell(origin)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(awaitPhase(latchRef))
+    assertEquals(
+      PulseToleranceState.zero,
+      readouts.get()(origin).pulseState,
+      "re-registration resets the dynamics, and the heartbeat ledger goes with it"
+    )
+
+  private def awaitPhase(latchRef: AtomicReference[CountDownLatch]): Boolean =
+    latchRef.get().await(5, TimeUnit.SECONDS)
 
   private def mkOscillatingCell(): MandateState =
     // The saturated working point of the design-note-07 rigs (a = -0.30,
