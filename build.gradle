@@ -115,7 +115,12 @@ java {
 jar {
 	inputs.property "archivesName", project.base.archivesName
 
+	// Code is MPL-2.0; narrative prose and assets are CC BY-NC-SA 4.0. Both
+	// notices ship inside the jar so a redistributed build always carries them.
 	from("LICENSE") {
+		rename { "${it}_${inputs.properties.archivesName}"}
+	}
+	from("LICENSE-CONTENT") {
 		rename { "${it}_${inputs.properties.archivesName}"}
 	}
 }

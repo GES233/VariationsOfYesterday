@@ -7,7 +7,7 @@
 - 模组 ID：`variations-of-yesterday`
 - 包名：`moe.chestnut.awa.voy`
 - 版本与坐标：`gradle.properties`（`mod_version=0.1.0`，`maven_group=moe.chestnut.awa.voy`）
-- 许可证：All Rights Reserved（ARR）
+- 许可证：代码 MPL-2.0（`LICENSE`）；叙事与美术资源 CC BY-NC-SA 4.0（`LICENSE-CONTENT`，范围含 `docs/`、`tools/voy_world/content/`、lang 文案、贴图与图标）。Mojang EULA 规定模组不得售卖，故本协议只约束社区二创，不涉及商业分发。
 
 ## 技术栈
 

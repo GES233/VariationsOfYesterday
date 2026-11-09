@@ -25,4 +25,12 @@ Design notes live in [`docs/`](docs/) (in Chinese). Build & test: `./gradlew tes
 
 ## License
 
-All Rights Reserved (ARR).
+Code is licensed under the [Mozilla Public License 2.0](LICENSE).
+
+Narrative content and visual assets — design notes, the dossier corpus, prose
+in the language files, textures, the icon — are licensed
+[CC BY-NC-SA 4.0](LICENSE-CONTENT): quote, translate, remix and ship them in
+modpacks or videos with credit, but not commercially, and derivatives stay
+under the same terms.
+
+Minecraft itself is not covered by either license.

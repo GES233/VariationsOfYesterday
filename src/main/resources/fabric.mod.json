@@ -11,7 +11,7 @@
 		"homepage": "https://github.com/GES233/VariationsOfYesterday",
 		"sources": "https://github.com/GES233/VariationsOfYesterday"
 	},
-	"license": "All Rights Reserved",
+	"license": "MPL-2.0",
 	"icon": "assets/variations-of-yesterday/icon.png",
 	"environment": "*",
 	"entrypoints": {
