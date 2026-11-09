@@ -1,6 +1,6 @@
 package moe.chestnut.awa.voy.inner.plant
 
-/** Symbiotic condition of a `天麻床` (Gastrodia bed, design note 06 §4.3).
+/** Symbiotic condition of a `菌塘` (mycelial bed, design note 06 §4.3).
   *
   * Pure value vocabulary (no Minecraft classes) shared between the readout
   * projection in `MandatePhenomena` and the block state property in
@@ -8,7 +8,7 @@ package moe.chestnut.awa.voy.inner.plant
   */
 enum GastrodiaBedVerdict(val wire: String):
   /** `s < 0.45` (below `Strained`) and healthy mycelial network (`M >= 0.60`):
-    * the Armillaria network feeds the tuber and growth advances.
+    * the living `荧丝` network feeds the tuber and growth advances.
     */
   case Growing extends GastrodiaBedVerdict("healthy")
 

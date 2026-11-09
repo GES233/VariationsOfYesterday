@@ -20,12 +20,13 @@ import net.minecraft.world.World
 import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
 import moe.chestnut.awa.voy.mandate.{MandateEconomy, MandatePhenomena, MandateRuntime, MandateWording}
 
-/** `天麻床` (Gastrodia Bed, design note 06 §4.3 & WO-3).
+/** `菌塘` (mycelial bed, design note 06 §4.3 & WO-3).
   *
-  * Gastrodia elata has neither roots nor green leaves; its tuber grows only
-  * while fed by an intact underground Armillaria mycelial network (`M`).
-  * This block holds no dynamics of its own — every tick and inspection is a
-  * stateless projection of the chunk's [[moe.chestnut.awa.voy.inner.veins.CellReadout]]
+  * The tuber the bed holds has neither roots nor green leaves; it grows only
+  * while fed by an intact underground glowing mycelial network (`M`, the
+  * fictional `荧丝`). This block holds no dynamics of its own — every tick and
+  * inspection is a stateless projection of the chunk's
+  * [[moe.chestnut.awa.voy.inner.veins.CellReadout]]
   * via [[MandatePhenomena.evaluateGastrodiaBed]]:
   *
   *  - `condition = 0` (`Growing`): `s < 0.45` and `M >= 0.60`; advances `age`
@@ -85,6 +86,23 @@ final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(se
     if stack.isOf(Items.CLOCK) || stack.isOf(Items.COMPASS) then
       return ActionResult.PASS
 
+    val currentCond = state.get(CONDITION).intValue()
+    val currentAge = state.get(AGE).intValue()
+    val emptyHand = stack.isEmpty
+
+    // Only take over the clicks this bed actually answers. Everything else
+    // keeps vanilla behaviour, so a player can still build against (or on top
+    // of) the bed and a stray right-click with a block never harvests a ripe
+    // bed by accident.
+    val tendsBed =
+      (currentCond == ConditionWithered && isRefurbishMaterial(stack)) ||
+        (currentCond != ConditionWithered && currentAge < MaxAge && isNutrientMaterial(stack)) ||
+        (currentCond != ConditionWithered && currentAge >= MaxAge &&
+          (emptyHand || isHarvestKnife(stack))) ||
+        emptyHand ||
+        player.isSneaking
+    if !tendsBed then return ActionResult.PASS
+
     if world.isClient then return ActionResult.SUCCESS
     if world.getRegistryKey != World.OVERWORLD then return ActionResult.PASS
 
@@ -92,8 +110,6 @@ final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(se
     val chunkX = pos.getX >> 4
     val chunkZ = pos.getZ >> 4
     val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-    val currentCond = state.get(CONDITION).intValue()
-    val currentAge = state.get(AGE).intValue()
 
     // 1. Withered bed: refurbish with Inoculated Timber or fungal inoculum.
     if currentCond == ConditionWithered && isRefurbishMaterial(stack) then
@@ -150,8 +166,10 @@ final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(se
         )
         return ActionResult.SUCCESS
 
-    // 2. Mature non-withered bed: harvest Fresh Gastrodia tubers and re-seed.
-    if currentCond != ConditionWithered && currentAge >= MaxAge then
+    // 2. Mature non-withered bed: harvest Fresh Glowroot tubers and re-seed.
+    //    Sneaking always means "don't disturb it" (inspect only), matching the
+    //    vanilla convention players use when they want to build around a block.
+    if currentCond != ConditionWithered && currentAge >= MaxAge && !player.isSneaking then
       harvestMatureBed(state, serverWorld, pos, player, stack, readout)
       return ActionResult.SUCCESS
 

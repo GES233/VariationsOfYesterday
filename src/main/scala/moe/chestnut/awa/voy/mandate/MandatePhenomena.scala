@@ -227,7 +227,7 @@ object MandatePhenomena:
     else
       ReInoculationOutcome.Seeded
 
-  /** Pure symbiotic growth rule for a `天麻床` (Gastrodia bed, design note 06
+  /** Pure symbiotic growth rule for a `菌塘` (mycelial bed, design note 06
     * §4.3 & WO-3):
     *
     *  - `BurnoutNoCycle` or dead mycelial network (`M < sustenanceFloor`) ->
@@ -250,7 +250,7 @@ object MandatePhenomena:
     then GastrodiaBedVerdict.Stalled
     else GastrodiaBedVerdict.Growing
 
-  /** Whether a withered `天麻床` can be refurbished with fresh `菌材`
+  /** Whether a withered `菌塘` can be refurbished with fresh `荧丝菌材`
     * (Inoculated Timber): requires the cell to have exited deep incapacitation
     * (`Withered`) and soil stress to be below the acid toxicity threshold.
     */

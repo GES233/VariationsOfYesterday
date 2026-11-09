@@ -98,23 +98,24 @@
 
 **「下游」的当前口径**：运行时晶格只有扩散边、没有平流边（`MandateRuntime` 的矩形格，默认 32×32，可经 `VoyConfig.lattice` 覆盖）。在 D8 地势推导落地之前，按**区块地表高度**取四邻中最低者为下游（平手按 N→E→S→W 固定顺序），覆盖自身 + 该区块；D8 落地后改为沿真实平流边。
 
-### 4.3 菌塘 / 天麻床——把保护动机变成生计
+### 4.3 菌塘——把保护动机变成生计
 
-现实链条：天麻（Gastrodia elata）无根无叶，全靠蜜环菌供养。菌网完整 = 菌子收成，保护土地从道德劝诫变成经济利益。
+现实原型（内部考据，玩家文案不出现真实物种，见 §6）：一类无根无叶、全靠地下巨型菌丝网络供养的块根植物。菌网完整 = 块根收成，保护土地从道德劝诫变成经济利益。玩家侧一律使用虚构词 **荧丝 / 菌塘 / 鲜伏根 / 煨伏根**（札记 10 §1.1）。
 
-- **天麻床方块（`gastrodia_bed`）**：无独立动力学状态，每次随机刻与交互均为所在 Cell 快照的无状态投影（`MandatePhenomena.evaluateGastrodiaBed`）：
+- **菌塘方块（`gastrodia_bed`）**：无独立动力学状态，每次随机刻与交互均为所在 Cell 快照的无状态投影（`MandatePhenomena.evaluateGastrodiaBed`）：
   - `Growing`（`condition = 0`）：`s < 0.45`（`Calm`）且 `M ≥ 0.60`（菌网完好），推进 `age = 0..3`；同时受沉滞经济档（`MandateEconomy.suppressCropGrowth`）调制；
-  - `Stalled`（`condition = 1`）：`s ≥ 0.45`（`Strained` 及以上）或 `floor ≤ M < 0.60`（菌网受损），菌索失水停滞；
-  - `Withered`（`condition = 2`）：`BurnoutNoCycle` 或 `M < floor`（菌网枯绝），菌丝黑腐枯死并锁存为死塘，须待地脉脱离失能且 `s < 0.60` 后手持**蜜环菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。
-- **段木伴栽与菌材（`inoculated_timber`）**：
-  - 在健康区块（`Growing`）手持野生菌种右键去皮原木可就地「段木发菌」转化为蜜环菌材（或工作台合制）；
-  - 紧贴天麻床四周或正下方放置蜜环菌材构成「段木伴栽」，生长概率翻倍（`1/4 → 1/2`）、成熟起挖产量提升（`1–2 → 3–4`）；
-  - 手持蜜环菌材右键枯竭土壤（不潜行）执行高活性再接种，播入 `M = 0.12`（`RichReInoculationSeed`，野生菌种为 `0.05`）。
-- **收获物与药食闭环**：**鲜天麻（`fresh_gastrodia`）**为老寨礼物经济物产；烤制得**煨天麻（`roasted_gastrodia`）**，玩家食用后清除身体上的 `脉冲过载`（`voy:pulse_saturation`）与尖峰震麻带来的 `SLOWNESS` / `NAUSEA`（只作用于玩家身体，不改地脉 `s` / `M`）。
+  - `Stalled`（`condition = 1`）：`s ≥ 0.45`（`Strained` 及以上）或 `floor ≤ M < 0.60`（菌网受损），菌丝失水停滞；
+  - `Withered`（`condition = 2`）：`BurnoutNoCycle` 或 `M < floor`（菌网枯绝），菌丝黑腐枯死并锁存为死塘，须待地脉脱离失能且 `s < 0.60` 后手持**荧丝菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。
+- **段木伴栽与荧丝菌材（`inoculated_timber`）**：
+  - 在健康区块（`Growing`）手持野生菌种右键去皮原木可就地「段木发菌」转化为荧丝菌材（或工作台合制）；
+  - 紧贴菌塘四周或正下方放置荧丝菌材构成「段木伴栽」，生长概率翻倍（`1/4 → 1/2`）、成熟起挖产量提升（`1–2 → 3–4`）；
+  - 手持荧丝菌材**潜行**右键枯竭土壤执行高活性再接种，播入 `M = 0.12`（`RichReInoculationSeed`，野生菌种为 `0.05`）；非潜行右键仍是正常放置——菌材首先是一种建材；
+  - 接种只抬地板、不降级：写入值取 `max(当前 M, 种子)`，已有活丝不会被更低的种子冲掉。
+- **收获物与药食闭环**：**鲜伏根（`fresh_gastrodia`）**为聚落礼物经济物产；烤制得**煨伏根（`roasted_gastrodia`）**，玩家食用后清除身体上的 `脉冲过载`（`voy:pulse_saturation`）与尖峰震麻带来的 `SLOWNESS` / `NAUSEA`（只作用于玩家身体，不改地脉 `s` / `M`）。
 - **可选软联动（农夫乐事 Farmer's Delight，零硬依赖）**：
-  - **沃土与堆肥互通**：`farmersdelight:rich_soil` / `rich_soil_farmland` 纳入可接种土壤（`isInoculableSoil`），垫于天麻床正下方时视作伴栽基底；后续可让有机堆肥（`organic_compost`）的熟化速率受所在区块 `M` 调制（`BurnoutNoCycle` 静默期失活停转），且沃土作物同样受 `MandateEconomy` 沉滞压制，绝不架空地脉约束；
-  - **小刀起麻与砧板/厨锅扩展**：「起麻动刀不动锄」——手持小刀（`#c:tools/knife` / `#farmersdelight:tools/knives`）起挖成熟天麻床额外多产 1 枚鲜天麻；后续可通过带 `fabric:load_conditions` 的数据包配方扩展砧板劈菌材、鲜天麻切片留白麻种芽，以及厨锅炖「老寨天麻汤」（提供短暂「定风」豁免一次尖峰震麻硬直）与伴生榛蘑（蜜环菌子实体）菜肴。
-- **叙事钩子**：垦殖破坏菌网 → 天麻绝收 + 土地失稳，**经济与地质共用同一底层**。
+  - **沃土与堆肥互通**：`farmersdelight:rich_soil` / `rich_soil_farmland` 纳入可接种土壤（`isInoculableSoil`），垫于菌塘正下方时视作伴栽基底；后续可让有机堆肥（`organic_compost`）的熟化速率受所在区块 `M` 调制（`BurnoutNoCycle` 静默期失活停转），且沃土作物同样受 `MandateEconomy` 沉滞压制，绝不架空地脉约束；
+  - **小刀起根与砧板/厨锅扩展**：「起根动刀不动锄」——手持小刀（`#c:tools/knife` / `#farmersdelight:tools/knives`）起挖成熟菌塘额外多产 1 枚鲜伏根；后续可通过带 `fabric:load_conditions` 的数据包配方扩展砧板劈菌材、鲜伏根切片留种芽，以及厨锅炖「菌塘伏根汤」（提供短暂「定风」豁免一次尖峰震麻硬直）与伴生菌子实体菜肴。
+- **叙事钩子**：垦殖破坏菌网 → 伏根绝收 + 土地失稳，**经济与地质共用同一底层**。
 
 ## 5. 实现工单
 
@@ -122,7 +123,7 @@
 > 每完成一个 WO 运行 `./gradlew build` 与 `./gradlew test`，全绿才继续。
 
 ### WO-1 术语与文案（**已落地，2026-11-07**）
-- ~~`src/main/resources/assets/variations-of-yesterday/lang/zh_cn.json` / `en_us.json` 新增术语条目~~ **已落地**：菌网（mycelial network）、地脉（沿用）、黄水（iron-yellow seep）、石灰石沟（limestone drain）、人工湿地（constructed wetland）、天麻床（gastrodia bed）均已入库，键集一致性由 `MandatePhenomenaSpec` 断言；
+- ~~`src/main/resources/assets/variations-of-yesterday/lang/zh_cn.json` / `en_us.json` 新增术语条目~~ **已落地**：菌网（mycelial network）、地脉（沿用）、黄水（iron-yellow seep）、石灰石沟（limestone drain）、人工湿地（constructed wetland）、菌塘（mycelial bed）均已入库，键集一致性由 `MandatePhenomenaSpec` 断言；玩家侧物种名已按札记 10 §1.1 统一为虚构词（荧丝 / 荧丝菌材 / 鲜伏根 / 煨伏根）；
 - HUD（`hud/MandateHud.scala`）遥测行已加 `M`；玩家侧验山读数（`MandateOverworld.formatInspection`）接入 §3 的定性菌网词（枯绝/受损/完好，不给数值）。开发 HUD 的裸数值行只存在于开发环境（`VariationsOfYesterdayClient` 仅在 `isDevelopmentEnvironment` 时注册），不会进入发布环境。
 
 ### WO-2 安抚设施方块（石灰石沟 / 人工湿地）
@@ -132,11 +133,11 @@
 - 参数全部进 config（`c_drain`、`k_armor`、`q₀`、`armorMax`、`c_wetland`）。
 - 验收：新单元测试（mock 快照 → 断言总线求和值与装甲累积）；既有测试全绿。
 
-### WO-3 天麻床与感官签名（**已落地，签名/再接种 2026-11-07，天麻床/菌材闭环 2026-11-09**）
+### WO-3 菌塘与感官签名（**已落地，签名/再接种 2026-11-07，菌塘/荧丝菌材闭环 2026-11-09**）
 - 感官签名（§3）已由 `MandatePhenomena`（纯映射，可单测）+ `MandateOverworld.emitChunkPhenomena`（服务端统一发射，不进客户端逻辑）落地：黄水三档（铁锈色 `DustParticleEffect` 扫表层水体，计数按档）、健康夜光（`GLOW`，低密度封顶）、深度失能静默（`WHITE_ASH`，绑 `BurnoutNoCycle` 而非 `Regime.Burnout`）；
-- **菌网再接种**：手持菌种（发光地衣/蘑菇/菌丝体/蜜环菌材）右键土壤 → `evaluateReInoculation` 纯判定（`Seeded` / `AcidTooToxic` / `AlreadyViable`）→ `EventMsg.SetSustenance`（野生菌种 `M = 0.05`，蜜环菌材 `M = 0.12`）；酸毒未退（s ≥ 0.6）时接种失败且菌种照常消耗——失败是身体证据，不是禁令；
-- **天麻床与共生闭环（`blocks/VoyBlocks`、`GastrodiaBedBlock`）**：已落地 `gastrodia_bed`（天麻床）、`inoculated_timber`（蜜环菌材）、`fresh_gastrodia`（鲜天麻）、`roasted_gastrodia`（煨天麻），以及农夫乐事沃土基底/小刀起麻零依赖软兼容钩子。
-- 验收：签名与天麻床裁决金样测试见 `MandatePhenomenaSpec`（全量测试数见 `AGENTS.md` 构建与测试）；服务器侧无渲染引用；专用服务器可用。
+- **菌网再接种**：手持菌种（发光地衣/蘑菇/菌丝体）**不潜行**右键土壤，或手持荧丝菌材**潜行**右键土壤 → `evaluateReInoculation` 纯判定（`Seeded` / `AcidTooToxic` / `AlreadyViable`）→ `EventMsg.SetSustenance`（野生菌种 `M = 0.05`，荧丝菌材 `M = 0.12`；写入取 `max(当前 M, 种子)`）；酸毒未退（s ≥ 0.6）时接种失败且菌种照常消耗——失败是身体证据，不是禁令；
+- **菌塘与共生闭环（`blocks/VoyBlocks`、`GastrodiaBedBlock`）**：已落地 `gastrodia_bed`（菌塘）、`inoculated_timber`（荧丝菌材）、`fresh_gastrodia`（鲜伏根）、`roasted_gastrodia`（煨伏根），以及农夫乐事沃土基底/小刀起根零依赖软兼容钩子；交互只接管与菌塘相关的点击（空手、营养物、小刀、潜行），其余一律 `PASS` 交还原版，摆放方块与意外收割互不干扰。
+- 验收：签名与菌塘裁决金样测试见 `MandatePhenomenaSpec`（全量测试数见 `AGENTS.md` 构建与测试）；服务器侧无渲染引用；专用服务器可用。
 
 ### WO-4 回归与金样（已完成）
 - ~~为 §3 签名映射加金样测试~~ **已完成**：`MandatePhenomenaSpec` 构造 `CellReadout` 断言签名档位与语言键集；
@@ -181,7 +182,7 @@
    - **滥用→衰竭涌现**（实测）：持续采挖不泄压 ~0.6h 进入深度失能、~4.4h 灭绝；采挖 + 泄压（c ≳ 2u）永不失能；慢性高应力停在部分平衡（s=0.7 → M\*=0.6 半失能，s=0.8 → M\*=0.2 濒死）；
    - **与 γ 校准的耦合**：M 消耗使「饱和→深度失能」比 γ 单独决定的快（实测见上条）；草案 01 §7 待完成项 3 的 γ 对表落地时必须重跑耦合扫描，不能只按纯应力路径；
    - **遗留**：触发器清单（哪些叙事事件抽走/回填、各多少）待定；突触解耦仍挂搭车包（持久化已于 2026-11-07 先行落地，未触契约哈希锚）；
-2. 天麻经济的数值（产量、交易价）需与礼物经济（§3.1）统一校准；
+2. 伏根经济的数值（产量、交易价）需与礼物经济（§3.1）统一校准；
 3. 菌光粒子的亮度上限：不能变成免费的数值读表（违反 §1 约束 5）；
 4. ~~烧毁的「不可逆」需要游戏层锁存（`burnoutLatched`）~~ **已裁定（2026-11-07）**：不引入锁存。机制层只有「失能」没有「死」——饱和失能（`Regime.Burnout`）的恢复走成本路径（按 §4.1 的泄压量级持续泄压后重锚 `c₀`，见札记 07 E4b）；深度失能（`BurnoutNoCycle`）可由叙事通道抽走维持源触发，也可由 M 的酸蚀项在持续高应力下耗尽触发（见 §7 开放问题 1 实测）；恢复靠再接种（菌网「再接种」）或叙事干预。「死」只作为叙事层的既定失败布景（如上游先例节点），不进入机制语义；
 5. ~~状态持久化~~ **已落地（2026-11-07）**：维度级 `PersistentState`（`MandatePersistence`，存 `data/voy_mandate.dat`）承载整格快照——每格全状态（`v/w/s/q`、`M`、四通道电平、双参数集）、输运边、水晶链路与 `simTime`；`MandateSnapshot`（纯数据，`inner/` 无 MC 类型）负责 capture/restore，actor 以 1 sim 秒节拍发布、存档时刻序列化，启动时按几何指纹（origin/宽/高）校验后恢复，不匹配则丢弃重来。裁定结果：**粒度取整格**（Node 聚合结算属未来的离线抽稀问题，不在存储层做）；**快变量存**（成本可忽略，且保证重启后相位读数连续）；**突触内核与链路待投递队列不存**（τ≤5 s 即衰减、一周期内重建，丢失无可感知影响）。仍开放：`CalmingBus` 注册表与装甲化落盘（方块实体 NBT，随设施工单同行）；「离线按 Node 聚合结算」已由草案 01 §1.3 的「常驻 + 粗步进」设计取代（不做离线加速风化）；**存档时刻 flush（2026-11-07）**：`BEFORE_SAVE` 让 actor 立即发布并阻塞至多 2 s（超时只 warn，不阻断保存），优雅关服不再丢最后一个 persist 周期；**已知边界**：schema 不匹配（`schemaVersion` 不等）仍静默丢弃并覆盖原文件（`.bak` 备份与迁移留到 payload 真正变更时再做），崩溃/`kill -9` 仍最多丢一个 persist 周期；

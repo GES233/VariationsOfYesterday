@@ -33,7 +33,7 @@ object VoyBlocks:
   private def itemKey(path: String): RegistryKey[Item] =
     RegistryKey.of(RegistryKeys.ITEM, id(path))
 
-  /** `天麻床` (Gastrodia Bed, `variations-of-yesterday:gastrodia_bed`).
+  /** `菌塘` (Mycelial Bed, `variations-of-yesterday:gastrodia_bed`).
     *
     * Faintly bioluminescent (luminance 2, obeying note 06 §7.3 cap) when its
     * mycelial network is healthy (`condition == 0`).
@@ -59,11 +59,13 @@ object VoyBlocks:
 
   val GastrodiaBedItem: Item = registerBlockItem("gastrodia_bed", GastrodiaBed)
 
-  /** `菌材` (Inoculated Timber, `variations-of-yesterday:inoculated_timber`).
+  /** `荧丝菌材` (Glowsilk Inoculum Log, `variations-of-yesterday:inoculated_timber`).
     *
-    * Debarked mountain timber colonized by Armillaria rhizomorphs. Serves as
-    * companion substrate beside a `天麻床`, refurbishes withered beds, and
-    * acts as a rich mycelial inoculum on depleted soil.
+    * Debarked mountain timber threaded with glowing rhizomorphs (the fictional
+    * `荧丝`; its real-world prototype stays in the internal sourcing section of
+    * design note 06 §6 and never reaches player-facing text). Serves as
+    * companion substrate beside a `菌塘`, refurbishes withered beds, and acts
+    * as a rich mycelial inoculum on depleted soil.
     */
   val InoculatedTimber: Block = registerBlock(
     "inoculated_timber",
@@ -81,7 +83,7 @@ object VoyBlocks:
 
   val InoculatedTimberItem: Item = registerBlockItem("inoculated_timber", InoculatedTimber)
 
-  /** `鲜天麻` (Fresh Gastrodia tuber, `variations-of-yesterday:fresh_gastrodia`). */
+  /** `鲜伏根` (Fresh glowroot tuber, `variations-of-yesterday:fresh_gastrodia`). */
   val FreshGastrodiaItem: Item = registerItem(
     "fresh_gastrodia",
     key =>
@@ -97,9 +99,9 @@ object VoyBlocks:
       )
   )
 
-  /** `煨天麻` (Roasted Gastrodia, `variations-of-yesterday:roasted_gastrodia`).
+  /** `煨伏根` (Roasted Glowroot, `variations-of-yesterday:roasted_gastrodia`).
     *
-    * Folk tonic ("定风镇惊"): eating it clears acute `脉冲过载`
+    * Folk tonic: eating it clears acute `脉冲过载`
     * (`voy:pulse_saturation`) and tremor-induced `SLOWNESS` / `NAUSEA` on the
     * player's body without altering the land's underlying `s` or `M`.
     */

@@ -283,9 +283,14 @@ object MandateOverworld:
               true
             )
           ActionResult.SUCCESS
-        else if !(held.isOf(VoyBlocks.InoculatedTimberItem) && player.isSneaking) &&
-          isInoculum(held) && isInoculableSoil(state) &&
-          MandateRuntime.isLiveChunk(chunkX, chunkZ)
+        // Placement stays the default gesture: prepared `菌材` is a building
+        // material that has to be placeable beside a bed, so seeding soil with
+        // it takes a deliberate sneak-right-click. Wild inoculum keeps the
+        // original scatter gesture (no sneak = scatter into the soil).
+        else if isInoculum(held) && isInoculableSoil(state) &&
+          MandateRuntime.isLiveChunk(chunkX, chunkZ) &&
+          (if held.isOf(VoyBlocks.InoculatedTimberItem) then player.isSneaking
+           else !player.isSneaking)
         then
           val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
           val outcome = MandatePhenomena.evaluateReInoculation(readout)
@@ -304,9 +309,14 @@ object MandateOverworld:
               ActionResult.PASS
             case MandatePhenomena.ReInoculationOutcome.Seeded =>
               val serverWorld = world.asInstanceOf[ServerWorld]
+              // Seeding is a floor, never a downgrade: a bed that already holds
+              // more living thread than the seed must not lose sustenance.
               val targetSeed =
-                if richTimber then MandatePhenomena.RichReInoculationSeed
-                else outcome.targetLevel
+                Math.max(
+                  readout.sustenance,
+                  if richTimber then MandatePhenomena.RichReInoculationSeed
+                  else outcome.targetLevel
+                )
               MandateRuntime.setSustenanceAt(chunkX, chunkZ, targetSeed)
               if !player.isCreative then held.decrement(1)
               serverWorld.spawnParticles(

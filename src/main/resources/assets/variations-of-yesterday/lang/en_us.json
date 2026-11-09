@@ -10,9 +10,9 @@
   "term.variations-of-yesterday.yellow_seep": "Iron-Yellow Seep",
   "block.variations-of-yesterday.limestone_drain": "Limestone Drain",
   "block.variations-of-yesterday.constructed_wetland": "Constructed Wetland",
-  "block.variations-of-yesterday.gastrodia_bed": "Gastrodia Bed",
-  "block.variations-of-yesterday.inoculated_timber": "Inoculated Timber",
-  "item.variations-of-yesterday.fresh_gastrodia": "Fresh Gastrodia",
-  "item.variations-of-yesterday.roasted_gastrodia": "Roasted Gastrodia",
+  "block.variations-of-yesterday.gastrodia_bed": "Mycelial Bed",
+  "block.variations-of-yesterday.inoculated_timber": "Glowsilk Inoculum Log",
+  "item.variations-of-yesterday.fresh_gastrodia": "Fresh Glowroot",
+  "item.variations-of-yesterday.roasted_gastrodia": "Roasted Glowroot",
   "itemGroup.variations-of-yesterday.main": "Variations of Yesterday"
 }
