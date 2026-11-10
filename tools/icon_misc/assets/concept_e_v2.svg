@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="tile">
+      <rect x="12" y="12" width="488" height="488" rx="56"/>
+    </clipPath>
+    <clipPath id="mountain">
+      <path d="M32 448V352H80V320H128V336H160V288H192V240H224V272H256V224H288V160H320V208H352V256H384V224H416V288H448V320H480V448Z"/>
+    </clipPath>
+    <filter id="pixel-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="12" y="12" width="488" height="488" rx="56" fill="#11191a" stroke="#d8cfb5" stroke-width="8"/>
+  <rect x="28" y="28" width="456" height="456" rx="42" fill="none" stroke="#435354" stroke-width="4"/>
+
+  <g clip-path="url(#tile)">
+    <!-- Faded survey grid: an old record still visible beneath the present. -->
+    <g stroke="#77817b" stroke-width="2" opacity=".15">
+      <path d="M64 28V484M128 28V484M192 28V484M256 28V484M320 28V484M384 28V484M448 28V484"/>
+      <path d="M28 96H484M28 160H484M28 224H484M28 288H484M28 352H484M28 416H484"/>
+    </g>
+
+    <!-- Square dusk disc, weathered like a damaged map print rather than a ritual seal. -->
+    <rect x="202" y="62" width="108" height="108" fill="#b99a61" opacity=".9"/>
+    <g fill="#11191a" opacity=".34">
+      <rect x="202" y="62" width="18" height="12"/>
+      <rect x="292" y="74" width="18" height="18"/>
+      <rect x="220" y="140" width="15" height="30"/>
+      <rect x="277" y="62" width="12" height="20"/>
+      <rect x="298" y="119" width="12" height="16"/>
+    </g>
+
+    <!-- Yesterday's mountain: offset, faded, and partly overwritten by the living present. -->
+    <path d="M16 394H64V346H112V362H144V314H176V266H208V298H240V250H272V186H304V234H336V282H368V250H400V314H432V346H480V394Z"
+          fill="#263233" opacity=".72"/>
+    <path d="M16 394H64V346H112V362H144V314H176V266H208V298H240V250H272V186H304V234H336V282H368V250H400V314H432V346H480"
+          fill="none" stroke="#697574" stroke-width="4" opacity=".55"/>
+
+    <!-- Present mountain uses a Minecraft-like stepped silhouette and 16 px visual rhythm. -->
+    <path d="M32 448V352H80V320H128V336H160V288H192V240H224V272H256V224H288V160H320V208H352V256H384V224H416V288H448V320H480V448Z"
+          fill="#182526" stroke="#ddd5bc" stroke-width="8" stroke-linejoin="miter"/>
+    <path d="M32 352H80V320H128V336H160V288H192V240H224V272H256V224H288V160H320V208H352V256H384V224H416V288H448V320H480"
+          fill="none" stroke="#f0ead5" stroke-width="3" stroke-linejoin="miter"/>
+
+    <g clip-path="url(#mountain)">
+      <!-- Block strata keep the terrain readable as stacked material. -->
+      <g fill="#2c3a3a" opacity=".75">
+        <rect x="32" y="352" width="448" height="16"/>
+        <rect x="32" y="400" width="448" height="16"/>
+        <rect x="96" y="304" width="320" height="12"/>
+        <rect x="176" y="256" width="192" height="10"/>
+      </g>
+      <g fill="#667270" opacity=".32">
+        <rect x="48" y="370" width="48" height="8"/><rect x="112" y="370" width="80" height="8"/>
+        <rect x="208" y="370" width="32" height="8"/><rect x="272" y="370" width="96" height="8"/>
+        <rect x="384" y="370" width="64" height="8"/>
+        <rect x="64" y="418" width="96" height="8"/><rect x="192" y="418" width="64" height="8"/>
+        <rect x="288" y="418" width="48" height="8"/><rect x="368" y="418" width="80" height="8"/>
+      </g>
+
+      <!-- Mycelium is built from square voxels: a buried constellation in a block world. -->
+      <g fill="#6fe1aa" filter="url(#pixel-glow)">
+        <rect x="248" y="416" width="16" height="32"/>
+        <rect x="248" y="384" width="16" height="16"/>
+        <rect x="232" y="368" width="16" height="16"/>
+        <rect x="216" y="352" width="16" height="16"/>
+        <rect x="200" y="336" width="16" height="16"/>
+        <rect x="184" y="304" width="16" height="32"/>
+        <rect x="264" y="352" width="16" height="32"/>
+        <rect x="280" y="336" width="16" height="16"/>
+        <rect x="296" y="304" width="16" height="32"/>
+        <rect x="296" y="272" width="16" height="16"/>
+        <rect x="296" y="240" width="16" height="16"/>
+        <rect x="168" y="352" width="32" height="16"/>
+        <rect x="136" y="368" width="32" height="16"/>
+        <rect x="104" y="352" width="32" height="16"/>
+        <rect x="72" y="368" width="32" height="16"/>
+        <rect x="312" y="352" width="32" height="16"/>
+        <rect x="344" y="368" width="32" height="16"/>
+        <rect x="376" y="352" width="32" height="16"/>
+        <rect x="408" y="368" width="32" height="16"/>
+      </g>
+
+      <!-- Bright cores survive the downsample; darker ghosts imply earlier pulses. -->
+      <g fill="#d1ffe6">
+        <rect x="249" y="385" width="14" height="14"/>
+        <rect x="217" y="353" width="14" height="14"/>
+        <rect x="185" y="305" width="14" height="14"/>
+        <rect x="265" y="353" width="14" height="14"/>
+        <rect x="297" y="305" width="14" height="14"/>
+        <rect x="297" y="241" width="14" height="14"/>
+        <rect x="137" y="369" width="14" height="14"/>
+        <rect x="377" y="353" width="14" height="14"/>
+      </g>
+      <g fill="#477965" opacity=".5">
+        <rect x="88" y="400" width="12" height="12"/><rect x="120" y="416" width="12" height="12"/>
+        <rect x="168" y="400" width="12" height="12"/><rect x="328" y="416" width="12" height="12"/>
+        <rect x="392" y="400" width="12" height="12"/><rect x="424" y="416" width="12" height="12"/>
+      </g>
+    </g>
+
+    <!-- A thin lit bed says the old system is dormant, not dead. -->
+    <rect x="48" y="448" width="416" height="8" fill="#6fe1aa" filter="url(#pixel-glow)"/>
+    <rect x="48" y="449" width="416" height="3" fill="#dcffea"/>
+
+    <!-- Pixel wear keeps the icon from feeling like clean contemporary UI. -->
+    <g fill="#d8cfb5" opacity=".25">
+      <rect x="62" y="66" width="7" height="19"/><rect x="92" y="102" width="7" height="11"/>
+      <rect x="397" y="72" width="7" height="18"/><rect x="433" y="112" width="7" height="12"/>
+      <rect x="110" y="58" width="6" height="8"/><rect x="361" y="106" width="6" height="8"/>
+    </g>
+  </g>
+</svg>

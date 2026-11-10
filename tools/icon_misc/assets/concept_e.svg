@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="tile">
+      <rect x="12" y="12" width="488" height="488" rx="64"/>
+    </clipPath>
+    <clipPath id="mountain">
+      <path d="M34 433 34 367 91 321 139 337 205 210 252 260 301 159 355 247 399 215 478 337 478 433Z"/>
+    </clipPath>
+    <filter id="soft-glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="node-glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Cold-rain field: the new semantic anchor is a living mountain, not a seal. -->
+  <rect x="12" y="12" width="488" height="488" rx="64" fill="#0d1517" stroke="#d7d1be" stroke-width="8"/>
+  <rect x="28" y="28" width="456" height="456" rx="50" fill="none" stroke="#30454a" stroke-width="3"/>
+
+  <g clip-path="url(#tile)">
+    <!-- Sparse rain also reads as an engineer's ruled observation field. -->
+    <g stroke="#8aa0a2" stroke-width="3" stroke-linecap="round" opacity=".28">
+      <path d="M76 61 66 86M126 47 116 72M181 68 171 93M350 59 340 84M406 45 396 70M454 74 444 99"/>
+      <path d="M92 126 82 151M151 111 141 136M373 118 363 143M433 132 423 157"/>
+    </g>
+
+    <!-- A plain work bell: an instrument and a household object, never a ritual stamp. -->
+    <g transform="translate(256 112)">
+      <path d="M0-48V-31" stroke="#d7d1be" stroke-width="7" stroke-linecap="round"/>
+      <path d="M-39 18C-27 6-25-4-25-20-25-36-14-47 0-47s25 11 25 27c0 16 2 26 14 38Z"
+            fill="#c3a464" stroke="#151b1c" stroke-width="7" stroke-linejoin="round"/>
+      <path d="M-44 19H44" stroke="#e5d6a9" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="0" cy="29" r="8" fill="#e5d6a9" stroke="#151b1c" stroke-width="5"/>
+    </g>
+
+    <!-- One struck note descends into the ground. -->
+    <g fill="none" stroke="#c3a464" stroke-linecap="round" opacity=".7">
+      <path d="M205 102Q178 130 205 158" stroke-width="5"/>
+      <path d="M307 102Q334 130 307 158" stroke-width="5"/>
+      <path d="M184 83Q143 130 184 177" stroke-width="3" opacity=".55"/>
+      <path d="M328 83Q369 130 328 177" stroke-width="3" opacity=".55"/>
+    </g>
+
+    <!-- Mountain body, deliberately broad and legible at 32 px. -->
+    <path d="M34 433 34 367 91 321 139 337 205 210 252 260 301 159 355 247 399 215 478 337 478 433Z"
+          fill="#172326" stroke="#d7d1be" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M34 367 91 321 139 337 205 210 252 260 301 159 355 247 399 215 478 337"
+          fill="none" stroke="#eff0df" stroke-width="3" stroke-linejoin="round"/>
+
+    <g clip-path="url(#mountain)">
+      <!-- Quiet geological strata keep the 1980s survey language in the background. -->
+      <g fill="none" stroke="#5e7476" stroke-width="3" opacity=".34">
+        <path d="M8 309Q96 274 178 310T342 306T506 299"/>
+        <path d="M0 337Q83 301 169 338T337 334T512 326"/>
+        <path d="M-4 370Q91 333 180 371T350 367T516 356"/>
+        <path d="M-8 403Q84 369 179 404T350 401T520 390"/>
+      </g>
+
+      <!-- Bioluminescent mycelium as a buried constellation and a living probe network. -->
+      <g fill="none" stroke="#64e6b0" stroke-linecap="round" stroke-linejoin="round" filter="url(#soft-glow)">
+        <path d="M256 420 256 371 225 341 207 302" stroke-width="7"/>
+        <path d="M256 371 291 338 304 289 301 240" stroke-width="7"/>
+        <path d="M225 341 176 355 139 337 95 355" stroke-width="6"/>
+        <path d="M291 338 342 354 397 330 447 350" stroke-width="6"/>
+        <path d="M176 355 158 393 119 416" stroke-width="4"/>
+        <path d="M342 354 364 398 404 417" stroke-width="4"/>
+      </g>
+      <g fill="none" stroke="#c9ffe7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M256 420 256 371 225 341 207 302M256 371 291 338 304 289 301 240" stroke-width="2.5"/>
+        <path d="M225 341 176 355 139 337 95 355M291 338 342 354 397 330 447 350" stroke-width="2"/>
+      </g>
+
+      <g fill="#a9ffd6" stroke="#102321" stroke-width="3" filter="url(#node-glow)">
+        <circle cx="256" cy="371" r="10"/>
+        <circle cx="225" cy="341" r="7"/>
+        <circle cx="291" cy="338" r="7"/>
+        <circle cx="207" cy="302" r="6"/>
+        <circle cx="304" cy="289" r="6"/>
+        <circle cx="301" cy="240" r="7"/>
+        <circle cx="176" cy="355" r="5"/>
+        <circle cx="342" cy="354" r="5"/>
+        <circle cx="139" cy="337" r="5"/>
+        <circle cx="397" cy="330" r="5"/>
+      </g>
+    </g>
+
+    <!-- The mountain is resting on a lit, recoverable bed rather than a dead boundary. -->
+    <path d="M48 433H464" stroke="#64e6b0" stroke-width="9" stroke-linecap="round" filter="url(#soft-glow)"/>
+    <path d="M48 433H464" stroke="#d9ffec" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>

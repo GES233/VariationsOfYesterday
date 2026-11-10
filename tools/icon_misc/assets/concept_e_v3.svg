@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="tile">
+      <rect x="12" y="12" width="488" height="488" rx="56"/>
+    </clipPath>
+    <clipPath id="mountain">
+      <path d="M32 448V352H80V320H128V336H160V288H192V240H224V272H256V224H288V160H320V208H352V256H384V224H416V288H448V320H480V448Z"/>
+    </clipPath>
+    <filter id="pixel-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="12" y="12" width="488" height="488" rx="56" fill="#11191a" stroke="#d8cfb5" stroke-width="8"/>
+  <rect x="28" y="28" width="456" height="456" rx="42" fill="none" stroke="#435354" stroke-width="4"/>
+
+  <g clip-path="url(#tile)">
+    <!-- Fragments of a handled survey sheet: broken bearings, loops and illegible field marks. -->
+    <g fill="none" stroke="#7f8982" stroke-width="3" stroke-linecap="square" opacity=".22">
+      <path d="M43 103 78 91 111 97M49 119 83 110M118 72 137 51 151 74"/>
+      <path d="M354 56 380 48 397 60M404 92 445 78M421 108 452 112"/>
+      <path d="M55 185Q93 162 126 181T190 174" stroke-dasharray="19 10 5 10"/>
+      <path d="M328 176Q363 151 398 174T468 165" stroke-dasharray="8 9"/>
+      <path d="M51 258 76 244 98 252 119 236M397 253 420 236 451 243 467 228"/>
+      <path d="M72 143 65 158 83 164M439 142 447 159 431 166"/>
+      <path d="M153 107Q171 92 188 108Q173 124 153 107ZM337 113Q354 95 373 112Q356 129 337 113Z"/>
+      <path d="M101 205 115 217 102 230 88 218ZM391 201 405 215 390 228 377 214Z"/>
+    </g>
+    <g fill="#90998f" opacity=".18">
+      <rect x="58" y="67" width="7" height="18"/><rect x="91" y="129" width="16" height="6"/>
+      <rect x="132" y="89" width="6" height="13"/><rect x="365" y="77" width="14" height="6"/>
+      <rect x="415" y="54" width="7" height="17"/><rect x="447" y="131" width="15" height="6"/>
+    </g>
+
+    <!-- Square dusk disc, weathered like a damaged map print rather than a ritual seal. -->
+    <rect x="202" y="62" width="108" height="108" fill="#b99a61" opacity=".9"/>
+    <g fill="#11191a" opacity=".34">
+      <rect x="202" y="62" width="18" height="12"/>
+      <rect x="292" y="74" width="18" height="18"/>
+      <rect x="220" y="140" width="15" height="30"/>
+      <rect x="277" y="62" width="12" height="20"/>
+      <rect x="298" y="119" width="12" height="16"/>
+    </g>
+
+    <!-- Yesterday's mountain: offset, faded, and partly overwritten by the living present. -->
+    <path d="M16 394H64V346H112V362H144V314H176V266H208V298H240V250H272V186H304V234H336V282H368V250H400V314H432V346H480V394Z"
+          fill="#263233" opacity=".72"/>
+    <path d="M16 394H64V346H112V362H144V314H176V266H208V298H240V250H272V186H304V234H336V282H368V250H400V314H432V346H480"
+          fill="none" stroke="#697574" stroke-width="4" opacity=".55"/>
+
+    <!-- Present mountain uses a Minecraft-like stepped silhouette and 16 px visual rhythm. -->
+    <path d="M32 448V352H80V320H128V336H160V288H192V240H224V272H256V224H288V160H320V208H352V256H384V224H416V288H448V320H480V448Z"
+          fill="#182526" stroke="#ddd5bc" stroke-width="8" stroke-linejoin="miter"/>
+    <path d="M32 352H80V320H128V336H160V288H192V240H224V272H256V224H288V160H320V208H352V256H384V224H416V288H448V320H480"
+          fill="none" stroke="#f0ead5" stroke-width="3" stroke-linejoin="miter"/>
+
+    <g clip-path="url(#mountain)">
+      <!-- Block strata keep the terrain readable as stacked material. -->
+      <g fill="#2c3a3a" opacity=".75">
+        <rect x="32" y="352" width="448" height="16"/>
+        <rect x="32" y="400" width="448" height="16"/>
+        <rect x="96" y="304" width="320" height="12"/>
+        <rect x="176" y="256" width="192" height="10"/>
+      </g>
+      <g fill="#667270" opacity=".32">
+        <rect x="48" y="370" width="48" height="8"/><rect x="112" y="370" width="80" height="8"/>
+        <rect x="208" y="370" width="32" height="8"/><rect x="272" y="370" width="96" height="8"/>
+        <rect x="384" y="370" width="64" height="8"/>
+        <rect x="64" y="418" width="96" height="8"/><rect x="192" y="418" width="64" height="8"/>
+        <rect x="288" y="418" width="48" height="8"/><rect x="368" y="418" width="80" height="8"/>
+      </g>
+
+      <!-- A lateral, redundant mycelial mesh: no trunk, no privileged root, many alternate paths. -->
+      <g fill="none" stroke="#62d9a2" stroke-width="13" stroke-linecap="square" stroke-linejoin="miter" filter="url(#pixel-glow)">
+        <path d="M72 384H112V352H160V384H208V352H256V384H304V352H352V384H440"/>
+        <path d="M96 416H160V384H224V416H288V384H352V416H416"/>
+        <path d="M112 352V320H176V352M208 352V304H272V336H336V288H400V336"/>
+        <path d="M160 384V416M224 352V416M288 384V416M352 384V416"/>
+      </g>
+      <g fill="none" stroke="#caffdf" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter">
+        <path d="M72 384H112V352H160V384H208V352H256V384H304V352H352V384H440"/>
+        <path d="M96 416H160V384H224V416H288V384H352V416H416"/>
+        <path d="M112 352V320H176V352M208 352V304H272V336H336V288H400V336"/>
+        <path d="M160 384V416M224 352V416M288 384V416M352 384V416"/>
+      </g>
+
+      <!-- Bright junctions and dim dormant patches preserve the earlier light hierarchy. -->
+      <g fill="#d4ffe8">
+        <rect x="104" y="344" width="16" height="16"/><rect x="152" y="376" width="16" height="16"/>
+        <rect x="200" y="344" width="16" height="16"/><rect x="248" y="376" width="16" height="16"/>
+        <rect x="296" y="344" width="16" height="16"/><rect x="344" y="376" width="16" height="16"/>
+        <rect x="216" y="408" width="16" height="16"/><rect x="280" y="408" width="16" height="16"/>
+        <rect x="328" y="280" width="16" height="16"/><rect x="392" y="328" width="16" height="16"/>
+      </g>
+      <g fill="#416e5c" opacity=".55">
+        <rect x="80" y="400" width="12" height="12"/><rect x="128" y="336" width="12" height="12"/>
+        <rect x="176" y="400" width="12" height="12"/><rect x="240" y="320" width="12" height="12"/>
+        <rect x="312" y="400" width="12" height="12"/><rect x="368" y="304" width="12" height="12"/>
+        <rect x="416" y="400" width="12" height="12"/>
+      </g>
+    </g>
+
+    <!-- A thin lit bed says the old system is dormant, not dead. -->
+    <rect x="48" y="448" width="416" height="8" fill="#6fe1aa" filter="url(#pixel-glow)"/>
+    <rect x="48" y="449" width="416" height="3" fill="#dcffea"/>
+
+    <!-- Pixel wear keeps the icon from feeling like clean contemporary UI. -->
+    <g fill="#d8cfb5" opacity=".25">
+      <rect x="62" y="66" width="7" height="19"/><rect x="92" y="102" width="7" height="11"/>
+      <rect x="397" y="72" width="7" height="18"/><rect x="433" y="112" width="7" height="12"/>
+      <rect x="110" y="58" width="6" height="8"/><rect x="361" y="106" width="6" height="8"/>
+    </g>
+  </g>
+</svg>
