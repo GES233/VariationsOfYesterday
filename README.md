@@ -23,6 +23,10 @@ _Go and see for yourself. Follow the water upstream, and find out what really ha
 
 Design notes live in [`docs/`](docs/) (in Chinese). Build & test: `./gradlew test`, `cd tools/voy_world && mix test`.
 
+## Series Context
+
+This is the first act of the thematic *Three Dreams* trilogy. The three works share a meta-theme, recurring imagery, and the player's memory, but they do not promise loader, save, or runtime compatibility and are not intended to form a single modpack. What crosses their incompatible worlds is the player, not the inventory. See [Design Note 10](docs/design-note-10-meta-trilogy-and-drift.md) (in Chinese).
+
 ## License
 
 Code is licensed under the [Mozilla Public License 2.0](LICENSE).
