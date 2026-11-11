@@ -1,5 +1,6 @@
 package moe.chestnut.awa.voy.hud
 
+import com.mojang.brigadier.arguments.IntegerArgumentType
 import net.fabricmc.fabric.api.client.command.v2.{ClientCommandManager, ClientCommandRegistrationCallback}
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.minecraft.client.MinecraftClient
@@ -59,7 +60,7 @@ object MandateHud:
         })
       // The client-registered `voy` root CONSUMES same-root commands whose
       // parse fails client-side (Fabric swallows them instead of forwarding),
-      // so the server-side `/voy debug` (MandateOverworld) would be
+      // so server-side `/voy debug` and `/voy terrain` would be
       // unreachable without an explicit forwarder node here. The forwarder
       // must send the command packet directly: `sendChatCommand` is itself
       // intercepted by Fabric and would re-enter this very node forever.
@@ -72,7 +73,15 @@ object MandateHud:
         .executes(_ => forward("voy debug"))
         .`then`(ClientCommandManager.literal("on").executes(_ => forward("voy debug on")))
         .`then`(ClientCommandManager.literal("off").executes(_ => forward("voy debug off")))
-      dispatcher.register(ClientCommandManager.literal("voy").`then`(hud).`then`(debug))
+      val terrain = ClientCommandManager.literal("terrain")
+        .executes(_ => forward("voy terrain"))
+        .`then`(ClientCommandManager.literal("export")
+          .executes(_ => forward("voy terrain export"))
+          .`then`(ClientCommandManager.argument("radius", IntegerArgumentType.integer(1, 8))
+            .executes(ctx => forward(s"voy terrain export ${IntegerArgumentType.getInteger(ctx, "radius")}"))))
+        .`then`(ClientCommandManager.argument("radius", IntegerArgumentType.integer(1, 8))
+          .executes(ctx => forward(s"voy terrain ${IntegerArgumentType.getInteger(ctx, "radius")}")))
+      dispatcher.register(ClientCommandManager.literal("voy").`then`(hud).`then`(debug).`then`(terrain))
     }
 
   private def render(context: DrawContext): Unit =

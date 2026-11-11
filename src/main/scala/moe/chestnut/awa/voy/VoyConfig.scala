@@ -1,6 +1,7 @@
 package moe.chestnut.awa.voy
 
 import java.nio.file.{Files, Path}
+import scala.jdk.CollectionConverters.*
 
 import com.google.gson.{GsonBuilder, JsonObject, JsonParser}
 import net.fabricmc.loader.api.FabricLoader
@@ -48,13 +49,21 @@ final case class LatticeConfig(
   * with the core defaults as the last resort. Tuning a knob therefore
   * does NOT retroactively change the physics of an existing world's cells.
   */
+final case class TerrainCaptureConfig(
+    enabled: Boolean = true,
+    earlyCapture: Boolean = true,
+    dimensions: Set[String] = Set("minecraft:overworld")
+):
+  def allows(dimension: String): Boolean = enabled && dimensions.contains(dimension)
+
 final case class VoyConfig(
     tickDt: Double = 0.05,
     lattice: LatticeConfig = LatticeConfig(),
     fastParam: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
     stressParam: StressParam =
       StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-    pulseParam: PulseToleranceParam = PulseToleranceParam()
+    pulseParam: PulseToleranceParam = PulseToleranceParam(),
+    terrain: TerrainCaptureConfig = TerrainCaptureConfig()
 )
 
 object VoyConfig:
@@ -100,7 +109,8 @@ object VoyConfig:
         lattice = latticeFrom(obj(root, "lattice")),
         fastParam = fastFrom(obj(root, "fastParam")),
         stressParam = stressFrom(obj(root, "stressParam")),
-        pulseParam = pulseFrom(obj(root, "pulseParam"))
+        pulseParam = pulseFrom(obj(root, "pulseParam")),
+        terrain = terrainFrom(obj(root, "terrain"))
       )
     catch
       case e: Exception =>
@@ -108,6 +118,17 @@ object VoyConfig:
         VoyConfig()
 
   // ==== JSON codec (manual, so every field documents itself in the file) ====
+
+  private def terrainFrom(o: JsonObject): TerrainCaptureConfig =
+    val d = TerrainCaptureConfig()
+    if o == null then d
+    else TerrainCaptureConfig(
+      enabled = if o.has("enabled") then o.get("enabled").getAsBoolean else d.enabled,
+      earlyCapture = if o.has("earlyCapture") then o.get("earlyCapture").getAsBoolean else d.earlyCapture,
+      dimensions = if o.has("dimensions") then
+        o.getAsJsonArray("dimensions").asScala.map(_.getAsString).toSet
+      else d.dimensions
+    )
 
   private def dbl(obj: JsonObject, key: String, fallback: Double): Double =
     if obj != null && obj.has(key) && obj.get(key).isJsonPrimitive then
@@ -243,4 +264,11 @@ object VoyConfig:
     p.addProperty("pulseBurnoutGain", pp.pulseBurnoutGain)
     root.add("pulseParam", p)
 
+    val terrain = JsonObject()
+    terrain.addProperty("enabled", cfg.terrain.enabled)
+    terrain.addProperty("earlyCapture", cfg.terrain.earlyCapture)
+    val dimensions = new com.google.gson.JsonArray()
+    cfg.terrain.dimensions.toVector.sorted.foreach(dimensions.add)
+    terrain.add("dimensions", dimensions)
+    root.add("terrain", terrain)
     GsonBuilder().setPrettyPrinting().create().toJson(root)

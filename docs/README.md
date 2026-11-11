@@ -2,6 +2,7 @@
 
 | 文档 | 主题 | 状态 |
 | :--- | :--- | :--- |
+| [地形采集与 D8 实验](terrain-survey.md) | 生成阶段采集、区块附件、兼容配置、现场勘测与 CSV 导出 | 实验原型 |
 | [设计草案 01](design-draft-01-living-world.md) | 总纲：动力学（FHN + M）、Node/格子场与休眠调度、聚落、ARG 主线、Worldgen 路线、开放待办 | 0.1 结构冻结 |
 | [设计札记 02](design-note-02-kanren-worldview-engine.md) | 关系世界模型：Kanren 分层、四纪编译、六结局与时域结算、地形组合、Scala 对接 | 现行架构 |
 | [设计札记 05](design-note-05-medikanren-microchains.md) | 五跳卷宗与内容管线：微链图谱、种子物证、写作规则、Canon 不变量 | 现行规范 |

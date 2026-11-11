@@ -56,3 +56,10 @@ class VoyConfigSpec:
       VoyConfig.loadFrom(configPath),
       "a malformed file must never half-apply"
     )
+
+  @Test def `terrain capture accepts explicit dimension and early hook policy`(): Unit =
+    Files.writeString(configPath,
+      """{"terrain":{"enabled":true,"earlyCapture":false,"dimensions":["example:valley"]}}""")
+    val cfg = VoyConfig.loadFrom(configPath)
+    assertEquals(TerrainCaptureConfig(true, false, Set("example:valley")), cfg.terrain)
+    assertEquals(VoyConfig().lattice, cfg.lattice)

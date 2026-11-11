@@ -19,6 +19,7 @@ object VariationsOfYesterday extends ModInitializer:
     // Load the external config first: the engine's geometry, tick step and
     // parameters are all read from it when the engine starts.
     VoyConfig.reload()
+    moe.chestnut.awa.voy.mandate.TerrainCapture.register()
     // Touch the effect holder first: registering status effects must happen
     // during mod init, before any server-driven `StatusEffectInstance` exists.
     MandateEffects.Stagnation
@@ -36,6 +37,7 @@ object VariationsOfYesterday extends ModInitializer:
     ServerLifecycleEvents.SERVER_STOPPED.register(_ => MandateRuntime.stop())
     ServerTickEvents.END_SERVER_TICK.register(MandateRuntime.onTick(_))
     MandateOverworld.register()
+    moe.chestnut.awa.voy.mandate.TerrainSurveyCommand.register()
 
 
   override def onInitialize(): Unit =
