@@ -70,7 +70,7 @@ object MandateWording:
       case GastrodiaBedVerdict.Stalled =>
         f"§e[翻看菌塘] $stageWord ($age%d/$maxAge%d · $timberNote) — 地脉${regimeWord(r.regime)}、菌网$netWord，菌丝失水停滞，须安抚地脉或养复菌网"
       case GastrodiaBedVerdict.Withered =>
-        f"§4[翻看菌塘] 菌塘枯死 (菌网:$netWord) — 荧丝黑腐断绝，须待地脉脱离失能并降酸后，持菌材重铺菌塘"
+        f"§4[翻看菌塘] 菌塘已枯 (菌网:$netWord) — 荧丝黑腐断绝，须待菌网恢复、酸毒减退后，用菌材重铺；重铺后若地脉仍失调，菌塘暂缓生长"
 
   /** Player-facing wording when harvesting mature tubers from a `菌塘`. */
   def formatGastrodiaHarvest(count: Int, hasCompanionTimber: Boolean): String =
@@ -85,7 +85,7 @@ object MandateWording:
     if success then
       f"§a[重铺菌塘] 剔去黑腐死丝、换入新菌材，菌塘重新下种（菌网:$netWord）"
     else
-      f"§c[重铺无果] 土层尚处深度失能或酸毒未退（态:${regimeWord(r.regime)} 菌网:$netWord），此时换入菌材亦会黑腐"
+      f"§c[重铺无果] 菌网枯绝或酸毒未退（态:${regimeWord(r.regime)} 菌网:$netWord），此时换入菌材亦会黑腐"
 
   /** Player-facing wording when inoculating a stripped log into `荧丝菌材`
     * in the field.

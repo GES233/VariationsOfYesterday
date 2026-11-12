@@ -246,24 +246,36 @@ class MandatePhenomenaSpec:
     assertEquals(GastrodiaBedVerdict.Stalled, MandatePhenomena.evaluateGastrodiaBed(damaged))
     assertFalse(MandatePhenomena.canInoculateTimberInField(damaged))
 
-    // Deep incapacitation via the readout threshold rule -> Withered (note 06
-    // §4.3). The fact comes from the cell's own criterion (stacked pulse drive
-    // across the knee), not from the displayed phase.
+    // Batch 4 (assistant-proposed direction 1, adopted by the user, pending
+    // acceptance): the readout threshold rule is NOT
+    // a death cause any more — it only stalls the bed. Death is decided by the
+    // medium itself (`M` below the floor). The fact still comes from the cell's
+    // own criterion (stacked pulse drive across the knee), never from `phase`.
     val trajectoryBurnout = readout(
       s = 0.30,
       phase = PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee),
       sustenance = 0.80
     ).copy(pulseDrive = 2.1)
     assertTrue(trajectoryBurnout.isOffsetBelowKnee, "the readout threshold condition holds")
-    assertEquals(GastrodiaBedVerdict.Withered, MandatePhenomena.evaluateGastrodiaBed(trajectoryBurnout))
-    assertFalse(MandatePhenomena.canRefurbishGastrodiaBed(trajectoryBurnout))
+    assertFalse(
+      MandatePhenomena.isGastrodiaBedDeepDead(trajectoryBurnout),
+      "a no-cycle readout is not evidence that the medium died"
+    )
+    assertEquals(
+      GastrodiaBedVerdict.Stalled,
+      MandatePhenomena.evaluateGastrodiaBed(trajectoryBurnout),
+      "the readout threshold reason only pauses growth"
+    )
+    assertTrue(
+      MandatePhenomena.canRefurbishGastrodiaBed(trajectoryBurnout),
+      "the refurbish gate follows the medium, not the phase label"
+    )
 
-    // 2026-11-12 gameplay decision: an ACUTE overload lockout now only STALLS
-    // the bed — growth pauses (condition 1) and re-evaluates once the lockout
-    // expires — instead of latching it withered. The lockout masks the readout
-    // threshold reason; a dead network would still wither (death outranks).
-    // The silent signature still fires for the same lockout: that is C2, still
-    // pending, and the mismatch is deliberate for now.
+    // 2026-11-12 gameplay decision (batch 4): an acute overload lockout only
+    // STALLS the bed — growth pauses (condition 1) and re-evaluates once the
+    // lockout expires. Neither the lockout nor the readout threshold latches
+    // `Withered`; only `M` does. The silent signature still covers the same
+    // lockout: that is C2, still pending.
     val overloadLocked = readout(
       s = 0.30,
       phase = PhaseReading.Undefined(UndefinedReason.OverloadLocked),
@@ -281,12 +293,12 @@ class MandatePhenomenaSpec:
       "a short lockout only pauses growth; the bed is not latched as withered"
     )
     assertFalse(MandatePhenomena.isGastrodiaBedDeepDead(overloadLocked))
-    assertFalse(
+    assertTrue(
       MandatePhenomena.canRefurbishGastrodiaBed(overloadLocked),
-      "refurbishing is still blocked during a lockout: the gate keeps the pre-decision signal"
+      "refurbishing is governed by the medium and soil, not by the lockout"
     )
     // [BATCH-2 REGRESSION LOCK] C2 pending: the silent signature still covers
-    // the short lockout even though the bed now only stalls under it.
+    // the short lockout even though the bed only stalls under it.
     assertTrue(
       MandatePhenomena.classifyPhenomena(overloadLocked, isNight = true).silentBlight,
       "C2 still pending: the silent signature still covers the lockout"
@@ -370,9 +382,8 @@ class MandatePhenomenaSpec:
       MandatePhenomena.evaluateGastrodiaBed(belowFloorButPositive)
     )
 
-    // 2026-11-12 gameplay decision: an acute lockout still fires the silent
-    // signature (C2 pending) but no longer makes the bed deep-dead. The network
-    // is alive, so neither verdict fact comes from M here.
+    // Batch 4: an acute lockout still fires the silent signature (C2 pending)
+    // but is never a bed death cause. The network is alive, so `M` decides.
     val locked = readout(
       s = 0.30,
       phase = PhaseReading.Undefined(UndefinedReason.OverloadLocked),
@@ -385,14 +396,14 @@ class MandatePhenomenaSpec:
     assertTrue(MandatePhenomena.hasSilentBlight(locked))
     assertFalse(
       MandatePhenomena.isGastrodiaBedDeepDead(locked),
-      "the lockout masks the threshold reason; the bed only stalls"
+      "the lockout is not a death cause; only M is"
     )
     assertEquals(GastrodiaBedVerdict.Stalled, MandatePhenomena.evaluateGastrodiaBed(locked))
 
-  @Test def `lockout masks the readout threshold but never masks a dead network`(): Unit =
-    // Precedence of the 2026-11-12 bed decision (docs/mechanism-state-
-    // responsibilities.md §5 C1/C14): network death > acute lockout > readout
-    // threshold reason.
+  @Test def `a no-cycle reason only stalls; only a dead network withers`(): Unit =
+    // Batch 4 (assistant-proposed direction 1, adopted by the user, pending
+    // acceptance): neither the readout-threshold
+    // reason nor a lockout is a bed death cause. Only `M` below the floor is.
     val thresholdOnly = readout(
       s = 0.30,
       phase = PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee),
@@ -400,8 +411,12 @@ class MandatePhenomenaSpec:
     ).copy(pulseDrive = 2.1)
     assertTrue(thresholdOnly.isOffsetBelowKnee)
     assertFalse(thresholdOnly.isOverloadLocked)
-    assertTrue(MandatePhenomena.isGastrodiaBedDeepDead(thresholdOnly))
-    assertEquals(GastrodiaBedVerdict.Withered, MandatePhenomena.evaluateGastrodiaBed(thresholdOnly))
+    assertFalse(
+      MandatePhenomena.isGastrodiaBedDeepDead(thresholdOnly),
+      "the readout rule is not a death cause"
+    )
+    assertEquals(GastrodiaBedVerdict.Stalled, MandatePhenomena.evaluateGastrodiaBed(thresholdOnly))
+    assertTrue(MandatePhenomena.canRefurbishGastrodiaBed(thresholdOnly))
 
     val thresholdPlusLockout = thresholdOnly.copy(
       pulseLedger = PulseLedger(overload = OverloadLock(200.0)),
@@ -409,19 +424,12 @@ class MandatePhenomenaSpec:
     )
     assertTrue(thresholdPlusLockout.isOffsetBelowKnee, "the readout fact does not vanish")
     assertTrue(thresholdPlusLockout.isOverloadLocked)
-    assertFalse(
-      MandatePhenomena.isGastrodiaBedDeepDead(thresholdPlusLockout),
-      "the active lockout masks the readout-threshold reason"
-    )
+    assertFalse(MandatePhenomena.isGastrodiaBedDeepDead(thresholdPlusLockout))
     assertEquals(
       GastrodiaBedVerdict.Stalled,
-      MandatePhenomena.evaluateGastrodiaBed(thresholdPlusLockout),
-      "a locked bed cannot be latched withered by the threshold reason"
+      MandatePhenomena.evaluateGastrodiaBed(thresholdPlusLockout)
     )
-    assertFalse(
-      MandatePhenomena.canRefurbishGastrodiaBed(thresholdPlusLockout),
-      "a latched/deep-dead bed must not become refurbishable during the lockout mask"
-    )
+    assertTrue(MandatePhenomena.canRefurbishGastrodiaBed(thresholdPlusLockout))
 
     val deadPlusLockout = readout(
       s = 0.10,
@@ -434,25 +442,58 @@ class MandatePhenomenaSpec:
     assertTrue(deadPlusLockout.isOverloadLocked)
     assertTrue(
       MandatePhenomena.isGastrodiaBedDeepDead(deadPlusLockout),
-      "a dead network still withers under a lockout: death outranks the mask"
+      "a dead network withers regardless of the lockout"
     )
     assertEquals(GastrodiaBedVerdict.Withered, MandatePhenomena.evaluateGastrodiaBed(deadPlusLockout))
+    assertFalse(MandatePhenomena.canRefurbishGastrodiaBed(deadPlusLockout))
 
-  @Test def `the refurbish gate keeps the pre-decision predicate`(): Unit =
-    // Before 2026-11-12 the gate was `evaluateGastrodiaBed != Withered && s <
-    // toxicity`, i.e. exactly `!(isBurnoutPhase || M < max(floor, 1e-9)) && s <
-    // toxicity`. The new verdict masks the threshold reason under a lockout, so
-    // the gate must NOT follow it (a latched bed would become refurbishable and
-    // waste the material). Enumerate the inputs so a refactor cannot silently
-    // reuse the masked verdict.
-    def legacy(r: CellReadout): Boolean =
-      !(r.isOffsetBelowKnee || r.isOverloadLocked ||
-        r.sustenance < Math.max(r.stressParam.sustenanceFloor, 1e-9)) &&
+  @Test def `a refurbished bed cycles stalled then growing and never re-latches`(): Unit =
+    // The flow this batch is meant to verify: while the land is out of a
+    // working phase (lockout or readout threshold), a live network can be
+    // refurbished and the bed merely stalls; once the condition clears and the
+    // soil is healthy it grows again. No step re-latches `Withered`, because
+    // `M` never fell below the floor.
+    val lockedHealthy = readout(
+      s = 0.30,
+      phase = PhaseReading.Undefined(UndefinedReason.OverloadLocked),
+      sustenance = 0.80
+    ).copy(
+      pulseLedger = PulseLedger(overload = OverloadLock(200.0)),
+      simTime = 100.0
+    )
+    assertTrue(MandatePhenomena.canRefurbishGastrodiaBed(lockedHealthy), "re-inoculation may take")
+    assertEquals(GastrodiaBedVerdict.Stalled, MandatePhenomena.evaluateGastrodiaBed(lockedHealthy))
+    assertFalse(MandatePhenomena.isGastrodiaBedDeepDead(lockedHealthy))
+
+    val afterLockout = lockedHealthy.copy(pulseLedger = PulseLedger.zero, simTime = 200.0)
+    assertFalse(afterLockout.isOverloadLocked)
+    assertEquals(
+      GastrodiaBedVerdict.Growing,
+      MandatePhenomena.evaluateGastrodiaBed(afterLockout),
+      "healthy soil and a live network resume growth"
+    )
+    assertFalse(MandatePhenomena.isGastrodiaBedDeepDead(afterLockout))
+
+    val recoveringButDamaged = afterLockout.copy(sustenance = 0.40)
+    assertEquals(
+      GastrodiaBedVerdict.Stalled,
+      MandatePhenomena.evaluateGastrodiaBed(recoveringButDamaged),
+      "taking hold does not guarantee growth: a damaged network still stalls"
+    )
+    assertFalse(MandatePhenomena.isGastrodiaBedDeepDead(recoveringButDamaged))
+
+  @Test def `the refurbish gate follows the medium, not the phase`(): Unit =
+    // Batch 4 threshold 2: refurbishing requires a live-enough network and
+    // sub-toxic soil, nothing else. Enumerate the inputs (including lockout and
+    // stacked drive, which must make NO difference) so a refactor cannot
+    // silently re-introduce the phase coupling.
+    def expected(r: CellReadout): Boolean =
+      r.sustenance >= Math.max(r.stressParam.sustenanceFloor, 1e-9) &&
         r.current.stress < r.stressParam.sustenanceBurnThreshold
     var checked = 0
     for
-      m <- List(0.0, 0.00005, 0.3, 1.0)
-      s <- List(0.2, 0.5, 0.62)
+      m <- List(0.0, 0.00005, Math.max(StressParam().sustenanceFloor, 1e-9), 0.3, 1.0)
+      s <- List(0.2, 0.5, StressParam().sustenanceBurnThreshold, 0.62)
       locked <- List(false, true)
       drive <- List(0.0, 2.1)
     do
@@ -467,12 +508,12 @@ class MandatePhenomenaSpec:
         simTime = 10.0
       )
       assertEquals(
-        legacy(r),
+        expected(r),
         MandatePhenomena.canRefurbishGastrodiaBed(r),
         s"M=$m s=$s locked=$locked drive=$drive"
       )
       checked += 1
-    assertEquals(4 * 3 * 2 * 2, checked)
+    assertEquals(5 * 4 * 2 * 2, checked, "includes M == floor and s == toxicity boundaries")
 
   @Test def `zh_cn and en_us language files keep identical key sets`(): Unit =
     import com.google.gson.JsonParser

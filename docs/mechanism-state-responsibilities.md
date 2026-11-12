@@ -1,9 +1,9 @@
 # 机制职责与状态转移（阶段 A 产出）
 
-> 更新：2026-11-12。状态：**职责表初稿（阶段 A）**，配合第一批结构解耦（阶段 B）、第二批消费者事实分账（阶段 C-1）与第三批首个玩法变化（阶段 C：短时锁闭期菌塘只停长）。
+> 更新：2026-11-12。状态：**职责表初稿（阶段 A）**，配合第一批结构解耦（阶段 B）、第二批消费者事实分账（阶段 C-1）、第三批（阶段 C：短时锁闭期菌塘只停长）与第四批（阶段 C：菌塘死因收敛到 `M`，按助手建议实现，待用户验收）。
 > 用途：把刺激、庇护、耐受、过载、生态损伤／菌网存活的触发、持续、失效、恢复、可观察证据与状态所有权写清，供后续玩法讨论与阶段 C 施工直接引用。
 > 本文**不是玩法定稿**。文中参数（40 s / 8 s / 0.10 / 0.35 / 45 s / 120 tick 等）全部是现行实现的默认值，本轮没有重新确认（见[备忘 §3.2](work-in-progress-mechanism-decoupling.md)）；凡未由用户拍板的后果一律标【待拍板】。
-> 第二批（2026-11-12，C-1）只把消费者共用的粗判拆成**具名事实**并保持每个消费者的结论不变；新增事实表见 §1.3，消费者依赖表见 §7.1。第三批（2026-11-12）是**首个玩法变化**：按用户拍板，短时过载锁闭期菌塘只停长、不再锁存枯萎（§5 C1/C14、§6 场景 A、§8.4），其余玩家可见后果仍未定。相关：[临时施工备忘 §2.2、§3.1–§3.7、§6、§10、§11](work-in-progress-mechanism-decoupling.md)；[札记 08 心跳规范](design-note-08-fast-variable-and-stagnation.md)；[札记 06 菌网与菌塘](design-note-06-mycelial-grounding.md)。
+> 第二批（2026-11-12，C-1）只把消费者共用的粗判拆成**具名事实**并保持每个消费者的结论不变；新增事实表见 §1.3，消费者依赖表见 §7.1。第三批（2026-11-12）是**首个玩法变化**：按用户拍板，短时过载锁闭期菌塘只停长、不再锁存枯萎（§5 C1/C14、§6 场景 A、§8.4）。第四批按**助手建议**（用户采用并修正边界；2026-11-12 实现，**待用户验收**，见[备忘 §12、§13](work-in-progress-mechanism-decoupling.md)）把菌塘死因收敛到「`M` 低于存活下限」：锁闭与读数越膝都只判 `Stalled`，重铺门槛只看介质与毒性（§5 C1/C14、§6、§8.4）。相关：[临时施工备忘 §2.2、§3.1–§3.7、§6、§10、§11、§12、§13](work-in-progress-mechanism-decoupling.md)；[札记 08 心跳规范](design-note-08-fast-variable-and-stagnation.md)；[札记 06 菌网与菌塘](design-note-06-mycelial-grounding.md)。
 
 ---
 
@@ -17,8 +17,9 @@
   - 【用户确认】只有用户明确拍板的方向／结论；
   - 【本轮显式化，结果不变】第一批结构改动把隐含职责写成显式状态或转移，运行结果与改前等价；
   - 【待拍板】玩法、参数或消费者后果尚未决定；本文只列问题与候选，不定案。
+- 第四批的方案由**助手提出**、用户采用并修正边界；实施时记为「按助手建议实现（2026-11-12），**待用户验收**」，**不记为【用户确认】**：行为已按该方案落地，但仍可随验收与 playtest 调整。
 - 第一、二批的所有结构改动都标【本轮显式化，结果不变】：第二批只是把已有粗判拆成具名事实（§1.3），每个消费者的结论保持与改前相同，不新增玩法后果。
-- 本文引用的【用户确认】仅限两条方向：「事件 → 机制（1..n）→ 效果」与转义层职责（[备忘 §2.1](work-in-progress-mechanism-decoupling.md)）；主动显式化状态与转移（[备忘 §2.2](work-in-progress-mechanism-decoupling.md)）；以及本轮无旧档兼容要求（[备忘 §1](work-in-progress-mechanism-decoupling.md)）。**它们都不构成任何具体玩法参数或后果的批准。**
+- 本文的【用户确认】标签用于：「事件 → 机制（1..n）→ 效果」与转义层职责（[备忘 §2.1](work-in-progress-mechanism-decoupling.md)）；主动显式化状态与转移（[备忘 §2.2](work-in-progress-mechanism-decoupling.md)）；本轮无旧档兼容要求（[备忘 §1](work-in-progress-mechanism-decoupling.md)）；以及第三批「短时锁闭期菌塘只停长」（2026-11-12）。第四批按**助手建议**实现、待用户验收，不记入此类。上述方向都不构成任何具体玩法参数或后果的批准。
 
 阅读顺序：§1 三类信息 → §2 五机制职责 → §3 转移表 → §4 同事件多机制顺序 → §5 跨机制耦合 → §6 组合场景 → §7 新旧名对照 → §8 待定项。
 
@@ -62,10 +63,10 @@
 
 | 事实 | 判据 | 位置 | 消费者 |
 | :--- | :--- | :--- | :--- |
-| `isOffsetBelowKnee` | 本格 `effectiveA <= burnoutA`（读数规则；含叠脉冲修正，ODE 不含） | `Readout.isOffsetBelowKnee` / `cell.isOffsetBelowKnee` | 相位展示（规则原因；显示侧同判据另算，不调用此查询）；`isBurnoutPhase`；菌塘（**直接读**，带锁闭掩蔽）；静默（经 `isBurnoutPhase`） |
+| `isOffsetBelowKnee` | 本格 `effectiveA <= burnoutA`（读数规则；含叠脉冲修正，ODE 不含） | `Readout.isOffsetBelowKnee` / `cell.isOffsetBelowKnee` | 相位展示（规则原因；显示侧同判据另算，不调用此查询）；`isBurnoutPhase`；静默（经 `isBurnoutPhase`）；钟分派（经 `isEcologicalBurnout` 第三子句）；菌塘只经 `isBurnoutPhase` 判 `Stalled`，**不再是菌塘死因**（批次 4） |
 | `isSlowOffsetBelowKnee` | `a_slow <= burnoutA`（ODE 自己积分的偏移；无脉冲修正） | `Readout.isSlowOffsetBelowKnee` | `isEcologicalDeath`；「介质存活／工作区间／相位可读」三分时的动力学侧事实（§8.4） |
 | `isOverloadLocked` | `pulseLedger.overloadedAt(simTime)`（机制规则） | `cell.isOverloadLocked` | 相位展示（机制原因优先；显示侧另算，不调用此查询）；`isBurnoutPhase` |
-| `isBurnoutPhase` | 上两条的并集 | `cell.isBurnoutPhase` | 沿用旧后果的消费者（庇护、经济、静默、钟分派）；菌塘判决自第三批起改读带掩蔽的 `isOffsetBelowKnee` + `isOverloadLocked`，但**重铺门槛仍直接读 `!isBurnoutPhase`** |
+| `isBurnoutPhase` | 上两条的并集 | `cell.isBurnoutPhase` | 沿用旧后果的消费者（庇护、经济、静默、钟分派）；菌塘自批次 4 起只读它判 `Stalled`（不再判死），重铺门槛不读它 |
 | `isMyceliumViable` | `M >= floor`（本格 floor） | `cell.isMyceliumViable` | `isMaintained` |
 | `isMyceliumAbsent` | `M <= 0`（吸收态，比 floor 严） | `cell.isMyceliumAbsent` | `hasSilentBlight` |
 | `isEcologicalDeath` | `!isMyceliumViable \|\| isSlowOffsetBelowKnee` | `Readout.isEcologicalDeath`（数值重载 + 快照重载） | `MandateAgent.recordPulse` 的「死菌不记账」守卫；`isEcologicalBurnout` 的前两子句 |
@@ -73,14 +74,14 @@
 | `hasActivePositiveSpike` | `v >= spikeLevel`（只算正向；负向回摆不算） | `cell.hasActivePositiveSpike` | `isMaintained`；`classifyEconomy` 的尖峰档 |
 | `isMaintained` | `pulseSuppressed && isMyceliumViable && !isBurnoutPhase && !hasActivePositiveSpike` | `Readout.isMaintained` | 玩家沉滞效果、验山读数、开发 HUD、经济档（C8/C9/C13 未拆） |
 | `hasSilentBlight` | `isBurnoutPhase \|\| isMyceliumAbsent` | `MandatePhenomena.hasSilentBlight` | 静默签名 |
-| `isGastrodiaBedDeepDead` | `M < max(floor, 1e-9)`，或（**未锁闭时**）`isOffsetBelowKnee`（锁闭掩蔽读数原因；见 §5 C1） | `MandatePhenomena.isGastrodiaBedDeepDead` | 菌塘 `Withered` 守卫 |
+| `isGastrodiaBedDeepDead` | **只看** `M < max(floor, 1e-9)`（锁闭与读数越膝都不是死因；批次 4） | `MandatePhenomena.isGastrodiaBedDeepDead` | 菌塘 `Withered` 守卫（唯一死因） |
 
-三条边界，防止把「具名化」误当「已分账」：
+四条边界，防止把「具名化」误当「已分账」：
 
 - **两套 `M` 阈值**：`isMyceliumViable` 用 `M >= floor`，`isMyceliumAbsent` 用 `M <= 0`，`isGastrodiaBedDeepDead` 用 `M < max(floor, 1e-9)`。三者服务不同语义，不得合并成一个「M 死」。
-- **两套死亡**：`isEcologicalDeath`（含 `a_slow` 越膝）是「地脉失能」守卫；`isGastrodiaBedDeepDead`（`M < max(floor,1e-9)`，或未锁闭时的 `isOffsetBelowKnee`）是菌塘锁存规则；钟分派用 `isEcologicalBurnout`（再叠读数规则）。它们不互相蕴含。
-- **重铺门槛不复用菌塘判决**：`canRefurbishGastrodiaBed` 保持改判前的信号（`!isBurnoutPhase && M >= max(floor,1e-9) && s < 毒性阈值`），所以锁闭掩蔽不会让已锁存的死塘变成可重铺——否则玩家会白费材料，且与检查文案矛盾（§5 C14）。除 NaN 域外与改前逐输入一致；NaN 下新写法的 `M >=` 比改前的 `M <` 取反更保守（拒绝重铺）。
-- **合成事实仍是大多数消费者的唯一入口**：`isMaintained` / `hasSilentBlight` / `isEcologicalBurnout` 的结论与改前相同；菌塘的 `isGastrodiaBedDeepDead` 已按 2026-11-12 拍板改了判据（§5 C1/C14）。其余拆读仍是阶段 C 的决定（§7.1、§8.5），不是第二批的成果。
+- **两套死亡**：`isEcologicalDeath`（含 `a_slow` 越膝）是「地脉失能」守卫；`isGastrodiaBedDeepDead`（批次 4 起**只看** `M < max(floor,1e-9)`）是菌塘锁存规则；钟分派用 `isEcologicalBurnout`（再叠读数规则）。它们不互相蕴含。
+- **重铺门槛只问介质**：`canRefurbishGastrodiaBed = M >= max(floor,1e-9) && s < 毒性阈值`。死因与重铺条件可以不同：没有机制证明「短时锁闭／相位不可读会阻止接活」，所以门槛不读 `isBurnoutPhase`；保留的只有数值保护（酸毒杀新接种）。接活后按实时条件进入 `Growing` 或 `Stalled`，不保证立即生长（§5 C14）。
+- **合成事实仍是大多数消费者的唯一入口**：`isMaintained` / `hasSilentBlight` / `isEcologicalBurnout` 的结论与改前相同；菌塘的 `isGastrodiaBedDeepDead` 已经过两次玩法改动（第三批用户拍板「锁闭只停长」；第四批按助手建议实现、待验收：「死因收敛到 `M`」，§5 C1/C14）。其余拆读仍是阶段 C 的决定（§7.1、§8.5），不是第二批的成果。
 
 ---
 
@@ -144,7 +145,7 @@
 | :--- | :--- |
 | 触发条件 | 慢系统动力学（`M` 的 Fisher-KPP：logistic 生长、酸蚀、沿输运边的扩散）+ 叙事 `SetSustenance`；**不是**由单次脉冲直接扣 `M`。当前**没有额外的「账本负荷 → 损伤」路径**（即没有把脉冲计数直接兑换成 `M` 损失的地方）；但物理刺激仍会**间接**影响菌网：脉冲进 `dv/dt` → `v` 尖峰抬 `q`（`λ·(|v|−v_spike)_+`）→ `q` 经 `η` 抬 `s` → `s` 超过 0.6 的酸蚀扣 `M`（`p → v → q → s → M`）。游戏侧该链是开的（`sustenanceBurn = 4e-3`、阈值 0.6），冻结契约切片里 `sustenanceBurn = 0` 故 dormant。后续若新增显式负荷伤害，须先核对该链是否已覆盖同一后果，避免重复累计（备忘 §3.7） |
 | 持续 | `M` 持久；`M = 0` 是吸收态（无自生） |
-| 失效 / 恢复 | 再接种抬高地板（野生菌种 0.05／荧丝菌材 0.12，写入取 `max(当前 M, 种子)`，已有活丝不被冲掉）；邻格扩散回填小死斑；大死区实质永久。`a_slow <= burnoutA` 是轨迹失能，不等于 `M` 已死；泄压后若 `M` 仍活，相位可回升。菌塘枯死锁存需人工翻修（`canRefurbishGastrodiaBed`：`!isBurnoutPhase && M >= max(floor, 1e-9) && s < 毒性阈值`，**不复用锁闭掩蔽判决**）；短时锁闭已不再造成这种锁存（§5 C1） |
+| 失效 / 恢复 | 再接种抬高地板（野生菌种 0.05／荧丝菌材 0.12，写入取 `max(当前 M, 种子)`，已有活丝不被冲掉）；邻格扩散回填小死斑；大死区实质永久。`a_slow <= burnoutA` 是轨迹失能，不等于 `M` 已死；泄压后若 `M` 仍活，相位可回升。菌塘枯死锁存需人工重铺（`canRefurbishGastrodiaBed`：`M >= max(floor, 1e-9) && s < 毒性阈值`，**不看相位／锁闭**；批次 4） |
 | 可观察证据 | 菌塘 `condition`（0 长／1 滞／2 枯）、验山读数「菌网:完好/受损/枯绝」、夜间菌光与前兆孢子、静默枯败的灰、黄水三档、开发 HUD 的 `M=`、经济档 |
 | 状态拥有者 | `MandateState.sustenance`（核心，每格）；菌塘锁存在 `GastrodiaBedBlock.CONDITION`（消费侧方块状态） |
 | 是否必须保存 | **是**（`M` 必须随快照保存，`M=0` 必须仍是 0）；菌塘 `condition` 随区块保存；读数分类不保存 |
@@ -201,9 +202,7 @@
 
 > **注（默认参数下的可达性）**：锁闭时长 8 s 恰等于最小安全间隔 8 s，而守卫顺序是「太快 → 锁闭 → 饱和」。因此默认参数下 `AlreadyLocked` **不可达**：`elapsed < 8` 已被 `PulseTooSoon` 截获，`elapsed ≥ 8` 时锁已过期。只有把 `overloadBurnoutDuration` 配得比 `minSafeInterval` 长，才会出现该分支。一次结算只记录一个 `cause`，它是解释而非状态（不保存）。
 >
-> **锁闭对菌塘的影响（2026-11-12 用户拍板）**：锁闭期间**未锁存**的菌塘判 `Stalled`（`condition = 1`，暂停生长），锁到期后按当前生态条件重判；已锁存为 `condition = 2` 的塘**保持** 2，只有人工翻修能解除（C14）；`M` 低于存活下限者仍判 `Withered`（死亡优先）。读数越膝原因在锁闭期间被掩蔽，不参与枯萎判定（§5 C1）。重铺门槛不复用该掩蔽判决（§1.3 边界、C14）。
->
-> **掩蔽的直接后果（务必记住）**：锁闭给菌塘提供了一段**临时保护**——「读数越膝」本身不再足以在锁闭期判死；**持续续锁会延长这段保护**（例如持续链路流量、反复快速敲击）。但锁闭结束（或间隙中的一次评估）时若读数仍越膝，菌塘仍会被锁存为枯死，且不会自动恢复。保护的是「何时评估」，不是「越膝是否无害」。
+> **锁闭对菌塘的影响（2026-11-12 按助手建议实现，待用户验收；批次 4）**：锁闭与读数越膝都只让菌塘 `Stalled`（`condition = 1`，暂停生长），条件解除后按当前生态条件重判；**只有 `M` 低于存活下限才判 `Withered`**。因此上一批的「锁闭掩蔽」与「续锁延长免死保护」不再存在——越膝本来就不直接判死，没有需要保护的东西。重铺门槛只看介质与毒性（§1.3 边界、C14），锁闭期也可以接活；已锁存为 `condition = 2` 的塘仍保持 2，只有人工重铺能解除。
 
 ### 3.5 生态损伤 / 菌网存活
 
@@ -211,10 +210,10 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | 持续酸蚀（`s > 0.6` 且 `M > 0`） | tick 积分 | Fisher-KPP | `M` 下降；穿 `floor` 且局部趋势 ≤ 0 → 0（吸收） | 消费侧检查时刻可能把菌塘写成 `Withered` | 泄压 + 再接种 |
 | `M > 0` + 低应力 | tick | — | logistic 回升 + 扩散 | 无 | — |
-| `effectiveA ≤ burnoutA`（读数阈值规则；含叠脉冲修正，**ODE 不含此项**） | 查询／显示 | `overloaded` 为假时占据相位槽 | 不写状态；相位发布 `OffsetBelowKnee` | 静默枯败、钟「无应」、菌塘锁存（**仅未锁闭时**；锁闭期改判 `Stalled`，§5 C1） | `effectiveA` 回升（降应力／抬 `M`／撤掉叠脉冲） |
+| `effectiveA ≤ burnoutA`（读数阈值规则；含叠脉冲修正，**ODE 不含此项**） | 查询／显示 | `overloaded` 为假时占据相位槽 | 不写状态；相位发布 `OffsetBelowKnee` | 静默枯败、钟「无应」；菌塘只 `Stalled`（批次 4 起不再是死因） | `effectiveA` 回升（降应力／抬 `M`／撤掉叠脉冲） |
 | `a_slow ≤ burnoutA`（ODE 自己的偏移，接近动力学结论） | tick／查询 | 不涉及相位槽 | 不写状态；`isSlowOffsetBelowKnee` 为真 | 由 `isEcologicalDeath`／`isEcologicalBurnout` 合并判定（消费者结果不变） | 应力缓解或 `M` 回升使 `a_slow` 回升 |
 | `M < floor` | tick／查询 | — | 不写状态；`isMyceliumViable = false`，分类「枯绝」 | 同上；菌塘 `isGastrodiaBedDeepDead`；静默仍用 `isMyceliumAbsent`（`M ≤ 0`） | 再接种（大死区实质永久） |
-| 菌塘随机刻／交互被判 `Withered` | 下游检查 | `evaluateGastrodiaBed`（内部 `isGastrodiaBedDeepDead`；锁闭期改判 `Stalled`） | `CONDITION = 2` 锁存 | 白灰、枯死外观 | 人工翻修（`canRefurbishGastrodiaBed`：`!isBurnoutPhase && M >= max(floor, 1e-9) && s < 毒性阈值`；锁闭期不可重铺） |
+| 菌塘随机刻／交互被判 `Withered` | 下游检查 | `evaluateGastrodiaBed`（内部 `isGastrodiaBedDeepDead`：只读 `M`；越膝／锁闭判 `Stalled`） | `CONDITION = 2` 锁存 | 白灰、枯死外观 | 人工重铺（`canRefurbishGastrodiaBed`：`M >= max(floor, 1e-9) && s < 毒性阈值`） |
 | 再接种 | `SetSustenance`／方块交互 | 接线层 `evaluateReInoculation`（`M < 0.2` 且 `s < 0.6`） | `M = max(M, seed)`（0.05／0.12） | 种子写入、文案 | 扩散 / logistic |
 
 ---
@@ -250,20 +249,20 @@
 
 | 编号 | 关系（当前事实） | 代码依据 | 标注 | 待讨论 |
 | :--- | :--- | :--- | :--- | :--- |
-| C1 | 过载期间菌塘判 `Stalled`（不锁存） | `evaluateGastrodiaBed` 的 `isGastrodiaBedDeepDead = M < max(floor, 1e-9) \|\| (!isOverloadLocked && isOffsetBelowKnee)`；锁闭期判 `Stalled`，不写锁存 | 【用户确认 2026-11-12：短时锁闭只停长】 | 已拍板：暂停生长、解除后重判；读数越膝本身是否锁存仍【待拍板】（§8.4） |
+| C1 | 过载／读数越膝期间菌塘判 `Stalled`（不锁存） | `isGastrodiaBedDeepDead = M < max(floor, 1e-9)`（唯一死因）；`isBurnoutPhase`（锁闭或越膝）→ `Stalled` | 【按助手建议实现 2026-11-12；待用户验收】 | 已按建议实施：两种异常态都只停长；静默签名未跟进（C2） |
 | C2 | 静默枯败同时覆盖两种 no-cycle 原因 | `hasSilentBlight = isBurnoutPhase \|\| isMyceliumAbsent`；玩家文案两原因同词 | 【本轮显式化，结果不变】 | 短时锁闭是否发静默签名；文案是否拆出「过载·暂锁」【待拍板】 |
 | C3 | 耐受缩短庇护窗口 | `effectiveWindowAt = 40 · (1 − T/1.0)` | 【本轮显式化，结果不变】 | 数值与「维护必加耐受」【待拍板】 |
 | C4 | 过载关闭庇护窗口 | 结算内 `shelter.closed`；查询再以 `overloadedAt` 掩蔽 | 【本轮显式化，结果不变】 | 是否保留「一次过载即清窗」【待拍板】 |
 | C5 | 死菌不记账 | `recordPulse` 的 `ecoDead`（`M < floor` 或 `a_slow ≤ burnoutA`） | 【本轮显式化，结果不变】 | 死亡边界是否应只看 `M` 而非 `a_slow`【待拍板】 |
 | C6 | 机制锁闭进入相位读数 | `PhaseTracker.reading` 先看 `overloaded()` → `OverloadLocked`；读数阈值原因其次（**仅展示优先级**）。两个事实查询各自独立，同时成立时都返回真（§1.1） | 【本轮显式化，结果不变】 | 读数是否应反映「规则锁闭」（[备忘 §3.3](work-in-progress-mechanism-decoupling.md)）；两原因同时成立时 `PhaseReading` 只能显示一个，是否需要并列展示【待拍板】 |
-| C7 | 慢偏移越膝仍被下游当「烧毁／枯绝」 | `isEcologicalBurnout` 的 `isSlowOffsetBelowKnee` 与钟 `DeadMyceliumBurnout`；静默经 `isBurnoutPhase`（菌塘判决读带掩蔽的 `isOffsetBelowKnee`，见 C1；重铺门槛仍读 `!isBurnoutPhase`） | 【本轮显式化，结果不变】 | 备忘 §3.7 要求的「介质存活 / 工作区间 / 相位可读」三分【待拍板】 |
+| C7 | 慢偏移越膝仍被下游当「烧毁／枯绝」 | `isEcologicalBurnout` 的 `isSlowOffsetBelowKnee` 与钟 `DeadMyceliumBurnout`；静默经 `isBurnoutPhase`；菌塘自批次 4 起只读 `M`，越膝只判 `Stalled` | 【本轮显式化，结果不变】（菌塘已按助手建议解耦，待用户验收） | 备忘 §3.7 要求的「介质存活 / 工作区间 / 相位可读」三分【待拍板】 |
 | C8 | `isMaintained` 仍是庇护／经济／玩家效果的统一入口 | `pulseSuppressed && isMyceliumViable && !isBurnoutPhase && !hasActivePositiveSpike`（四个具名事实的合成） | 【本轮显式化，结果不变】（消费者仍未拆） | 消费者分账（[备忘 §3.5](work-in-progress-mechanism-decoupling.md)）；已具名化，拍板后改读对应事实即可 |
 | C9 | 经济档统一由 `isMaintained` 决定 | `classifyEconomy`：维持态读 `isMaintained`，尖峰档读 `Regime.Burnout` 或 `hasActivePositiveSpike` | 【本轮显式化，结果不变】 | 是否按长期土地健康／临时危险／设施服务分账 |
 | C10 | 钟一次动作多职责 | `BellStrikeOutcome`：`c0` + 脉冲 + 账本 + 惩罚 | 【待拍板】（本批未拆） | 备忘 §3.1、阶段 C |
 | C11 | 正常维护必加耐受 | 每次接受都 `+0.10` | 【待拍板】（本批未拆） | 「维护必加耐受」是否需要 |
 | C12 | 链路脉冲恒 `Counted`、无分派 | 链路无分派 → 恒 `Counted`（来源字段 `transmitter` 保留） | 【待拍板】（本批未拆） | 内生／链路／外部是否共享同一套耐受／过载／庇护（[备忘 §2.1](work-in-progress-mechanism-decoupling.md)） |
 | C13 | 沉滞玩家效果由轮询驱动 | 每 20 tick 轮询 `isMaintained`；效果 55 tick | 【待拍板】（本批未拆） | 是否改为状态转移钩子（备忘 §2.2 到期语义） |
-| C14 | 菌塘枯死不可自动恢复 | `CONDITION = 2` 锁存；翻修门槛 `canRefurbishGastrodiaBed = !isBurnoutPhase && M >= max(floor, 1e-9) && s < 毒性阈值`（不复用锁闭掩蔽判决） | 【部分用户确认 2026-11-12】短时锁闭不再造成锁存（C1）；锁闭期不可重铺（重铺门槛保留改判前信号）；读数越膝造成的锁存仍在 | 读数越膝是否也允许留下锁存；持续多久算「持续枯萎」 |
+| C14 | 菌塘枯死不可自动恢复 | `CONDITION = 2` 锁存；人工重铺门槛 `canRefurbishGastrodiaBed = M >= max(floor, 1e-9) && s < 毒性阈值`（只看介质与毒性） | 【按助手建议实现 2026-11-12；待用户验收】死因仅 `M`；锁闭／越膝不再造成锁存 | 若希望「环境长期恶化造成永久枯死」，应显式走 `p → v → q → s → M` 或另立损伤路径，而不是复用相位标签 |
 
 > 另：`Regime.Burnout`（`s ≥ 0.95` 的应力读数）与 `isBurnoutPhase`（无周期相位）是两种读数，札记 06 §3 的不变量要求静默签名只绑后者——这条不涉及取舍，不在上表编号内。
 
@@ -275,10 +274,10 @@
 
 | 场景 | 备忘 §3.7 的方向（候选） | 当前实现真实结论 | 判定 | 待拍板 |
 | :--- | :--- | :--- | :--- | :--- |
-| **A. 活菌 + 短时过载** | 临时过载可暂缓生长，解除后按生态条件重判；不自动等于永久死亡 | 活菌 `M ≥ floor`；8 s 锁闭内 `phase = OverloadLocked`、`isBurnoutPhase = true` → `silentBlight = true`（C2 仍未拍板）；菌塘判 **`Stalled`（暂停生长）**，锁到期后按当前生态条件重判，**不再锁存**；`isMaintained = false` → 经济至少沉滞档（若 `v` 尖峰或 `Regime.Burnout` 则为尖峰档）；玩家若经钟触发则吃 `pulse_saturation`；`M` 与轨迹不受损；8 s 后相位恢复，但庇护窗已在结算时关闭，须新脉冲；耐受已 `+0.35` | **符合候选方向**（2026-11-12 拍板：过载可恢复、不永久枯死）；静默签名仍在锁闭期发白灰，与菌塘判决不一致（C2） | 静默/文案是否拆出「过载·暂锁」；读数越膝本身是否也允许锁存（§8.4） |
-| **B. 低菌量 + 无过载** | 低菌量只影响生长／生态，不应误触发过载与死亡 | 前提：`M ∈ [floor, 0.60)` **且 `a_slow > burnoutA`（未越膝）**——此时菌塘 `Stalled`；`silentBlight = false`；账本无锁闭；若相位有定义且窗新鲜，`isMaintained` 可为 true → 庇护与经济照常（`isMaintained` 只要求 `M ≥ floor`，不要求 `M ≥ 0.60`）。注意菌网受损本身不决定相位：默认 `coupling = 1.0 / depth = 1.2` 下，`M = 0.59` 只要 `s ≥ 0.54` 就已 `a_slow ≤ burnoutA`，转入场景 C 的混合（`Withered`／静默／非维持）；`M` 越膝主要靠 **s 高**，不是靠 M 低。`M < floor` 才是「枯绝」 | 基本符合（不误触发过载、不自动判死）；「菌网受损仍算 maintained」是待定耦合 | 庇护／经济是否应随 `M` 分级（C8／C9） |
-| **C. 慢系统失能但菌网未死** | `a_slow` 越膝 ≠ 菌网死亡；介质存活、动力学工作区间、相位可读性应分开 | **(i)** `a_slow ≤ burnoutA` 且 `M ≥ floor`、**且无锁闭**：`phase = OffsetBelowKnee`；`isEcologicalBurnout = true` → 钟判 `DeadMyceliumBurnout`（PhysicsOnly）；菌塘 `Withered`；`silentBlight`；经济非维持；但 `M` 未死，泄压后 `a_slow` 可回升、相位可恢复，菌塘需翻修。若同一时刻还有活跃锁闭，相位显示 `OverloadLocked`、菌塘 `Stalled`（C1 掩蔽）。**(ii)** `Regime.Burnout`（`s ≥ 0.95`）且 `M` 活、`a_slow` 未越膝：相位可为 `Cycle`；`silentBlight` 必须 false；菌塘 `Stalled`（`s ≥ 0.45`）；钟 `SaturatedNoAnchor`（不锚 `c0` 但 `Counted`、开窗）；窗新鲜且无尖峰时 `isMaintained` 可为 true → 经济可维持 | (ii) 已区分；(i) 无锁闭时仍把轨迹失能当生态烧毁，**未满足**；锁闭期已按 2026-11-12 拍板改为停长 | 是否为 (i) 增加独立的「介质存活／损伤」事实；钟在 (i) 下是否仍应毫无回音；读数越膝是否仍判菌塘枯死 |
-| **D. 菌网死亡 + 过载并存** | 两状态可并存、互不取消；过载解除不能复活死菌网 | `M < floor` 后 `recordPulse` 跳过记账，不再新设锁；死亡前已设的锁可自然到期。两者同时成立时 `phase` 发布 `OverloadLocked`（机制原因优先），不是 `OffsetBelowKnee`；`isBurnoutPhase` 同判，下游结论不变（菌塘 `Withered`、`silentBlight`、钟优先 `DeadMyceliumBurnout`）。锁到期不改变 `M`；`M = 0` 吸收 | 满足「不互相取消」；读数无法并列展示两个原因 | 是否需并列／分别查询（`CellReadout` 已有两个布尔，但 `phase` 单槽）；是否需要额外的账本负荷损伤（注意 `p → v → q → s → M` 已覆盖一条间接路径） |
+| **A. 活菌 + 短时过载** | 临时过载可暂缓生长，解除后按生态条件重判；不自动等于永久死亡 | 活菌 `M ≥ floor`；8 s 锁闭内 `phase = OverloadLocked`、`isBurnoutPhase = true` → `silentBlight = true`（C2 仍未拍板）；菌塘判 **`Stalled`（暂停生长）**，锁到期后按当前生态条件重判，**不锁存**；不再存在「锁闭掩蔽越膝」的额外保护（越膝本来就不判死）；`isMaintained = false` → 经济至少沉滞档（若 `v` 尖峰或 `Regime.Burnout` 则为尖峰档）；玩家若经钟触发则吃 `pulse_saturation`；`M` 与轨迹不受损；8 s 后相位恢复，但庇护窗已在结算时关闭，须新脉冲；耐受已 `+0.35` | **符合方向 1**（2026-11-12 助手建议，批次 4，待用户验收）：过载可恢复、不永久枯死；静默签名仍在锁闭期发白灰，与菌塘判决不一致（C2） | 静默/文案是否拆出「过载·暂锁」（C2） |
+| **B. 低菌量 + 无过载** | 低菌量只影响生长／生态，不应误触发过载与死亡 | 前提：`M ∈ [floor, 0.60)` **且 `a_slow > burnoutA`（未越膝）**——此时菌塘 `Stalled`；`silentBlight = false`；账本无锁闭；若相位有定义且窗新鲜，`isMaintained` 可为 true → 庇护与经济照常（`isMaintained` 只要求 `M ≥ floor`，不要求 `M ≥ 0.60`）。注意菌网受损本身不决定相位：默认 `coupling = 1.0 / depth = 1.2` 下，`M = 0.59` 只要 `s ≥ 0.54` 就已 `a_slow ≤ burnoutA`，转入场景 C 的混合（`Stalled`／静默／非维持；菌塘自批次 4 起不因越膝判死）；`M` 越膝主要靠 **s 高**，不是靠 M 低。`M < floor` 才是「枯绝」 | 基本符合（不误触发过载、不自动判死）；「菌网受损仍算 maintained」是待定耦合 | 庇护／经济是否应随 `M` 分级（C8／C9） |
+| **C. 慢系统失能但菌网未死** | `a_slow` 越膝 ≠ 菌网死亡；介质存活、动力学工作区间、相位可读性应分开 | **(i)** `a_slow ≤ burnoutA` 且 `M ≥ floor`：`phase = OffsetBelowKnee`；`isEcologicalBurnout = true` → 钟判 `DeadMyceliumBurnout`（PhysicsOnly）；**菌塘自批次 4 起判 `Stalled`（越膝不是死因）**；`silentBlight`；经济非维持；但 `M` 未死，泄压后 `a_slow` 可回升、相位可恢复，菌塘无需重铺。若同一时刻还有活跃锁闭，相位显示 `OverloadLocked`、菌塘同样 `Stalled`。**(ii)** `Regime.Burnout`（`s ≥ 0.95`）且 `M` 活、`a_slow` 未越膝：相位可为 `Cycle`；`silentBlight` 必须 false；菌塘 `Stalled`（`s ≥ 0.45`）；钟 `SaturatedNoAnchor`（不锚 `c0` 但 `Counted`、开窗）；窗新鲜且无尖峰时 `isMaintained` 可为 true → 经济可维持 | (ii) 已区分；(i) **菌塘已按方向 1 解耦**；但钟分派与静默签名仍把轨迹失能当「枯绝」，三分仍未满足 | 钟／静默是否也按方向 1 收敛；「介质存活／工作区间／相位可读」如何在读数与文案中分开 |
+| **D. 菌网死亡 + 过载并存** | 两状态可并存、互不取消；过载解除不能复活死菌网 | `M < floor` 后 `recordPulse` 跳过记账，不再新设锁；死亡前已设的锁可自然到期。两者同时成立时 `phase` 发布 `OverloadLocked`（机制原因优先），不是 `OffsetBelowKnee`；`isBurnoutPhase` 同判，下游结论不变（菌塘 `Withered` 因 `M` 已死、`silentBlight`、钟优先 `DeadMyceliumBurnout`）。锁到期不改变 `M`；`M = 0` 吸收 | 满足「不互相取消」；读数无法并列展示两个原因 | 是否需并列／分别查询（`CellReadout` 已有两个布尔，但 `phase` 单槽）；是否需要额外的账本负荷损伤（注意 `p → v → q → s → M` 已覆盖一条间接路径） |
 | **E. 仅缺周期参照** | 无周期参照是观测不足，不应自动致枯死 | `phase = NoCycleReference`；不属于 `isBurnoutPhase`；`silentBlight = false`；菌塘按 `s` / `M` 判 `Growing` / `Stalled`；钟走默认 `AnchoredOrMaintained`（锚 `c0` + `Counted`）；窗新鲜时 `isMaintained` 可为 true | 符合 | 无（内容层如何解释「看不见相位」可另定） |
 
 > 读法提醒：以上「真实结论」是**当前消费者选择**的结果，不是物理必然。C1–C14 中任何一条被用户拍板改掉后，本表对应行应同步重写。
@@ -287,9 +286,9 @@
 
 ---
 
-## 7. 与第一、二、三批代码改动的对应关系
+## 7. 与第一、二、三、四批代码改动的对应关系
 
-第一批只改结构与命名，第二批把消费者共用的粗判拆成具名事实；第三批是首个玩法变化（短时锁闭期菌塘只停长）。前两批不改数值与下游结论（行为等价清单见[备忘 §9、§10](work-in-progress-mechanism-decoupling.md)），第三批的改动见[备忘 §11](work-in-progress-mechanism-decoupling.md) 与下表末尾两行。下表用于按新名检索旧资料。
+第一批只改结构与命名，第二批把消费者共用的粗判拆成具名事实；第三、四批是玩法变化（短时锁闭期菌塘只停长 → 菌塘死因收敛到 `M`）。前两批不改数值与下游结论（行为等价清单见[备忘 §9、§10](work-in-progress-mechanism-decoupling.md)），第三、四批的改动见[备忘 §11、§13](work-in-progress-mechanism-decoupling.md) 与下表末尾几行。下表用于按新名检索旧资料。
 
 | 现在（2026-11-12） | 原来 | 变化性质 | 行为 |
 | :--- | :--- | :--- | :--- |
@@ -320,24 +319,25 @@
 | `evaluateGastrodiaBed` 的 `deepDead` | 就地算 `isBurnoutPhase \|\| M < max(floor, 1e-9)` | 具名 `isGastrodiaBedDeepDead` | 不变 |
 | `classifyEconomy` 尖峰判据 | `dissonance >= spikeLevel` | `hasActivePositiveSpike` | 不变 |
 | 新增查询 | 无 | `isMyceliumViable` / `isMyceliumAbsent` / `isSlowOffsetBelowKnee` / `isEcologicalDeath` / `hasActivePositiveSpike` / `hasSilentBlight` / `isGastrodiaBedDeepDead` | 纯新增，不改变任何现有值 |
-| `evaluateGastrodiaBed` 的锁闭分支 | 无（锁闭经 `isBurnoutPhase` 直接判 `Withered`） | 锁闭优先判 `Stalled`；`Withered` 需 `M < floor` 或「未锁闭的越膝」 | **改变**（2026-11-12 用户拍板：短时锁闭只停长） |
-| `isGastrodiaBedDeepDead` 判据 | `isBurnoutPhase \|\| M < max(floor, 1e-9)` | `M < max(floor, 1e-9) \|\| (!isOverloadLocked && isOffsetBelowKnee)` | **改变**（同上；静默签名未跟进，C2 待拍板） |
+| `evaluateGastrodiaBed` 的锁闭分支 | 无（锁闭经 `isBurnoutPhase` 直接判 `Withered`） | 第三批：锁闭优先判 `Stalled`；第四批：任何 `isBurnoutPhase`（锁闭或越膝）都判 `Stalled` | **改变**（第三批用户拍板；第四批按助手建议实现，待用户验收） |
+| `isGastrodiaBedDeepDead` 判据 | `isBurnoutPhase \|\| M < max(floor, 1e-9)` | `M < max(floor, 1e-9)`（唯一死因） | **改变**（第四批：越膝/锁闭只停长；静默签名未跟进，C2 待拍板） |
+| `canRefurbishGastrodiaBed` | `evaluateGastrodiaBed != Withered && s < 毒性`（即 `!isBurnoutPhase && M >= max(floor,1e-9) && s < 毒性`） | `M >= max(floor, 1e-9) && s < 毒性阈值`（死因与重铺条件分开） | **改变**（第四批阈值 2） |
 
 **行为等价核对**：庇护窗口仍为 40 s 基准、耐受仍缩短窗口、过载仍关闭窗口并锁 8 s、`silentBlight` 仍覆盖两种 no-cycle 原因。第二批的等价性证据分三层：① `isMaintained` 有 96 组组合与改前字面表达式逐一比对；② `isEcologicalDeath` 与 `isEcologicalBurnout`（同用本格参数时）在「单钟峰值以下」40 组组合一致（此范围内两守卫恒等价，见 §4.1）；③ 其余合成项用定点边界断言（两套 `M` 阈值、负向回摆）覆盖，不是全组合枚举。除 NaN 外（损坏存档的 double、或损坏配置导致的非有限值，属定义域外；取反写法在 NaN 下与改前不同，`recordPulse` 的记账守卫在 M=NaN 时也会从「照记账」变为「跳过」）有限输入上等价；单测见 `MandateReadoutSpec`／`MandatePhenomenaSpec`。
 
-**第三批是首次刻意改变行为的批次**：菌塘在锁闭期从 `Withered` 改为 `Stalled`，不再锁存（2026-11-12 用户拍板，见 §5 C1/C14）。这条不等价是目标，不是回归；`MandatePhenomenaSpec` 的锁闭用例与 §6 场景 A 已同步，其余消费者的等价结论不受影响。
+**第三批是首次刻意改变行为的批次**：菌塘在锁闭期从 `Withered` 改为 `Stalled`，不再锁存（2026-11-12 用户拍板，见 §5 C1/C14）。**第四批进一步**：锁闭与读数越膝都不再是菌塘死因，枯死只由 `M` 决定，重铺门槛改为只看介质与毒性（按助手建议实现，待用户验收；见[备忘 §13](work-in-progress-mechanism-decoupling.md)）。这些不等价是目标，不是回归；`MandatePhenomenaSpec` 与 §6 场景 A/C 已同步，其余消费者的等价结论不受影响。
 
-**测试标记约定**：为「行为不变」而**刻意钉住旧后果**的断言带批次注释——第一批是 `[BATCH-1 REGRESSION LOCK]`（锁闭期庇护仍被撤销）；第二批的 `[BATCH-2 REGRESSION LOCK]` 现在只剩「锁闭期仍发静默签名」一项（C2 待拍板），菌塘那一项已在第三批按用户拍板改掉（§5 C1）。它们的含义是「当前行为被锁定」，**不是**「解耦目标已达成」；`grep -rn "BATCH-1 REGRESSION LOCK\|BATCH-2 REGRESSION LOCK" src/` 可一次找全，等 §8 对应项拍板后集中改。
+**测试标记约定**：为「行为不变」而**刻意钉住旧后果**的断言带批次注释——第一批是 `[BATCH-1 REGRESSION LOCK]`（锁闭期庇护仍被撤销）；第二批的 `[BATCH-2 REGRESSION LOCK]` 现在只剩「锁闭期仍发静默签名」一项（C2 待拍板）。第三、四批的菌塘判决改动属于**玩法变化**，断言随新判决改写、不戴回归锁。它们的含义是「当前行为被锁定」，**不是**「解耦目标已达成」；`grep -rn "BATCH-1 REGRESSION LOCK\|BATCH-2 REGRESSION LOCK" src/` 可一次找全，等 §8 对应项拍板后集中改。
 
-### 7.1 消费者现在读什么（第二批后；第三批只更新菌塘一行）
+### 7.1 消费者现在读什么（第四批后）
 
 「现在读什么」是代码事实；「语义上可能需要」是 §8.5 的候选，**不是决定**，拍板前不要据此改代码或文案。
 
-| 消费者 | 现在读的事实（代码事实；菌塘结论已在第三批改变） | 语义上可能需要（候选【待拍板】） | 耦合 |
+| 消费者 | 现在读的事实（代码事实；菌塘结论已在第三、四批改变） | 语义上可能需要（候选【待拍板】） | 耦合 |
 | :--- | :--- | :--- | :--- |
 | 玩家沉滞效果（`MandateOverworld.applyChunkMandateEffects`） | `isMaintained`；离开维持态后还内联 `Regime.Burnout \|\| dissonance >= ReadoutParam().spikeLevel` 判尖峰档 | 庇护窗口（`shelteredAt`）＋ 实际暴露（尖峰／锁闭），不必牵连菌网健康 | C8、C13 |
 | 经济档（`MandateEconomy` → `classifyEconomy`） | `isMaintained`、`Regime.Burnout`、`hasActivePositiveSpike` | 长期土地健康（`isMyceliumViable`／`isSlowOffsetBelowKnee`）与临时危险（尖峰／锁闭）分账 | C9 |
-| 菌塘（`GastrodiaBedBlock`） | `evaluateGastrodiaBed` 读 `isGastrodiaBedDeepDead`（锁闭掩蔽读数原因）、`isOverloadLocked`（→ `Stalled`）、`current.stress >= strained` 与 `M < GastrodiaHealthySustenance`；重铺门槛独立读 `canRefurbishGastrodiaBed`（`!isBurnoutPhase`、`M >= max(floor,1e-9)`、`s < 毒性阈值`） | 生态死亡（`M`）与暂锁分开——**已于 2026-11-12 拍板**；读数越膝是否也允许锁存仍待定 | C1（已拍板）、C14（部分） |
+| 菌塘（`GastrodiaBedBlock`） | `evaluateGastrodiaBed` 读 `isGastrodiaBedDeepDead`（只读 `M`）、`isBurnoutPhase`（锁闭或越膝 → `Stalled`）、`current.stress >= strained` 与 `M < GastrodiaHealthySustenance`；重铺门槛独立读 `canRefurbishGastrodiaBed`（`M >= max(floor,1e-9)`、`s < 毒性阈值`） | 死因与重铺已解耦（批次 4 按助手建议实现，待验收）；静默签名仍与菌塘判决不一致（C2） | C1、C14 |
 | 静默签名（`classifyPhenomena` → `hasSilentBlight`） | `hasSilentBlight` | 是否只绑真正死亡（`isMyceliumAbsent`／`isSlowOffsetBelowKnee`），锁闭另设征兆 | C2、C7 |
 | 钟分派（`BellRitual.evaluateBellStrike`） | `isEcologicalBurnout`、`pulseLedger.wouldOverloadAt`、`isBurnoutPhase`、`Regime`、`baselineCalming`、`phase`（`Cycle` 的标签分支） | 账本结算是否为唯一真相；分派是否只做提示／文案 | C10、C6 |
 | 验山读数／告示（`MandateWording`） | `isMaintained`、`regime`、`sustenanceWord`（`M`／floor）、`pulseLedger.effectiveWindowAt`、`phase`（`formatPhaseDial`） | 两个 no-cycle 原因是否拆词 | C2 |
@@ -370,14 +370,15 @@
 
 ### 8.4 生态后果
 
-- 短时过载：**用户确认 2026-11-12** —— 暂停生长（`Stalled`），不锁存；锁闭期掩蔽读数越膝原因，`M` 低于存活下限仍判枯死。仍待拍板：读数越膝（无锁闭时）是否也允许锁存；「持续枯萎」以什么为依据。
-- 静默签名是否覆盖锁闭（当前仍是，C2）；读数越膝（`OffsetBelowKnee`，无锁闭时）是否仍判菌塘枯死；钟在 `OffsetBelowKnee` 下是否仍「无应」。
+- 短时过载／读数越膝：**批次 4 按助手建议实现（2026-11-12，待用户验收）**——两者都只让菌塘 `Stalled`，菌塘枯死只由 `M < max(floor, 1e-9)` 决定；环境长期恶化经 `p → v → q → s → M` 等实际损伤路径降低 `M`，不另加负荷伤害。见[备忘 §12、§13](work-in-progress-mechanism-decoupling.md)。
+- 静默签名仍覆盖两种 no-cycle 原因（C2，未按方向 1 收敛）；钟分派在 `a_slow` 越膝（`isEcologicalBurnout` 的生态死亡子句）时仍判 `DeadMyceliumBurnout`（无应），而**叠脉冲**读数越膝走 `PulseOverloadBurnout`（脉冲过载）——两者都尚未按方向 1 收敛。
 - 若要定义「刺激负荷造成生态损伤」的玩法规则，需明确它落在**物理间接链**（现成）之上还是另立账本损伤（当前没有），并给出不与酸蚀重复累计的依据。
+- 未来环境（沙漠／沼泽）的三层区分（环境过程 / 介质状态 / 表象）见备忘 §12.2，**暂不扩成框架**。
 
 ### 8.5 消费者分账
 
 - `isMaintained` / `classifyEconomy` / 玩家效果 / 菌塘是否拆开；庇护是否应随 `M` 分级；沉滞是否只依赖庇护而不牵连经济与菌塘。
-- 第二批已把候选事实具名化（§1.3）并列出每个消费者当前的读法（§7.1）。多数情况拍板后只需改读取对象；但若方向涉及「短时过载期菌塘只停长」或「静默只绑真正死亡」，还需要新增／调整判据（例如给 `evaluateGastrodiaBed` 增加 `isOverloadLocked → Stalled` 分支，或把 `hasSilentBlight` 改为只读生态死亡事实），不是纯替换。
+- 第二批已把候选事实具名化（§1.3）并列出每个消费者当前的读法（§7.1）。多数情况拍板后只需改读取对象；但若方向涉及「静默只绑真正死亡」，还需要调整判据（把 `hasSilentBlight` 改为只读生态死亡事实），不是纯替换。菌塘的「锁闭／越膝 → `Stalled`」已在第四批按助手建议实现（待用户验收，§5 C1）。
 
 ### 8.6 钟与转义层
 

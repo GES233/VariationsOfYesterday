@@ -32,14 +32,15 @@ import moe.chestnut.awa.voy.mandate.{MandateEconomy, MandatePhenomena, MandateRu
   *  - `condition = 0` (`Growing`): `s < 0.45` and `M >= 0.60`; advances `age`
   *    from `0` to `3` (`MaxAge`), faster and with higher yield when a
   *    companion `菌材` (`inoculated_timber`) block touches the bed;
-  *  - `condition = 1` (`Stalled`): `s >= 0.45` or `M < 0.60`, or an acute
-  *    overload lockout is active (`isOverloadLocked`); threads dry out and
-  *    growth pauses, then resumes once the cause clears;
-  *  - `condition = 2` (`Withered`): the mycelial network is below the Allee
-  *    floor, or no cycle phase by the readout rule (`isOffsetBelowKnee`) with
-  *    no lockout masking it; symbiotic cords rot black and stay withered until
-  *    refurbished with `菌材` or fungal inoculum after the ground recovers.
-  *    A short acute lockout alone no longer latches the bed (2026-11-12).
+  *  - `condition = 1` (`Stalled`): `s >= 0.45`, `M < 0.60`, or ANY no-cycle
+  *    reason (`isBurnoutPhase`: an acute overload lockout or the readout
+  *    threshold below the knee); threads dry out and growth pauses, then
+  *    resumes once the cause clears;
+  *  - `condition = 2` (`Withered`): ONLY the mycelial network is below the
+  *    Allee floor (`M`, batch 4); symbiotic cords rot black and stay withered
+  *    until refurbished with `菌材` or fungal inoculum once `M` is live enough
+  *    and the soil is sub-toxic. Neither a lockout nor an unreadable phase
+  *    latches a bed (2026-11-12).
   */
 final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(settings):
   import GastrodiaBedBlock.*
