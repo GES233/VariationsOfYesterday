@@ -106,8 +106,8 @@
 
 - **菌塘方块（`gastrodia_bed`）**：无独立动力学状态，每次随机刻与交互均为所在 Cell 快照的无状态投影（`MandatePhenomena.evaluateGastrodiaBed`）：
   - `Growing`（`condition = 0`）：`s < 0.45`（`Calm`）且 `M ≥ 0.60`（菌网完好），推进 `age = 0..3`；同时受沉滞经济档（`MandateEconomy.suppressCropGrowth`）调制；
-  - `Stalled`（`condition = 1`）：`s ≥ 0.45`（`Strained` 及以上）或 `floor ≤ M < 0.60`（菌网受损），菌丝失水停滞；
-  - `Withered`（`condition = 2`）：`isBurnoutPhase`（`OffsetBelowKnee` / `OverloadLocked`）或 `M < floor`（菌网枯绝），菌丝黑腐枯死并锁存为死塘，须待地脉脱离失能且 `s < 0.60` 后手持**荧丝菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。
+  - `Stalled`（`condition = 1`）：`s ≥ 0.45`（`Strained` 及以上）或 `floor ≤ M < 0.60`（菌网受损），或**短时过载锁闭期**（`isOverloadLocked`，2026-11-12 拍板：只暂停生长，解除后重判），菌丝失水停滞；
+  - `Withered`（`condition = 2`）：菌网低于存活下限（`M < floor`），或读数规则越膝（`OffsetBelowKnee`）且**当前无锁闭掩蔽**；菌丝黑腐枯死并锁存为死塘，须待地脉脱离失能且 `s < 0.60` 后手持**荧丝菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。锁闭掩蔽是 2026-11-12 的玩法决定，见职责表 §5 C1。
 - **段木伴栽与荧丝菌材（`inoculated_timber`）**：
   - 在健康区块（`Growing`）手持野生菌种右键去皮原木可就地「段木发菌」转化为荧丝菌材（或工作台合制）；
   - 紧贴菌塘四周或正下方放置荧丝菌材构成「段木伴栽」，生长概率翻倍（`1/4 → 1/2`）、成熟起挖产量提升（`1–2 → 3–4`）；

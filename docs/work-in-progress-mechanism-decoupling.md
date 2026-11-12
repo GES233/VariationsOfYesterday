@@ -1,8 +1,8 @@
 # 临时施工备忘：机制解耦与玩法讨论接续
 
-> 更新：2026-11-12。状态：**第一批（阶段 B 结构解耦）已实施 2026-11-12；第二批（阶段 C-1 消费者事实分账 + 旧文档同步）已实施 2026-11-12；玩法仍待讨论**。
+> 更新：2026-11-12。状态：**第一批（阶段 B 结构解耦）、第二批（阶段 C-1 消费者事实分账 + 旧文档同步）与第三批（阶段 C 首个玩法变化：短时锁闭期菌塘只停长）均已实施 2026-11-12；其余玩法仍待讨论**。
 > 用途：保存本轮会话的设计共识、源码审查发现、候选施工顺序与开放问题，供上下文压缩或后续会话接续。
-> 本文不是新一轮机制定稿，也不是立即改动代码的指令。当前任务仅为落盘备忘，下一步继续讨论玩法。本批实施记录见 §9、§10，配套职责表见 [mechanism-state-responsibilities.md](mechanism-state-responsibilities.md)。
+> 本文不是新一轮机制定稿，也不是立即改动代码的指令。当前任务仅为落盘备忘，下一步继续讨论玩法。实施记录见 §9、§10、§11，配套职责表见 [mechanism-state-responsibilities.md](mechanism-state-responsibilities.md)。
 
 ## 1. 接续会话时先读这里
 
@@ -235,13 +235,13 @@ Elixir 的 `Witness` 把实测 `safe_tick` 绑定到物证，`Chronicle` 和卷�
 - `isEcologicalBurnout` 改为 `isEcologicalDeath || (isOffsetBelowKnee && pulseDrive <= 单钟峰值)`；`isMaintained` 改为 `pulseSuppressed && isMyceliumViable && !isBurnoutPhase && !hasActivePositiveSpike`。
 - `MandatePhenomena`：`silentBlight` 具名为 `hasSilentBlight = isBurnoutPhase || isMyceliumAbsent`；菌塘 `deepDead` 具名为 `isGastrodiaBedDeepDead = isBurnoutPhase || M < max(floor, 1e-9)`；`classifyEconomy` 的尖峰判据改用 `hasActivePositiveSpike`。
 - 内部判据（agent 的「死菌不记账」守卫、`silentBlight`、菌塘 `deepDead`、经济档尖峰判据）改为引用具名事实，结论与改前一致；游戏侧消费者只在 `MandateOverworld.applyChunkMandateEffects` 加了一条注释说明「现在读合成事实、分账待拍板」——**没有任何消费者被改成读取不同的事实集合**。
-- 测试：`MandateReadoutSpec` 新增三组（生存／慢偏移／尖峰事实各自独立；`isMaintained` 与改前字面表达式按 96 组组合逐一比对；`isEcologicalDeath` 与 `isEcologicalBurnout` 在单钟峰值以下 40 组组合一致）；`MandatePhenomenaSpec` 新增两套 `M` 阈值边界用例与负向回摆的经济档用例；短时锁闭仍判菌塘 `Withered`／静默的断言补 `[BATCH-2 REGRESSION LOCK]`。
+- 测试：`MandateReadoutSpec` 新增三组（生存／慢偏移／尖峰事实各自独立；`isMaintained` 与改前字面表达式按 96 组组合逐一比对；`isEcologicalDeath` 与 `isEcologicalBurnout` 在单钟峰值以下 40 组组合一致）；`MandatePhenomenaSpec` 新增两套 `M` 阈值边界用例与负向回摆的经济档用例；短时锁闭仍判菌塘 `Withered`／静默的断言补 `[BATCH-2 REGRESSION LOCK]`（菌塘那一半已在第三批按拍板改掉、标记移除；静默标记保留，见 §11）。
 - 旧文档标签同步（阶段 D 的一小步）：草案 01、札记 06/08/10、验证报告 01 的 `BurnoutNoCycle` 旧词与札记 08 的 `isMaintained` 判据按新名订正，每份文档集中一处「2026-11-12 名实订正」；带日期的历史裁定保留原词作历史对照。
 - 配套职责表更新（[mechanism-state-responsibilities.md](mechanism-state-responsibilities.md)）：新增 §1.3 具名事实清单、§7.1 消费者依赖表，§5 的 C1/C2/C7/C8/C9 改按事实叙述。
 
 ### 10.2 本批明确没做
 
-- **未改玩法**：`isMaintained` / `classifyEconomy` / `hasSilentBlight` / `isGastrodiaBedDeepDead` 的结论与改前完全一致；短时锁闭仍判菌塘枯死、仍发静默签名、仍撤销庇护——这些仍是【待拍板】（职责表 §8.4／§8.5）。
+- **未改玩法**：`isMaintained` / `classifyEconomy` / `hasSilentBlight` / `isGastrodiaBedDeepDead` 的结论与改前完全一致；短时锁闭仍判菌塘枯死、仍发静默签名、仍撤销庇护——这些仍是【待拍板】（职责表 §8.4／§8.5）。**（注：菌塘「锁闭期只停长」已在第三批按用户拍板改掉，见 §11；其余各项不变。）**
 - **未拆消费者**：玩家效果、经济、菌塘、静默、钟分派仍读合成事实；没有把哪个消费者改读 `isMyceliumViable` 之类的单项事实。
 - **未做转义层**：钟的六分派、`c0` 重锚／脉冲／账本／惩罚绑定仍在（职责表 §8.6）。
 - **未改**数值、ODE、输运、`contracts/mandate-slice-v1.json`、NBT key／`schemaVersion`、玩家面向文案与内容管线。
@@ -251,4 +251,32 @@ Elixir 的 `Witness` 把实测 `safe_tick` 绑定到物证，`Chronicle` 和卷�
 
 - 阶段 C 剩余部分是**玩法拍板**：先按职责表 §8 决定「消费者各要哪个事实」，再改读取对象（改动点已由 §7.1 列好）。
 - 若先做架构，则是转义层（「事件 → 机制（1..n） → 效果」）的接口设计；当前仍只有方向，没有接口与数据结构决定。
+
+## 11. 第三批实施记录（2026-11-12，阶段 C 首个玩法变化：短时锁闭期菌塘只停长）
+
+> 定位：**第一处刻意改变行为的批次**。用户拍板（2026-11-12）：短时过载锁闭不应把菌塘锁存为枯死；锁闭期只暂停生长，解除后按当前生态条件重判。
+
+### 11.1 本批做了什么
+
+- `MandatePhenomena.isGastrodiaBedDeepDead` 改为 `M < max(floor, 1e-9) || (!isOverloadLocked && isOffsetBelowKnee)`：
+  - 菌网死亡（`M` 低于存活下限）仍判 `Withered`，优先级最高；
+  - 活跃锁闭掩蔽读数越膝原因（`isOffsetBelowKnee`），短时过载不再锁存菌塘；
+  - 无锁闭时，读数越膝仍按原判据判枯死（§8.4 另一待拍板项，本次未动）。
+  - **掩蔽的直接后果**：锁闭给菌塘一段临时保护，持续续锁会延长它；锁闭结束（或间隙中的一次评估）若读数仍越膝，仍会锁存枯死且不自动恢复。保护的是「何时评估」，不是「越膝无害」。
+- `evaluateGastrodiaBed` 在枯死判定与常规停滞之间加入锁闭分支：`isOverloadLocked → Stalled`。菌塘方块（[GastrodiaBedBlock.scala](../src/main/scala/moe/chestnut/awa/voy/blocks/GastrodiaBedBlock.scala)）只在 `Withered` 裁决时写 `condition = 2`；**未锁存**的塘在 `Stalled` 时写 `condition = 1`、恢复 `Growing` 时回到 0，锁闭解除后自动重判。**已锁存为 2 的塘不会被 Stalled/Growing 覆盖**，仍只能人工翻修（C14）。
+- **重铺门槛保持改判前语义**：`canRefurbishGastrodiaBed` 改为直接使用 `!isBurnoutPhase && M >= max(floor,1e-9) && s < 毒性阈值`（即旧判决提供的谓词），不复用带锁闭掩蔽的新判决；否则一个已锁存的死塘会在锁闭期变成「可重铺」，白费材料且与检查文案矛盾。测试补了锁闭期不可重铺的断言。
+- `silentBlight` **未跟进**：锁闭期仍发静默签名（C2 待拍板），与菌塘判决不一致；本批在代码注释与职责表 C2 明确记录，不假装已拆。
+- 测试（`MandatePhenomenaSpec`）：锁闭用例从 `Withered` 改为 `Stalled`；新增「锁闭掩蔽读数越膝、但不掩蔽死菌网」的优先级用例（越膝无锁闭 → `Withered`；越膝+锁闭 → `Stalled`；死菌+锁闭 → `Withered`）；场景 D（死菌+锁闭）仍判 `Withered`；重铺门槛另加 48 组组合枚举，与改判前谓词逐项一致（锁闭期不可重铺）。
+- 文档：职责表 §1.3（事实行与边界）、§3.4 注、§3.5 两行、§5 C1/C7/C14、§6 场景 A/C、§7 改名表、§7.1 菌塘行、§8.4；札记 06 §4.3（§2.1 未改）。
+
+### 11.2 本批明确没做
+
+- **未改静默签名**（C2）、**未改钟分派**（C10）、**未改 `isMaintained`／经济／玩家效果**（C8/C9/C13）。
+- **未改读数越膝本身的菌塘后果**（无锁闭时仍判枯死）——§8.4 剩余待拍板项。
+- **未改**数值、ODE、输运、契约、NBT key／`schemaVersion`、文案字符串与内容管线。注意：文案字符串虽未改，锁闭期菌塘检查文本会由「枯死」类文案变为「失水停滞」类文案——这是判决变化的直接可见结果，不是文案改动。
+
+### 11.3 下一步入口
+
+- 下一处玩法拍板建议从「锁闭期静默签名／文案」（C2）或「读数越膝是否锁存」（C14 剩余）里选一个，与本次改动对称、可复用同一组场景测试。
+- 转义层（「事件 → 机制（1..n） → 效果」）仍只有方向，接口未定。
 

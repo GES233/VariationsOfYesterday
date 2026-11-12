@@ -183,24 +183,35 @@ object MandatePhenomena:
     * Boundary: this `M` guard is `<= 0`, deliberately STRICTER than the Allee
     * floor used by maintenance (`M >= floor`) and by the bed rule (`M < floor`).
     * The signature marks the absorbing state, not merely a depleted patch.
-    * [BATCH-2 REGRESSION LOCK] a short acute lockout still reads as silent
-    * blight; whether it should is pending (§8.4).
+    * Still pending (C2): a short acute lockout also reads as silent blight,
+    * even though the bed rule no longer withers under the same lockout. The
+    * mismatch is deliberate for now — the bed decision is 2026-11-12, the
+    * signature decision is not.
     */
   def hasSilentBlight(readout: CellReadout): Boolean =
     readout.isBurnoutPhase || readout.isMyceliumAbsent
 
-  /** Deep-dead fact behind the bed verdict: either no-cycle reason or `M`
-    * below the Allee floor (with the `1e-9` guard the bed rule has always
-    * used). Named separately from [[hasSilentBlight]] because the two use
-    * different `M` thresholds; do not merge them.
+  /** Deep-dead fact behind the bed verdict: the mycelial network is below the
+    * Allee floor (with the `1e-9` guard the bed rule has always used), or the
+    * readout rule puts the cell below the knee while NO acute overload lockout
+    * is active.
     *
-    * [BATCH-2 REGRESSION LOCK] a short acute lockout still counts here, so each
-    * bed evaluated during it is persisted as `Withered` until refurbished.
-    * That pins CURRENT behaviour, not the target: §8.4 待拍板.
+    * Gameplay decision (2026-11-12, user-approved): a short acute lockout must
+    * NOT be able to latch a bed as dead. While `isOverloadLocked` holds, the
+    * mechanism rule masks the readout-threshold reason, so the bed stalls and
+    * re-evaluates once the lockout expires (the block only writes
+    * `condition = 2` from a `Withered` verdict). A dead network (`M` below the
+    * floor) still withers regardless of the lockout: death outranks both rules.
+    *
+    * Still pending and deliberately NOT changed here: the readout-threshold
+    * reason on its own (including transient stacked-pulse drive) still latches
+    * a bed when no lockout is active — §8.4 in
+    * docs/mechanism-state-responsibilities.md — and the silent blight signature
+    * still covers the lockout reason (C2).
     */
   def isGastrodiaBedDeepDead(readout: CellReadout): Boolean =
-    readout.isBurnoutPhase ||
-      readout.sustenance < Math.max(readout.stressParam.sustenanceFloor, 1e-9)
+    readout.sustenance < Math.max(readout.stressParam.sustenanceFloor, 1e-9) ||
+      (!readout.isOverloadLocked && readout.isOffsetBelowKnee)
 
   /** Project a cell's semantic readout and time-of-day into its sensory
     * phenomenon profile (design note 06 §3).
@@ -265,40 +276,53 @@ object MandatePhenomena:
   /** Pure symbiotic growth rule for a `菌塘` (mycelial bed, design note 06
     * §4.3 & WO-3):
     *
-    *  - No cycle phase (`CellReadout.isBurnoutPhase`: the union of the
-    *    readout-threshold fact `isOffsetBelowKnee` and the mechanism fact
-    *    `isOverloadLocked`; both may hold at once) or a dead mycelial
-    *    network (`M < sustenanceFloor`) ->
-    *    [[GastrodiaBedVerdict.Withered]];
+    *  - Deep-dead ([[isGastrodiaBedDeepDead]]: `M` below the Allee floor, or
+    *    the readout rule below the knee while no lockout masks it) ->
+    *    [[GastrodiaBedVerdict.Withered]]; the block latches `condition = 2`
+    *    until refurbished;
+    *  - Else an active acute overload lockout (`isOverloadLocked`) ->
+    *    [[GastrodiaBedVerdict.Stalled]]: the bed PAUSES growth and re-evaluates
+    *    when the lockout expires (gameplay decision 2026-11-12, see
+    *    [[isGastrodiaBedDeepDead]]);
     *  - Else `s >= 0.45` (`Strained`+) or damaged mycelial network
     *    (`M < 0.60`) -> [[GastrodiaBedVerdict.Stalled]];
     *  - Else (`s < 0.45` and `M >= 0.60`) -> [[GastrodiaBedVerdict.Growing]].
     *
-    * Batch-1 rule (unchanged outcome): a short acute overload still counts as
-    * `Withered`, which the block persists until refurbished. That coupling is
-    * now explicit here instead of riding on one shared label; whether the bed
-    * should merely stall during an acute lockout is a pending gameplay
-    * decision (docs/mechanism-state-responsibilities.md 待拍板).
+    * Precedence: network death outranks the lockout rule, which outranks the
+    * readout-threshold reason (the lockout masks it). The silent signature does
+    * NOT follow this precedence yet (C2, still pending).
     */
   def evaluateGastrodiaBed(
       readout: CellReadout,
       p: ReadoutParam = ReadoutParam()
   ): GastrodiaBedVerdict =
     if isGastrodiaBedDeepDead(readout) then GastrodiaBedVerdict.Withered
+    else if readout.isOverloadLocked then GastrodiaBedVerdict.Stalled
     else if readout.current.stress >= p.strained ||
       readout.sustenance < GastrodiaHealthySustenance
     then GastrodiaBedVerdict.Stalled
     else GastrodiaBedVerdict.Growing
 
   /** Whether a withered `菌塘` can be refurbished with fresh `荧丝菌材`
-    * (Inoculated Timber): requires the cell to have exited deep incapacitation
-    * (`Withered`) and soil stress to be below the acid toxicity threshold.
+    * (Inoculated Timber): requires the cell to be out of deep incapacitation
+    * and soil stress below the acid toxicity threshold.
+    *
+    * The gate deliberately does NOT use the lockout-masked bed verdict: a bed
+    * that is latched (`condition = 2`) must not become refurbishable just
+    * because an acute lockout currently masks the threshold reason — that would
+    * waste the material and contradict the inspection text, which still shows
+    * the withered state. So the gate keeps the pre-2026-11-12 signal:
+    * `!isBurnoutPhase && M >= max(floor, 1e-9) && s < toxicity`. This is the
+    * exact HEAD predicate that the verdict used to provide (finite inputs;
+    * under NaN, which is outside the domain, the `>=` form is the conservative
+    * one: it refuses refurbishing).
     */
   def canRefurbishGastrodiaBed(
       readout: CellReadout,
       p: ReadoutParam = ReadoutParam()
   ): Boolean =
-    evaluateGastrodiaBed(readout, p) != GastrodiaBedVerdict.Withered &&
+    !readout.isBurnoutPhase &&
+      readout.sustenance >= Math.max(readout.stressParam.sustenanceFloor, 1e-9) &&
       readout.current.stress < toxicityThreshold(readout)
 
   /** Whether a stripped log in the world can be colonized in-situ into `菌材`
