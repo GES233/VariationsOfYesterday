@@ -15,10 +15,37 @@ enum PhaseLabel:
   case Resting, Excitation, AbsoluteRefractory, RelativeRefractory
 
 /** Why a state carries no cycle phase. The cases are different answers and
-  * must never be collapsed into a shared "undefined". */
+  * must never be collapsed into a shared "undefined".
+  *
+  * Batch 1 (docs/work-in-progress-mechanism-decoupling.md §3.3) split the
+  * former `BurnoutNoCycle` into one READOUT-RULE condition and one MECHANISM
+  * rule. Both are facts about this cell (not about which one the display
+  * happens to show): they can hold at the same time, they can hold
+  * independently, and a consumer must be able to query each one separately.
+  *
+  * Boundary (learned the hard way): the threshold condition lives on
+  * `effectiveA`, which is a READOUT-side quantity (it folds in a stacked-pulse
+  * correction). The ODE integrates `a = alpha - depth*(1-M) - coupling*s` and
+  * sees pulse drive as an explicit `dv/dt` term instead. So crossing the
+  * threshold means "this rule labels the cell no-cycle", NOT "the trajectory
+  * has been proven to have no limit cycle" — a cell can keep oscillating
+  * while the rule says no-cycle (design note 08 measured exactly that).
+  */
 enum UndefinedReason:
-  /** Fixed point left the oscillatory window (`a(s) <= burnout_a`). */
-  case BurnoutNoCycle
+  /** Current readout rule: the effective recovery offset `a_eff` (which
+    * includes the readout-side stacked-pulse correction) sits at or below the
+    * burnout knee `burnoutA`. It may be chronic (mycelial depletion, land
+    * stress) or transient (stacked pulse drive above a single bell kernel),
+    * so this alone does not mean the mycelium is dead — and it does not by
+    * itself prove the ODE trajectory stopped oscillating.
+    */
+  case OffsetBelowKnee
+
+  /** Mechanism rule: the cell's pulse ledger holds an active acute overload
+    * lockout. The bare trajectory may still be oscillating; this reason is
+    * the discrete rule's verdict, not an observation of the equations.
+    */
+  case OverloadLocked
 
   /** A non-repeating excursion, or a trace not settled into a regular cycle. */
   case TransientNoCycle
@@ -38,8 +65,14 @@ object PhaseReading:
   *
   * The stress cuts mirror `Voy.World.Profile` (Elixir also keeps `calm: 0.18`
   * for its own tolerance check; Scala does not partition on it). These cuts do
-  * not decide whether a phase exists — that is the recovery offset `a(s)`,
-  * below; the slice reaches `s = stress_max = 1.0` and still spikes.
+  * not decide whether a phase exists — that is the recovery offset, below; the
+  * slice reaches `s = stress_max = 1.0` and still spikes.
+  *
+  * Boundary: the offset that gates a phase is the READOUT-rule `effectiveA`
+  * (it folds in a stacked-pulse correction that the governing equations do not
+  * contain), while the ODE integrates `slowA`. Crossing [[Readout.burnoutA]]
+  * on `effectiveA` is a rule verdict ("this readout has no cycle phase here"),
+  * not a proof about the trajectory.
   */
 case class ReadoutParam(
     strained: Double = 0.45,
@@ -86,8 +119,17 @@ object Readout:
   ): Double =
     fast.alpha - depth * (1.0 - sustenance) - coupling * stress
 
-  /** Effective recovery offset with stacked pulse drive above a single bell
-    * peak; crossing [[burnoutA]] here is acute pulse-overload block. */
+  /** READOUT-RULE recovery offset: the ODE's `slowA` minus a correction for
+    * stacked pulse drive above a single bell peak.
+    *
+    * The pulse term is **not** in the governing equations: the ODE integrates
+    * `a = alpha - depth*(1-M) - coupling*s` and applies pulse drive as an
+    * explicit `dv/dt` term (`impulse + synapseP`). This number therefore
+    * belongs to the phase-gating rule only. `effectiveA <= burnoutA` means
+    * "this rule labels the cell no-cycle"; it is not evidence that the
+    * trajectory has no limit cycle (note 08 measured cells that keep spiking
+    * under such a label).
+    */
   def effectiveA(
       fast: MandateParam,
       stress: Double,
@@ -101,8 +143,36 @@ object Readout:
     slowA(fast, stress, sustenance, coupling, depth) -
       pulseParam.pulseBurnoutGain * excessPulse
 
-  /** Chronic burnout (mycelial depletion or the slow offset across the knee),
-    * as opposed to an acute pulse-overload lockout. */
+  /** The current readout rule's threshold condition for one cell: its
+    * `effectiveA` (readout-side, see [[effectiveA]]) is at or below
+    * [[burnoutA]]. This is the criterion behind
+    * `UndefinedReason.OffsetBelowKnee`, evaluated on the cell's own published
+    * facts, so it stays true even when the display publishes the mechanism
+    * reason instead.
+    */
+  def isOffsetBelowKnee(readout: CellReadout): Boolean =
+    val aEff = effectiveA(
+      readout.fastParam,
+      readout.current.stress,
+      readout.sustenance,
+      readout.stressParam.coupling,
+      readout.stressParam.sustenanceDepth,
+      readout.pulseDrive,
+      readout.pulseParam
+    )
+    aEff <= burnoutA(readout.fastParam)
+
+  /** Chronic burnout (mycelial depletion or the ODE's slow offset across the
+    * knee), as opposed to an acute pulse-overload lockout.
+    *
+    * Batch 1: the former third clause is restated in the new vocabulary. It
+    * reads the *readout-rule* condition with no stacked pulse drive (the
+    * mechanism reason is `UndefinedReason.OverloadLocked`, so it can no longer
+    * leak in here) and is a strict consequence of the second clause whenever
+    * the pulse drive is at or below a single bell peak (`a_eff == a_slow`
+    * there); it is kept explicit so the intent is visible instead of being an
+    * accident of one shared label.
+    */
   def isEcologicalBurnout(
       readout: CellReadout,
       fast: MandateParam = MandateAgent.DefaultFastParam,
@@ -113,9 +183,7 @@ object Readout:
     val slow = slowA(fast, readout.current.stress, readout.sustenance, coupling, depth)
     readout.sustenance < readout.stressParam.sustenanceFloor ||
       slow <= burnoutA(fast) ||
-      (readout.phase == PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) &&
-        !readout.pulseState.isOverloadedAt(readout.simTime) &&
-        readout.pulseDrive <= pulseParam.singlePulsePeak)
+      (readout.isOffsetBelowKnee && readout.pulseDrive <= pulseParam.singlePulsePeak)
 
   /** Whether a limit cycle exists at this recovery offset. */
   def oscillating(a: Double, fast: MandateParam): Boolean =
@@ -146,14 +214,21 @@ object Readout:
     else PhaseLabel.Resting
 
   /** Heartbeat shelter (design note 08): a fresh pulse window, a living
-    * mycelial network, a non-burnout phase, and no active positive spike. */
+    * mycelial network, a non-burnout phase, and no active positive spike.
+    *
+    * Batch 1 keeps the existing outcome: BOTH no-cycle reasons block shelter
+    * (`CellReadout.isBurnoutPhase`), so an acute overload lockout still
+    * withdraws the shelter it just collapsed. Whether a *short* lockout
+    * should block shelter at all is a pending gameplay decision, not an
+    * implementation detail — see docs/mechanism-state-responsibilities.md.
+    */
   def isMaintained(
       readout: CellReadout,
       p: ReadoutParam = ReadoutParam()
   ): Boolean =
     readout.pulseSuppressed &&
       readout.sustenance >= readout.stressParam.sustenanceFloor &&
-      readout.phase != PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) &&
+      !readout.isBurnoutPhase &&
       readout.current.dissonance < p.spikeLevel
 
   /** Cycle fraction `[0, 1)` -> 20-division dial index `0..19`. */
@@ -166,7 +241,19 @@ object Readout:
 end Readout
 
 /** One cell's semantic snapshot published to the game side, including the
-  * per-cell parameters the cell actually integrates. */
+  * per-cell parameters the cell actually integrates.
+  *
+  * The pulse mechanisms are published as separate facts: `pulseLedger` owns
+  * shelter, tolerance and overload ([[PulseLedger]]), and `pulseSuppressed` is
+  * the precomputed derived convenience "sheltered right now".
+  *
+  * `phase` is a DISPLAY: it has one slot, so when a cell is both no-cycle by
+  * the readout rule and locked out by the ledger, only one reason can be
+  * shown. The two underlying facts are therefore queried independently —
+  * `isOffsetBelowKnee` from this cell's own threshold condition and
+  * `isOverloadLocked` from its ledger — and `isBurnoutPhase` is their union.
+  * Never reverse-infer a fact from the displayed reason.
+  */
 final case class CellReadout(
     current: MandateCurrent,
     regime: Regime,
@@ -176,16 +263,50 @@ final case class CellReadout(
     pulseDrive: Double = 0.0,
     pulseSuppressed: Boolean = false,
     pulseTolerance: Double = 0.0,
-    pulseState: PulseToleranceState = PulseToleranceState.zero,
+    pulseLedger: PulseLedger = PulseLedger.zero,
     simTime: Double = 0.0,
     // Per-cell parameter sets (save > config > core default): the game layer
     // must judge this cell with the parameters the cell actually integrates,
     // not with the current global config (design draft §7.3).
     fastParam: MandateParam = MandateAgent.DefaultFastParam,
-    stressParam: StressParam = MandateAgent.DefaultStressParam
+    stressParam: StressParam = MandateAgent.DefaultStressParam,
+    // The pulse parameter set the cell's ledger was settled with. The readout
+    // threshold rule folds the stacked-pulse correction into `effectiveA`, so
+    // it needs the same numbers the ledger used — a config change must not
+    // silently re-judge an old cell with new constants.
+    pulseParam: PulseToleranceParam = PulseToleranceParam()
 ):
   def isMaintained: Boolean = Readout.isMaintained(this)
   def dialTick: Option[Int] = Readout.dialTick(phase)
+
+  /** Current readout rule's threshold condition, evaluated on this cell's own
+    * published facts (`effectiveA <= burnoutA`, stacked-pulse correction
+    * included) — NOT inferred from `phase`.
+    *
+    * It can be true while the display publishes `OverloadLocked` (the
+    * mechanism reason wins the single `phase` slot), and it is a readout rule,
+    * not proof that the ODE trajectory has no limit cycle.
+    */
+  def isOffsetBelowKnee: Boolean = Readout.isOffsetBelowKnee(this)
+
+  /** Mechanism rule: this cell's pulse ledger holds an active acute overload
+    * lockout at `simTime`. Taken from the ledger itself, so it is true even
+    * when the display publishes the offset-threshold reason instead.
+    */
+  def isOverloadLocked: Boolean = pulseLedger.overloadedAt(simTime)
+
+  /** The coarse "no cycle phase, cell reads as burnt out" predicate the
+    * batch-1 consumers share. Its value is the union of the two facts above,
+    * which is exactly what the phase tracker publishes as the two no-cycle
+    * reasons — so consumer behaviour is unchanged even though the facts are
+    * now queried independently.
+    *
+    * It deliberately covers BOTH reasons: keeping today's gameplay outcomes
+    * unchanged is the batch-1 constraint. Which consumer should keep treating
+    * an acute lockout like a chronic burnout is a pending decision — see
+    * docs/mechanism-state-responsibilities.md (待拍板).
+    */
+  def isBurnoutPhase: Boolean = isOffsetBelowKnee || isOverloadLocked
 
 object CellReadout:
   val zero: CellReadout = CellReadout(
@@ -259,11 +380,21 @@ class PhaseTracker(
       pulseDrive(),
       pulseParam
     )
-    if aEff <= Readout.burnoutA(fast) || overloaded() then
-      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
+    // DISPLAY priority only: the mechanism rule is shown before the
+    // readout-threshold reason because a lockout is not an observation of the
+    // equations. This is the single-slot display, never the source of the
+    // per-fact queries (`CellReadout.isOffsetBelowKnee` /
+    // `isOverloadLocked` evaluate their own criteria).
+    if overloaded() then
+      PhaseReading.Undefined(UndefinedReason.OverloadLocked)
+    else if aEff <= Readout.burnoutA(fast) then
+      PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee)
     else if !Readout.oscillating(aSlow, fast) then
-      // No limit cycle exists here: the only phase-free reading left is the
-      // resting basin itself. An excursion in flight is a transient.
+      // With the ODE's own recovery offset (no pulse drive folded in) this
+      // operating point has no limit cycle, so the only phase-free reading
+      // left is the resting basin itself. An excursion in flight is a
+      // transient — note the offset here is `a_slow`, the quantity the ODE
+      // actually integrates, not the readout-rule `a_eff`.
       val (vStar, wStar) = Readout.restPoint(aSlow, fast.beta)
       val atRest =
         Math.abs(cur.dissonance - vStar) <= param.basinTol &&

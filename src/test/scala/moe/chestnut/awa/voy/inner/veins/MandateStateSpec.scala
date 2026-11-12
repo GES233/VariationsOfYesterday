@@ -111,3 +111,68 @@ class MandateStateSpec:
       Math.abs(state.getState.dissonance - -1.185) < 0.2,
       s"fast variable should settle back near rest, got ${state.getState.dissonance}"
     )
+
+  /** The indirect physical path a pulse can take to the mycelial network:
+    * `p -> v` spike -> `q` (`activity`) -> `s` -> acid burn of `M`. No pulse
+    * subtracts `M` directly; this test pins the chain so a future "pulse load
+    * -> damage" rule cannot double-count it (memo §3.7).
+    */
+  @Test def `a physical pulse reaches the acid-burn path indirectly, through activity and stress`(): Unit =
+    // The game side enables the mycelial acid burn (design note 06 §7.1);
+    // the frozen core default keeps `M` dormant.
+    val gameStress = StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
+    def make(): MandateState =
+      val st = MandateState(
+        state = MandateCurrent(dissonance = -1.2, entrench = -0.6, stress = 0.2),
+        param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+        stressParam = gameStress
+      )
+      st.disturbance = 0.0
+      st
+
+    val pulsed = make()
+    val control = make()
+    var step = 0
+    var maxActivity = 0.0
+    var maxStress = 0.0
+    val horizon = 3000.0
+    while step * dt < horizon do
+      // A deliberately strong alpha-kernel pulse every 3 s (a bell is area
+      // 12); this is a physics probe, not a gameplay dose.
+      if step % 150 == 0 then
+        pulsed.synapseTau = 5.0
+        pulsed.firePulse(40.0)
+      pulsed.step(dt)
+      control.step(dt)
+      maxActivity = Math.max(maxActivity, pulsed.getState.activity)
+      maxStress = Math.max(maxStress, pulsed.getState.stress)
+      step += 1
+
+    assertTrue(
+      maxActivity > 0.0,
+      s"a pulsed cell must spike at least once, driving activity; got $maxActivity"
+    )
+    assertTrue(
+      maxStress > 0.6,
+      s"the activity feedback must push stress across the acid-burn threshold; got $maxStress"
+    )
+    assertTrue(
+      pulsed.sustenance < 1.0 - 1e-9,
+      s"acid burn must reduce M once stress crosses 0.6; got M=${pulsed.sustenance}"
+    )
+    assertEquals(
+      0.0,
+      control.getState.activity,
+      1e-12,
+      "an unstimulated cell never spikes, so it never drives the tracer"
+    )
+    assertEquals(
+      1.0,
+      control.sustenance,
+      1e-12,
+      "an unstimulated cell stays below the burn threshold and keeps native M"
+    )
+    assertTrue(
+      pulsed.sustenance < control.sustenance,
+      "the pulse's indirect path leaves the pulsed network more damaged than the control"
+    )

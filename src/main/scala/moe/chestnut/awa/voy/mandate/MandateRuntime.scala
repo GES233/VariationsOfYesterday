@@ -10,7 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import moe.chestnut.awa.voy.inner.action.MandateActionProtocol
 import moe.chestnut.awa.voy.inner.actor.ActorRef
-import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
+import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg, PulseBookkeeping}
 import moe.chestnut.awa.voy.inner.veins.*
 
 /** Game-side bridge between Minecraft and the mandate engine actor
@@ -90,13 +90,17 @@ object MandateRuntime:
   def injectStressAt(chunkX: Int, chunkZ: Int, amount: Double): Unit =
     tell(EventMsg.StressInject(worldToGrid(chunkX, chunkZ), amount))
 
+  /** Fire one pulse on a cell. `bookkeeping` says whether the same arrival
+    * also enters the pulse ledger; the physics applies either way (see
+    * [[PulseBookkeeping]]).
+    */
   def firePulseAt(
       chunkX: Int,
       chunkZ: Int,
       area: Double,
-      heartbeat: Boolean = true
+      bookkeeping: PulseBookkeeping = PulseBookkeeping.Counted
   ): Unit =
-    tell(EventMsg.FirePulse(worldToGrid(chunkX, chunkZ), area, heartbeat = heartbeat))
+    tell(EventMsg.FirePulse(worldToGrid(chunkX, chunkZ), area, bookkeeping = bookkeeping))
 
   def setBaselineCalmingAt(chunkX: Int, chunkZ: Int, level: Double): Unit =
     tell(EventMsg.SetBaselineCalming(worldToGrid(chunkX, chunkZ), level))
@@ -163,7 +167,7 @@ object MandateRuntime:
         matches
       }
 
-      val (grid, links, initialSimTime, initialPulseStates) = restored match
+      val (grid, links, initialSimTime, initialPulseLedgers) = restored match
         case Some(snap) =>
           logger.info(
             s"Restoring mandate lattice from saved state " +
@@ -171,7 +175,7 @@ object MandateRuntime:
               s"simTime = ${snap.simTime})."
           )
           val grid = MandateSnapshot.restoreGrid(snap)
-          val pulseStates = MandateSnapshot.restorePulseStates(snap)
+          val pulseLedgers = MandateSnapshot.restorePulseLedgers(snap)
           // Restore precedence: the SAVE wins for every value it carries
           // (state and per-cell parameters); the config is the fallback for
           // what the payload cannot provide, and the core default is the
@@ -179,20 +183,20 @@ object MandateRuntime:
           // registered cells only — `logSavedParameters` says so loudly,
           // because silently ignoring a knob is worse than not having one.
           logSavedParameters(snap)
-          (grid, snap.links, snap.simTime, pulseStates)
+          (grid, snap.links, snap.simTime, pulseLedgers)
         case None =>
           logger.info(
             s"Starting fresh mandate lattice (${width}x$height cells); " +
               s"parameters from config `$VoyConfig.FileName` " +
               "(core defaults if absent)."
           )
-          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, PulseToleranceState])
+          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, PulseLedger])
 
       persistence.geometry = expectedGeometry
       // Seed the carrier immediately so a save landing before the first
       // cadence publish never writes an empty payload over a valid save.
       persistence.snapshot = Some(
-        MandateSnapshot.capture(grid, links, initialSimTime, initialPulseStates)
+        MandateSnapshot.capture(grid, links, initialSimTime, initialPulseLedgers)
       )
       persistence.markDirty()
 
@@ -219,7 +223,7 @@ object MandateRuntime:
             if pending != null then pending.countDown()
           },
           pulseParam = VoyConfig.current.pulseParam,
-          initialPulseStates = initialPulseStates
+          initialPulseLedgers = initialPulseLedgers
         )
       )
   }

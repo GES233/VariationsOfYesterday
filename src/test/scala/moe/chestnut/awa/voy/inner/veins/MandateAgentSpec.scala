@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Assertions.*
 
 import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.actor.ActorRef
-import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
+import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg, PulseBookkeeping}
 
 /** Wiring contract of [[MandateAgent]] (design draft §1.4, 2026-09-30):
   * tick events drive integration deterministically, one published snapshot
@@ -270,7 +270,7 @@ class MandateAgentSpec:
     assertTrue(awaitPhase(latchRef))
     assertTrue(
       readouts.get()(origin).pulseTolerance > 0.05,
-      "a heartbeat pulse must open the tolerance ledger"
+      "a counted pulse must open the tolerance ledger"
     )
 
     latchRef.set(new CountDownLatch(1))
@@ -278,9 +278,9 @@ class MandateAgentSpec:
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(awaitPhase(latchRef))
     assertEquals(
-      PulseToleranceState.zero,
-      readouts.get()(origin).pulseState,
-      "re-registration resets the dynamics, and the heartbeat ledger goes with it"
+      PulseLedger.zero,
+      readouts.get()(origin).pulseLedger,
+      "re-registration resets the dynamics, and the pulse ledger goes with it"
     )
 
   private def awaitPhase(latchRef: AtomicReference[CountDownLatch]): Boolean =
@@ -401,9 +401,9 @@ class MandateAgentSpec:
       "full withdrawal sets M = 0"
     )
     assertEquals(
-      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee),
       seen.toArray(Array.empty[CellReadout]).last.phase,
-      "a fully withdrawn SATURATED cell reads BurnoutNoCycle — nothing was injected, something was removed"
+      "a fully withdrawn SATURATED cell reads OffsetBelowKnee — nothing was injected, something was removed"
     )
 
   @Test def partialWithdrawalBurnsOnlyWithEnoughStress(): Unit =
@@ -424,7 +424,7 @@ class MandateAgentSpec:
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
-    val burnout = PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
+    val burnout = PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee)
     val stages = seen.toArray(Array.empty[CellReadout]).toSeq
     assertNotEquals(burnout, stages(0).phase, "partial withdrawal alone must not burn a calm cell")
     assertEquals(burnout, stages(1).phase, "partial withdrawal plus saturation must burn")
@@ -445,7 +445,7 @@ class MandateAgentSpec:
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
-    val burnout = PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)
+    val burnout = PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee)
     val stages = seen.toArray(Array.empty[CellReadout]).toSeq
     assertEquals(burnout, stages(0).phase)
     assertEquals(burnout, stages(1).phase, "draining stress alone must not revive a withdrawn cell")
@@ -472,7 +472,7 @@ class MandateAgentSpec:
       "a re-registered cell starts at native sustenance"
     )
 
-  // ==== heartbeat pulse bookkeeping (design note 08) ==== //
+  // ==== pulse ledger bookkeeping (design note 08; batch-1 decoupling) ==== //
 
   @Test def wellSpacedPulsesOpenSuppressionWindows(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
@@ -487,8 +487,12 @@ class MandateAgentSpec:
 
     val stages = seen.toArray(Array.empty[CellReadout]).toSeq
     assertFalse(stages.head.pulseSuppressed, "no pulse yet -> no suppression window")
-    assertTrue(stages.last.pulseSuppressed, "a bell pulse opens the heartbeat window")
+    assertTrue(stages.last.pulseSuppressed, "a counted pulse opens the shelter window")
     assertTrue(stages.last.pulseTolerance > 0.0, "a pulse leaves a trace of tolerance")
+    assertTrue(
+      stages.last.pulseDrive > 0.0,
+      s"a Counted pulse also feeds the equations (p -> v), got drive ${stages.last.pulseDrive}"
+    )
 
   @Test def swallowedStrikeDoesNotOpenAWindow(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
@@ -497,8 +501,8 @@ class MandateAgentSpec:
     val agent = spawnReadoutLog(grid, seen, latch)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     // Design note 08 §3: a pulse swallowed by an active spike still enters the
-    // equations, but it is not a heartbeat and must not grant shelter.
-    agent ! EventMsg.FirePulse(origin, 12.0, heartbeat = false)
+    // equations, but it is PhysicsOnly and must not touch the pulse ledger.
+    agent ! EventMsg.FirePulse(origin, 12.0, bookkeeping = PulseBookkeeping.PhysicsOnly)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
@@ -507,7 +511,19 @@ class MandateAgentSpec:
       stages.last.pulseSuppressed,
       "a swallowed strike must not open a suppression window"
     )
-    assertFalse(stages.last.isMaintained, "no heartbeat -> no shelter")
+    assertFalse(stages.last.isMaintained, "no counted pulse -> no shelter")
+    // Batch-1 decoupling: the physics/ledger split is visible. The pulse did
+    // reach the fast variable (kernel drive > 0) and the ledger stayed inert
+    // (no window, no tolerance, no lockout).
+    assertTrue(
+      stages.last.pulseDrive > 0.0,
+      s"a PhysicsOnly pulse still enters the equations, got drive ${stages.last.pulseDrive}"
+    )
+    assertEquals(
+      PulseLedger.zero,
+      stages.last.pulseLedger,
+      "a PhysicsOnly pulse must leave the whole pulse ledger untouched"
+    )
 
   @Test def rapidPulsesDriveTheCellIntoAcuteBurnout(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
@@ -515,19 +531,22 @@ class MandateAgentSpec:
     val grid = singleCellGrid(mkCell(0.0))
     val agent = spawnReadoutLog(grid, seen, latch)
     // Two strikes in the same instant: the second lands far inside the
-    // previous pulse's safe interval -> acute overload -> BurnoutNoCycle.
+    // previous pulse's safe interval -> acute overload -> OverloadLocked.
     agent ! EventMsg.FirePulse(origin, 12.0)
     agent ! EventMsg.FirePulse(origin, 12.0)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
     val r = seen.toArray(Array.empty[CellReadout]).last
+    // [BATCH-1 REGRESSION LOCK] the lid on an over-pulsed cell is the ledger's
+    // mechanism rule (not a trajectory burn-out), and it still withdraws the
+    // shelter. Whether a short lockout should is pending (§8.4).
     assertEquals(
-      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      PhaseReading.Undefined(UndefinedReason.OverloadLocked),
       r.phase,
-      "over-rapid pulsing must read as acute BurnoutNoCycle"
+      "over-rapid pulsing must read as an acute overload lockout, not as a burnt-out trajectory"
     )
-    assertFalse(r.pulseSuppressed, "the overload collapses the suppression window")
+    assertFalse(r.pulseSuppressed, "the overload collapses the shelter window")
     assertFalse(r.isMaintained, "an over-pulsed cell grants no shelter")
 
   @Test def deadMyceliumIgnoresPulsesEntirely(): Unit =
@@ -546,7 +565,7 @@ class MandateAgentSpec:
       "a dead network carries no pulse: no window is opened"
     )
     assertEquals(
-      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee),
       r.phase,
       "M = 0 is chronic burnout regardless of pulses"
     )

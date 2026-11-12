@@ -34,7 +34,7 @@ import moe.chestnut.awa.voy.mandate.{MandateEconomy, MandatePhenomena, MandateRu
   *    companion `菌材` (`inoculated_timber`) block touches the bed;
   *  - `condition = 1` (`Stalled`): `s >= 0.45` or `M < 0.60`; threads dry out
   *    and growth pauses;
-  *  - `condition = 2` (`Withered`): `BurnoutNoCycle` or `M < floor`; symbiotic
+  *  - `condition = 2` (`Withered`): no cycle phase (`isBurnoutPhase`) or `M < floor`; symbiotic
   *    cords rot black and stay withered until refurbished with `菌材` or
   *    fungal inoculum after the ground recovers.
   */

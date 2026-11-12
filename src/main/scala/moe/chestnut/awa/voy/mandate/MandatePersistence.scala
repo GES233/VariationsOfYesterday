@@ -12,10 +12,13 @@ import moe.chestnut.awa.voy.inner.veins.{
   MandateCurrent,
   MandateParam,
   MandateSnapshot,
+  OverloadLock,
+  PulseLedger,
   PulseLink,
-  PulseToleranceState,
   PulseTransmitter,
-  StressParam
+  ShelterWindow,
+  StressParam,
+  ToleranceBook
 }
 
 /** Dimension-scoped carrier for the mandate lattice snapshot, saved with
@@ -131,11 +134,14 @@ object MandatePersistence:
       c.putDouble("sustenanceBurn", sp.sustenanceBurn)
       c.putDouble("sustenanceBurnThreshold", sp.sustenanceBurnThreshold)
       c.putDouble("sustenanceFloor", sp.sustenanceFloor)
-      val ps = cs.pulseState
-      c.putDouble("lastPulseTime", ps.lastPulseTime)
-      c.putDouble("suppressedUntil", ps.suppressedUntil)
-      c.putDouble("overloadUntil", ps.overloadUntil)
-      c.putDouble("pulseTolerance", ps.tolerance)
+      // Pulse ledger: the three mechanisms keep their own saved fact. The
+      // NBT key names are the ones the former fused state used — the payload
+      // shape did not change, only which owner each number belongs to.
+      val pl = cs.pulseLedger
+      c.putDouble("lastPulseTime", pl.tolerance.lastPulseTime)
+      c.putDouble("suppressedUntil", pl.shelter.until)
+      c.putDouble("overloadUntil", pl.overload.until)
+      c.putDouble("pulseTolerance", pl.tolerance.amount)
       cells.add(c)
     }
     nbt.put("cells", cells)
@@ -213,19 +219,26 @@ object MandatePersistence:
             sustenanceBurnThreshold = c.getDouble("sustenanceBurnThreshold"),
             sustenanceFloor = c.getDouble("sustenanceFloor")
           ),
-          pulseState = PulseToleranceState(
-            lastPulseTime =
-              if c.contains("lastPulseTime") then c.getDouble("lastPulseTime")
-              else Double.NegativeInfinity,
-            suppressedUntil =
+          // Absent keys mean "never pulsed on this cell": the ledger reads as
+          // inert (no window, no load, no lockout). No migration path is
+          // written here — this project has no old saves to carry over.
+          pulseLedger = PulseLedger(
+            shelter = ShelterWindow(
               if c.contains("suppressedUntil") then c.getDouble("suppressedUntil")
-              else Double.NegativeInfinity,
-            overloadUntil =
+              else Double.NegativeInfinity
+            ),
+            tolerance = ToleranceBook(
+              amount =
+                if c.contains("pulseTolerance") then c.getDouble("pulseTolerance")
+                else 0.0,
+              lastPulseTime =
+                if c.contains("lastPulseTime") then c.getDouble("lastPulseTime")
+                else Double.NegativeInfinity
+            ),
+            overload = OverloadLock(
               if c.contains("overloadUntil") then c.getDouble("overloadUntil")
-              else Double.NegativeInfinity,
-            tolerance =
-              if c.contains("pulseTolerance") then c.getDouble("pulseTolerance")
-              else 0.0
+              else Double.NegativeInfinity
+            )
           )
         )
     }.toSeq

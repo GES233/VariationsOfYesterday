@@ -14,7 +14,7 @@ import moe.chestnut.awa.voy.inner.veins.*
   * The load-bearing invariants:
   *
   *  1. silent blight binds ONLY to deep incapacitation
-  *     (`PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)` or a dead
+  *     (a burnout-phase reason, `CellReadout.isBurnoutPhase`, or a dead
   *     network `M <= 0`), never to an oscillating `Regime.Burnout` (§3);
   *  2. the iron-yellow seep escalates None -> Light -> Moderate -> Heavy on
   *     precursor stress, post-spike acid residue, and live spike excursions;
@@ -42,12 +42,14 @@ class MandatePhenomenaSpec:
     )
 
   @Test def `silent blight binds to deep incapacitation, never to a saturated oscillation`(): Unit =
-    // Deep incapacitation via BurnoutNoCycle phase (note 06 §3).
+    // Deep incapacitation via the readout threshold rule (note 06 §3): the
+    // fact is built from its own criterion — stacked pulse drive pushes a_eff
+    // below the knee — not inferred from the displayed phase.
     val deepDead = MandatePhenomena.classifyPhenomena(
-      readout(phase = PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)),
+      readout(phase = PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee)).copy(pulseDrive = 2.1),
       isNight = true
     )
-    assertTrue(deepDead.silentBlight, "BurnoutNoCycle must read as silent blight")
+    assertTrue(deepDead.silentBlight, "the offset-threshold condition must read as silent blight")
     assertFalse(deepDead.mycelialGlow, "silent blight suppresses the glow")
     assertFalse(deepDead.precursorSpore, "silent blight suppresses precursor spores")
 
@@ -239,14 +241,44 @@ class MandatePhenomenaSpec:
     assertEquals(GastrodiaBedVerdict.Stalled, MandatePhenomena.evaluateGastrodiaBed(damaged))
     assertFalse(MandatePhenomena.canInoculateTimberInField(damaged))
 
-    // Deep incapacitation (BurnoutNoCycle) -> Withered (note 06 §4.3)
-    val burnoutNoCycle = readout(
+    // Deep incapacitation via the readout threshold rule -> Withered (note 06
+    // §4.3). The fact comes from the cell's own criterion (stacked pulse drive
+    // across the knee), not from the displayed phase.
+    val trajectoryBurnout = readout(
       s = 0.30,
-      phase = PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      phase = PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee),
       sustenance = 0.80
+    ).copy(pulseDrive = 2.1)
+    assertTrue(trajectoryBurnout.isOffsetBelowKnee, "the readout threshold condition holds")
+    assertEquals(GastrodiaBedVerdict.Withered, MandatePhenomena.evaluateGastrodiaBed(trajectoryBurnout))
+    assertFalse(MandatePhenomena.canRefurbishGastrodiaBed(trajectoryBurnout))
+
+    // [BATCH-1 REGRESSION LOCK] An ACUTE overload lockout also reads as
+    // Withered, so each bed the block touches during the lockout is persisted
+    // as withered until refurbished. This pins the CURRENT behaviour, not the
+    // target: whether a short lockout should merely pause growth is pending
+    // (docs/mechanism-state-responsibilities.md §8.4).
+    val overloadLocked = readout(
+      s = 0.30,
+      phase = PhaseReading.Undefined(UndefinedReason.OverloadLocked),
+      sustenance = 0.80
+    ).copy(
+      pulseLedger = PulseLedger(overload = OverloadLock(200.0)),
+      simTime = 100.0
     )
-    assertEquals(GastrodiaBedVerdict.Withered, MandatePhenomena.evaluateGastrodiaBed(burnoutNoCycle))
-    assertFalse(MandatePhenomena.canRefurbishGastrodiaBed(burnoutNoCycle))
+    assertTrue(overloadLocked.isOverloadLocked, "the ledger holds the lockout")
+    assertFalse(overloadLocked.isOffsetBelowKnee, "the readout threshold is not crossed here")
+    assertTrue(overloadLocked.isBurnoutPhase, "the coarse predicate still covers both reasons")
+    assertEquals(
+      GastrodiaBedVerdict.Withered,
+      MandatePhenomena.evaluateGastrodiaBed(overloadLocked),
+      "pending decision: a short overload currently still withers the bed"
+    )
+    assertFalse(MandatePhenomena.canRefurbishGastrodiaBed(overloadLocked))
+    assertTrue(
+      MandatePhenomena.classifyPhenomena(overloadLocked, isNight = true).silentBlight,
+      "pending decision: a short overload currently still reads as silent blight"
+    )
 
     // Dead mycelial network (M = 0) -> Withered
     val deadMycelium = readout(s = 0.10, sustenance = 0.0)
@@ -256,6 +288,42 @@ class MandatePhenomenaSpec:
     // Rich timber inoculum seed stays strictly between wild seed and viable threshold
     assertTrue(MandatePhenomena.RichReInoculationSeed > MandatePhenomena.ReInoculationSeed)
     assertTrue(MandatePhenomena.RichReInoculationSeed < MandatePhenomena.ReInoculationMaxSustenance)
+
+  @Test def `dead network plus an active lockout: both facts hold, neither cancels the other`(): Unit =
+    // Scenario D of docs/mechanism-state-responsibilities.md §6. The phase slot
+    // shows the mechanism reason, but the ecological fact (dead network) is
+    // still true and every downstream consequence fires.
+    val deadAndLocked = readout(
+      s = 0.10,
+      phase = PhaseReading.Undefined(UndefinedReason.OverloadLocked),
+      sustenance = 0.0
+    ).copy(
+      pulseLedger = PulseLedger(overload = OverloadLock(200.0)),
+      simTime = 100.0
+    )
+    assertTrue(
+      deadAndLocked.pulseLedger.overloadedAt(deadAndLocked.simTime),
+      "the ledger still holds the lockout"
+    )
+    assertTrue(
+      deadAndLocked.isOffsetBelowKnee,
+      "M = 0 also crosses the readout threshold: both facts hold at once"
+    )
+    assertTrue(deadAndLocked.isOverloadLocked)
+    assertTrue(deadAndLocked.isBurnoutPhase)
+    assertTrue(
+      MandatePhenomena.classifyPhenomena(deadAndLocked, isNight = true).silentBlight,
+      "a dead network is silent blight regardless of the lockout"
+    )
+    assertEquals(
+      GastrodiaBedVerdict.Withered,
+      MandatePhenomena.evaluateGastrodiaBed(deadAndLocked),
+      "Withered does not depend on which no-cycle reason the phase slot shows"
+    )
+    assertFalse(
+      MandatePhenomena.canRefurbishGastrodiaBed(deadAndLocked),
+      "a dead network cannot be refurbished just because the lockout expired"
+    )
 
   @Test def `zh_cn and en_us language files keep identical key sets`(): Unit =
     import com.google.gson.JsonParser

@@ -110,7 +110,7 @@ object MandateHud:
     )
     context.drawTextWithShadow(
       textRenderer,
-      f"v=${center.dissonance}%+.2f  s=${center.stress}%.3f  q=${center.activity}%.3f  M=${readout.sustenance}%.2f  c0=${readout.baselineCalming}%.2f  p=${readout.pulseDrive}%.2f  tol=${readout.pulseTolerance}%.2f  win=${readout.pulseState.remainingSuppressionAt(readout.simTime)}%.1f",
+      f"v=${center.dissonance}%+.2f  s=${center.stress}%.3f  q=${center.activity}%.3f  M=${readout.sustenance}%.2f  c0=${readout.baselineCalming}%.2f  p=${readout.pulseDrive}%.2f  tol=${readout.pulseTolerance}%.2f  win=${readout.pulseLedger.remainingShelterAt(readout.simTime)}%.1f",
       x0,
       y0 + lineHeight,
       0xFFE2E6EC

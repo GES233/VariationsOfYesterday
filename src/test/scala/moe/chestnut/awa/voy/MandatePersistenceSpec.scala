@@ -20,9 +20,12 @@ import moe.chestnut.awa.voy.inner.veins.{
   MandateCurrent,
   MandateParam,
   MandateSnapshot,
+  OverloadLock,
+  PulseLedger,
   PulseLink,
-  PulseToleranceState,
   PulseTransmitter,
+  ShelterWindow,
+  ToleranceBook,
   StressParam
 }
 
@@ -48,11 +51,10 @@ class MandatePersistenceSpec:
         fastParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
         stressParam =
           StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-        pulseState = PulseToleranceState(
-          lastPulseTime = 54300.0,
-          suppressedUntil = 54336.0,
-          overloadUntil = Double.NegativeInfinity,
-          tolerance = 0.25
+        pulseLedger = PulseLedger(
+          shelter = ShelterWindow(54336.0),
+          tolerance = ToleranceBook(amount = 0.25, lastPulseTime = 54300.0),
+          overload = OverloadLock.closed
         )
       ),
       CellSnapshot(
@@ -64,7 +66,15 @@ class MandatePersistenceSpec:
         baselineCalming = 0.0,
         impulse = 0.0,
         fastParam = MandateParam(alpha = 0.65, beta = 0.75, epsilon = 0.1),
-        stressParam = StressParam(coupling = 1.4, stressMax = 0.9)
+        stressParam = StressParam(coupling = 1.4, stressMax = 0.9),
+        // A cell saved mid-lockout: the finite overload deadline, a closed
+        // shelter window and a tolerance sitting on the hard cap all have to
+        // survive the round trip (the first cell covers an OPEN window).
+        pulseLedger = PulseLedger(
+          shelter = ShelterWindow.closed,
+          tolerance = ToleranceBook(amount = 1.5, lastPulseTime = 54290.0),
+          overload = OverloadLock(54310.0)
+        )
       )
     ),
     edges = Seq(

@@ -109,7 +109,7 @@ object MandatePhenomena:
     *
     * @param silentBlight
     *   `true` iff the cell is in deep incapacitation / depolarization block
-    *   (`PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)` or
+    *   (`CellReadout.isBurnoutPhase` or
     *   `sustenance <= 0.0`). Explicitly `false` for an oscillating
     *   `Regime.Burnout` (`s >= 0.95`) cell (note 06 §3).
     * @param seepTier
@@ -172,20 +172,22 @@ object MandatePhenomena:
   /** Project a cell's semantic readout and time-of-day into its sensory
     * phenomenon profile (design note 06 §3).
     *
-    * Note 06 §3 invariant: `silentBlight` binds ONLY to
-    * `PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle)` (or
-    * `sustenance <= 0.0`), never to `Regime.Burnout`.
+    * Batch-1 rule (unchanged outcome): `silentBlight` fires for BOTH
+    * no-cycle reasons (`CellReadout.isBurnoutPhase`) or a dead network, never
+    * for `Regime.Burnout`. In particular a *short* acute overload lockout
+    * currently reads as silent blight as well; whether it should is a pending
+    * gameplay decision (docs/mechanism-state-responsibilities.md 待拍板), and
+    * the split reasons make that decision a one-line change instead of a
+    * label archaeology.
     */
   def classifyPhenomena(
       readout: CellReadout,
       isNight: Boolean = false
   ): PhenomenonProfile =
-    val silentBlight =
-      readout.phase == PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) ||
-        readout.sustenance <= 0.0
+    val silentBlight = readout.isBurnoutPhase || readout.sustenance <= 0.0
     val seepTier = classifySeepTier(readout)
     // Glow and precursor spores bind to the slow `c0` anchor (a bell's lasting
-    // duty), NOT to the pulse suppression window: the heartbeat governs the
+    // duty), NOT to the pulse shelter window: the shelter window governs the
     // player's `沉滞`, while these signatures describe the land's own health.
     val c0Sheltered = readout.baselineCalming >= C0ShelterLevel
     val mycelialGlow =
@@ -230,20 +232,27 @@ object MandatePhenomena:
   /** Pure symbiotic growth rule for a `菌塘` (mycelial bed, design note 06
     * §4.3 & WO-3):
     *
-    *  - `BurnoutNoCycle` or dead mycelial network (`M < sustenanceFloor`) ->
+    *  - No cycle phase (`CellReadout.isBurnoutPhase`: the union of the
+    *    readout-threshold fact `isOffsetBelowKnee` and the mechanism fact
+    *    `isOverloadLocked`; both may hold at once) or a dead mycelial
+    *    network (`M < sustenanceFloor`) ->
     *    [[GastrodiaBedVerdict.Withered]];
     *  - Else `s >= 0.45` (`Strained`+) or damaged mycelial network
     *    (`M < 0.60`) -> [[GastrodiaBedVerdict.Stalled]];
     *  - Else (`s < 0.45` and `M >= 0.60`) -> [[GastrodiaBedVerdict.Growing]].
+    *
+    * Batch-1 rule (unchanged outcome): a short acute overload still counts as
+    * `Withered`, which the block persists until refurbished. That coupling is
+    * now explicit here instead of riding on one shared label; whether the bed
+    * should merely stall during an acute lockout is a pending gameplay
+    * decision (docs/mechanism-state-responsibilities.md 待拍板).
     */
   def evaluateGastrodiaBed(
       readout: CellReadout,
       p: ReadoutParam = ReadoutParam()
   ): GastrodiaBedVerdict =
     val floor = Math.max(readout.stressParam.sustenanceFloor, 1e-9)
-    val deepDead =
-      readout.phase == PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle) ||
-        readout.sustenance < floor
+    val deepDead = readout.isBurnoutPhase || readout.sustenance < floor
     if deepDead then GastrodiaBedVerdict.Withered
     else if readout.current.stress >= p.strained ||
       readout.sustenance < GastrodiaHealthySustenance

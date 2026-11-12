@@ -20,10 +20,11 @@ package moe.chestnut.awa.voy.inner.veins
   *    topology events, and links are player-built wiring;
   *  - `simTime` — the actor's integration clock, so pulse delays and
   *    phase readouts continue across a restart;
-  *  - per-cell pulse-tolerance state (`lastPulseTime / suppressedUntil /
-  *    overloadUntil / tolerance`) — the heartbeat ledger is closed-form on
-  *    `simTime`, so it must be saved or a restart would re-open a suppression
-  *    window (design note 08 §2.4).
+  *  - per-cell pulse ledger (`PulseLedger`: shelter window, tolerance book,
+  *    acute overload lockout) — the discrete pulse mechanisms are closed-form
+  *    on `simTime`, so they must be saved or a restart would re-open a
+  *    shelter window, forget accumulated tolerance, or lift a lockout early
+  *    (design note 08 §2.4). One ledger per cell, four doubles on the wire.
   *
   * What is deliberately NOT captured (transient, self-reconstructing):
   * the alpha-synapse kernel state (decays within ~5 s), the flux scratch
@@ -43,7 +44,7 @@ final case class CellSnapshot(
     impulse: Double,
     fastParam: MandateParam,
     stressParam: StressParam,
-    pulseState: PulseToleranceState = PulseToleranceState.zero
+    pulseLedger: PulseLedger = PulseLedger.zero
 )
 
 /** The full snapshot: cells, edges, links, and the integration clock. */
@@ -60,7 +61,7 @@ object MandateSnapshot:
       grid: MandateGrid,
       links: Seq[PulseLink],
       simTime: Double,
-      pulseStates: Map[CellCoord, PulseToleranceState] = Map.empty
+      pulseLedgers: Map[CellCoord, PulseLedger] = Map.empty
   ): MandateSnapshot =
     val cells = grid.cells.iterator.map { case (coord, state) =>
       CellSnapshot(
@@ -73,18 +74,18 @@ object MandateSnapshot:
         state.impulse,
         state.getParam,
         state.stressParam,
-        pulseStates.getOrElse(coord, PulseToleranceState.zero)
+        pulseLedgers.getOrElse(coord, PulseLedger.zero)
       )
     }.toSeq.sortBy(c => (c.coord.x, c.coord.z))
     MandateSnapshot(simTime, cells, grid.edges, links)
 
-  /** Extract the per-cell pulse-tolerance map from a captured snapshot. */
-  def restorePulseStates(
+  /** Extract the per-cell pulse ledger from a captured snapshot. */
+  def restorePulseLedgers(
       snapshot: MandateSnapshot
-  ): Map[CellCoord, PulseToleranceState] =
+  ): Map[CellCoord, PulseLedger] =
     snapshot.cells.iterator
-      .filter(_.pulseState != PulseToleranceState.zero)
-      .map(cs => cs.coord -> cs.pulseState)
+      .filter(_.pulseLedger != PulseLedger.zero)
+      .map(cs => cs.coord -> cs.pulseLedger)
       .toMap
 
   /** Rebuild a lattice from a snapshot. Edges whose endpoints are not

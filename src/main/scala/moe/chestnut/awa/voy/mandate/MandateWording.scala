@@ -131,7 +131,7 @@ object MandateWording:
       val fracText = r.phase match
         case PhaseReading.Cycle(_, frac) => f" frac=$frac%.3f"
         case _ => ""
-      val windowLeft = r.pulseState.remainingSuppressionAt(r.simTime)
+      val windowLeft = r.pulseLedger.remainingShelterAt(r.simTime)
       base +
         f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.dissonance}%.2f p=${r.pulseDrive}%.2f tol=${r.pulseTolerance}%.2f win=${windowLeft}%.1f$fracText]"
     else base
@@ -160,7 +160,13 @@ object MandateWording:
       case PhaseReading.Basin(_) => "静息域"
       case PhaseReading.Undefined(reason) =>
         reason match
-          case UndefinedReason.BurnoutNoCycle => "静默·深度失能"
+          case UndefinedReason.OffsetBelowKnee => "静默·深度失能"
+          // Batch-1: the acute overload lockout deliberately keeps the SAME
+          // player-facing word for now. Splitting the vocabulary (e.g. a
+          // distinct "过载·暂锁") is a content decision, not part of the
+          // structural decoupling — the two states are already distinguishable
+          // to code via `CellReadout.isOverloadLocked`.
+          case UndefinedReason.OverloadLocked => "静默·深度失能"
           case UndefinedReason.TransientNoCycle => "瞬态未定"
           case UndefinedReason.NoCycleReference => "无周期参照"
 
@@ -178,7 +184,7 @@ object MandateWording:
         f"§c[脉冲过载] [$chunkX%d,$chunkZ%d] 脉冲过密，地脉被顶入烧毁阻滞！本次未压住沉滞，且后续脉冲效力大减——让地脉缓一缓"
 
       case BellStrikeOutcome.SaturatedNoAnchor =>
-        val win = r.pulseState.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
+        val win = r.pulseLedger.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
         f"§4[叩钟无锚] [$chunkX%d,$chunkZ%d] 地脉饱和失能 (Burnout)，无法重锚 c0；但本次脉冲仍压住沉滞约 ${win}%.0f 息——根治须持续泄压"
 
       case BellStrikeOutcome.SpikeSwallowed =>
@@ -190,11 +196,11 @@ object MandateWording:
         val label = r.phase match
           case PhaseReading.Cycle(l, _) => l.toString
           case _ => "Refractory"
-        val win = r.pulseState.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
+        val win = r.pulseLedger.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
         f"§a[叩钟重锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 命中推迟刻度，c0已重锚 ($BellBaselineCalming%.2f)，下一次尖峰延后，沉滞退去约 ${win}%.0f 息"
 
       case BellStrikeOutcome.AnchoredOrMaintained =>
-        val win = r.pulseState.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
+        val win = r.pulseLedger.effectiveWindowAt(r.simTime, VoyConfig.current.pulseParam)
         r.phase match
           case PhaseReading.Cycle(label, _) =>
             val tick = r.dialTick.getOrElse(0)

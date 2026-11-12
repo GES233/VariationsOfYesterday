@@ -3,6 +3,7 @@ package moe.chestnut.awa.voy.inner.veins
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
+import moe.chestnut.awa.voy.inner.event.PulseBookkeeping
 import moe.chestnut.awa.voy.mandate.BellRitual
 import moe.chestnut.awa.voy.mandate.BellRitual.BellStrikeOutcome
 
@@ -96,7 +97,7 @@ class MandateReadoutSpec:
     // (§1.2) and check the readout refuses a phase there.
     val st = cell(1.0, coupling = 2.0)
     val (t, cur, tr) = settle(st, 600.0, coupling = 2.0)
-    assertEquals(PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle), tr.reading(t, cur))
+    assertEquals(PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee), tr.reading(t, cur))
 
   @Test def `the spike threshold has a single source`(): Unit =
     // Three consumers read "is this a spike": the agent's tremor edge
@@ -156,8 +157,30 @@ class MandateReadoutSpec:
       "the negative repolarisation overshoot (|v| > 1.8, v < 0) is NOT a spike"
     )
 
-    val burned = pulsed.copy(phase = PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle))
+    // [BATCH-1 REGRESSION LOCK] Both no-cycle reasons still withdraw shelter;
+    // whether a short lockout should is a pending decision (see
+    // docs/mechanism-state-responsibilities.md §8.4).
+    //
+    // The facts are built from their own criteria, not from the phase slot:
+    // stacked pulse drive pushes a_eff below the knee, and the ledger holds an
+    // active lockout.
+    val burned = pulsed.copy(
+      pulseDrive = 2.1,
+      phase = PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee)
+    )
+    assertTrue(burned.isOffsetBelowKnee, "the stacked drive crosses the readout threshold")
     assertFalse(burned.isMaintained, "a burnt-out cell cannot be sheltered by pulses")
+
+    val overloadLocked = pulsed.copy(
+      phase = PhaseReading.Undefined(UndefinedReason.OverloadLocked),
+      pulseLedger = PulseLedger(overload = OverloadLock(60.0)),
+      simTime = 10.0
+    )
+    assertTrue(overloadLocked.isOverloadLocked, "the ledger holds the lockout")
+    assertFalse(
+      overloadLocked.isMaintained,
+      "[BATCH-1 REGRESSION LOCK] an acute lockout still withdraws the shelter it collapsed"
+    )
 
     val deadMycelium = pulsed.copy(sustenance = 0.0)
     assertFalse(deadMycelium.isMaintained, "a dead mycelial network cannot be sheltered")
@@ -217,23 +240,28 @@ class MandateReadoutSpec:
     assertEquals(BellStrikeOutcome.SaturatedNoAnchor, burnoutOutcome)
     assertFalse(burnoutOutcome.anchorsC0, "saturated cell cannot re-anchor c0 while the stress stays high")
     assertEquals(0.0, burnoutOutcome.baselineCalming, 1e-12)
-    assertTrue(
-      burnoutOutcome.bookkeepsHeartbeat,
-      "a saturated but LIVING cell still answers the pulse with a heartbeat window"
+    assertEquals(
+      PulseBookkeeping.Counted,
+      burnoutOutcome.bookkeeping,
+      "a saturated but LIVING cell still answers the pulse with a counted arrival"
     )
 
   @Test def `bell strike on dead mycelium answers nothing`(): Unit =
     val deadCell = CellReadout(
       MandateCurrent(-1.2, -0.6, 0.3, 0.0),
       Regime.Strained,
-      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee),
       baselineCalming = 0.0,
       sustenance = 0.0 // chronic ecological burnout: the network is gone
     )
     val outcome = BellRitual.evaluateBellStrike(deadCell)
     assertEquals(BellStrikeOutcome.DeadMyceliumBurnout, outcome)
     assertFalse(outcome.anchorsC0, "dead mycelium cannot carry a baseline anchor")
-    assertFalse(outcome.bookkeepsHeartbeat, "dead mycelium cannot carry a heartbeat")
+    assertEquals(
+      PulseBookkeeping.PhysicsOnly,
+      outcome.bookkeeping,
+      "dead mycelium cannot carry a counted pulse"
+    )
     assertFalse(outcome.triggersOverloadPenalty, "death is not the striker's fault")
 
   @Test def `striking inside the refractory interval of the previous pulse overloads the cell`(): Unit =
@@ -244,15 +272,16 @@ class MandateReadoutSpec:
       Regime.Calm,
       PhaseReading.Basin(PhaseLabel.Resting),
       baselineCalming = 0.03,
-      pulseState = PulseToleranceState(lastPulseTime = 5.0),
+      pulseLedger = PulseLedger(tolerance = ToleranceBook(lastPulseTime = 5.0)),
       simTime = 6.0
     )
     val outcome = BellRitual.evaluateBellStrike(overpulsed)
     assertEquals(BellStrikeOutcome.PulseOverloadBurnout, outcome)
     assertFalse(outcome.anchorsC0)
-    assertTrue(
-      outcome.bookkeepsHeartbeat,
-      "overload is still recorded so it can collapse the suppression window"
+    assertEquals(
+      PulseBookkeeping.Counted,
+      outcome.bookkeeping,
+      "overload is still counted: the ledger records the refusal and collapses the window"
     )
     assertTrue(outcome.triggersOverloadPenalty, "the striker feels the recoil")
 
@@ -270,7 +299,7 @@ class MandateReadoutSpec:
     )
     val cur = MandateCurrent(-1.2, -0.6, 0.05, 0.0)
     assertEquals(
-      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee),
       tracker.reading(100.0, cur),
       "excess stacked pulse drive must push a_eff across the burnout knee"
     )
@@ -285,12 +314,12 @@ class MandateReadoutSpec:
       pulseDrive = () => 0.8
     )
     assertNotEquals(
-      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee),
       single.reading(100.0, cur),
       "one bell strike alone never burns a healthy cell"
     )
 
-  @Test def `an overload-locked cell reads BurnoutNoCycle regardless of state`(): Unit =
+  @Test def `an overload-locked cell reads OverloadLocked regardless of state`(): Unit =
     val tracker = new PhaseTracker(
       ReadoutParam(),
       fast,
@@ -301,9 +330,82 @@ class MandateReadoutSpec:
       overloaded = () => true
     )
     assertEquals(
-      PhaseReading.Undefined(UndefinedReason.BurnoutNoCycle),
+      PhaseReading.Undefined(UndefinedReason.OverloadLocked),
       tracker.reading(100.0, MandateCurrent(-1.2, -0.6, 0.05, 0.0)),
-      "the acute overload lockout must read as BurnoutNoCycle"
+      "the mechanism rule publishes its own reason, not the trajectory one"
     )
+
+  @Test def `when both no-cycle reasons hold, both facts stay queryable`(): Unit =
+    // M = 0 drives a_eff below the knee AND the ledger holds an active
+    // lockout. `phase` has one slot and keeps its display priority (mechanism
+    // first), but each fact must be answerable independently — a query must
+    // never reverse-infer from the displayed reason.
+    val tracker = new PhaseTracker(
+      ReadoutParam(),
+      fast,
+      coupling = 1.0,
+      sustenance = () => 0.0, // a_eff = 0.7 - 1.2 - 0.05, below the knee
+      depth = StressParam().sustenanceDepth,
+      pulseDrive = () => 0.0,
+      overloaded = () => true
+    )
+    val phase = tracker.reading(100.0, MandateCurrent(-1.2, -0.6, 0.05, 0.0))
+    assertEquals(
+      PhaseReading.Undefined(UndefinedReason.OverloadLocked),
+      phase,
+      "display priority: the mechanism rule wins the single phase slot"
+    )
+    val readout = CellReadout(
+      MandateCurrent(-1.2, -0.6, 0.05, 0.0),
+      Regime.Calm,
+      phase,
+      sustenance = 0.0,
+      pulseLedger = PulseLedger(overload = OverloadLock(200.0)),
+      simTime = 100.0
+    )
+    assertTrue(
+      readout.isOffsetBelowKnee,
+      "the threshold condition is true even though the display shows the other reason"
+    )
+    assertTrue(readout.isOverloadLocked, "the mechanism reason is true")
+    assertTrue(readout.isBurnoutPhase, "the coarse predicate is the union of both")
+    assertTrue(
+      readout.pulseLedger.overloadedAt(readout.simTime),
+      "the ledger still holds the lockout fact"
+    )
+    assertTrue(
+      Readout.isEcologicalBurnout(readout, fast, 1.0, StressParam().sustenanceDepth),
+      "the ecological burnout fact is decided by M / a_slow, not by the phase slot"
+    )
+
+  @Test def `dead network plus an active lockout: death wins the dispatch`(): Unit =
+    // Scenario D of docs/mechanism-state-responsibilities.md §6: the two facts
+    // coexist and neither cancels the other. Bell dispatch checks ecological
+    // burnout first, so a dead network still answers nothing even while the
+    // ledger shows a live lockout.
+    val deadAndLocked = CellReadout(
+      MandateCurrent(-1.2, -0.6, 0.05, 0.0),
+      Regime.Calm,
+      PhaseReading.Undefined(UndefinedReason.OverloadLocked),
+      baselineCalming = 0.0,
+      sustenance = 0.0, // the network is gone
+      pulseLedger = PulseLedger(overload = OverloadLock(200.0)),
+      simTime = 100.0
+    )
+    assertTrue(deadAndLocked.pulseLedger.overloadedAt(deadAndLocked.simTime))
+    assertTrue(
+      deadAndLocked.isOffsetBelowKnee,
+      "M = 0 puts a_eff below the knee; the fact does not depend on the display"
+    )
+    assertTrue(deadAndLocked.isOverloadLocked)
+    assertTrue(deadAndLocked.isBurnoutPhase)
+    val outcome = BellRitual.evaluateBellStrike(deadAndLocked)
+    assertEquals(
+      BellStrikeOutcome.DeadMyceliumBurnout,
+      outcome,
+      "ecological death takes precedence over the overload dispatch"
+    )
+    assertEquals(PulseBookkeeping.PhysicsOnly, outcome.bookkeeping)
+    assertFalse(outcome.triggersOverloadPenalty, "a dead cell is not an over-pulse fault")
 
 

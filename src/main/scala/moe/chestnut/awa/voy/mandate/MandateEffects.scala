@@ -17,7 +17,7 @@ import net.minecraft.util.Identifier
   * during the acute tiers — `StagnationSpike` while the ground is spiking
   * or burnout-saturated (×0.09 break speed, plus vanilla `SLOWNESS` as a
   * secondary cue), and `PulseSaturation` as the immediate recoil for
-  * over-pulsing a cell into acute `BurnoutNoCycle`.
+  * over-pulsing a cell into an acute overload lockout.
   *
   * Why these are *our* effects instead of vanilla `MINING_FATIGUE`: a vanilla
   * effect carries a vanilla name, icon and tooltip, so the pressure reads as
@@ -57,7 +57,7 @@ object MandateEffects:
   )
 
   /** 脉冲过载: immediate minor backlash when over-rapid pulses drive a cell into
-    * acute `BurnoutNoCycle` (×0.75 break speed, ×0.85 movement speed).
+    * acute overload lockout (×0.75 break speed, ×0.85 movement speed).
     */
   val PulseSaturation: StatusEffect = register(
     PulseSaturationId,
@@ -95,7 +95,7 @@ object MandateEffects:
     /** Stagnation is a continuous, ambient suppression: it does nothing on tick. */
     override def canApplyUpdateEffect(duration: Int, amplifier: Int): Boolean = false
 
-  /** Immediate minor backlash effect for over-pulsing a cell into `BurnoutNoCycle`. */
+  /** Immediate minor backlash effect for over-pulsing a cell into an acute overload lockout. */
   private final class PulseSaturationEffect(
       id: Identifier,
       color: Int,

@@ -52,13 +52,13 @@ import moe.chestnut.awa.voy.inner.veins.*
   *      burnout) the pressure turns bodily: players get
   *      `voy:stagnation_spike` (`×0.09` block break speed), plus `SLOWNESS`
   *      and ash particles. `c0` no longer gates stagnation: the source is
-  *      "too long without a pulse" (heartbeat model, note 08);
+  *      "too long without a pulse" (pulse-shelter model, note 08);
   *    - Outbound `CellSpikeTriggered` and `RegimeTransitioned` actions produce
   *      audible tremors and ash plumes on the server thread.
   *  - **Sensory phenomena (design note 06 §3)**: the world itself is the
   *    instrument panel — 3-tier iron-yellow water seep, night mycelial glow
   *    on healthy sheltered ground, and silent blight on deep-incapacitated
-  *    (`BurnoutNoCycle`) chunks, all driven by [[MandatePhenomena]].
+  *    (no-cycle phase: offset below the knee or acute overload lockout) chunks, all driven by [[MandatePhenomena]].
   *  - **Mycelial re-inoculation (note 06 §7.1)**: applying fungal inoculum
   *    to depleted, sub-toxic soil seeds `M` via `EventMsg.SetSustenance`.
   */
@@ -359,18 +359,18 @@ object MandateOverworld:
           val outcome = BellRitual.evaluateBellStrike(readout)
           if outcome.anchorsC0 then
             MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, outcome.baselineCalming)
-          // Physics always applies; the heartbeat ledger is gated by the
-          // dispatch verdict (SpikeSwallowed is not counted).
+          // Physics always applies; the pulse ledger only records arrivals the
+          // bookkeeping axis counts (SpikeSwallowed is PhysicsOnly).
           MandateRuntime.firePulseAt(
             chunkX,
             chunkZ,
             outcome.pulseArea,
-            heartbeat = outcome.bookkeepsHeartbeat
+            bookkeeping = outcome.bookkeeping
           )
           // Acute pulse-overload backlash (design note 08): over-rapid pulsing
-          // drives the cell into transient `BurnoutNoCycle`; the striker feels
-          // the recoil immediately, and the chunk's tolerance makes every
-          // later pulse suppress stagnation for a shorter window.
+          // drives the cell into a transient overload lockout; the striker
+          // feels the recoil immediately, and the chunk's tolerance makes
+          // every later pulse shelter stagnation for a shorter window.
           if outcome.triggersOverloadPenalty then
             val serverWorld = world.asInstanceOf[ServerWorld]
             player.addStatusEffect(
@@ -414,7 +414,7 @@ object MandateOverworld:
   /** Periodic Overworld check (runs on server thread): applies or clears the
     * `沉滞` (Stagnation) debuff on players and nearby villagers depending on
     * whether their chunk is currently sheltered by a fresh pulse window
-    * (heartbeat model, design note 08).
+    * (pulse-shelter model, design note 08).
     */
   def onServerTick(server: MinecraftServer): Unit =
     if server.getTicks % StagnationReapplyTicks != 0 then return
@@ -445,7 +445,7 @@ object MandateOverworld:
 
     if maintained then
       // A fresh pulse window swept the stagnation off: remove it actively so
-      // the heartbeat relief is felt at once instead of decaying out.
+      // the shelter relief is felt at once instead of decaying out.
       player.removeStatusEffect(MandateEffects.StagnationEntry)
       player.removeStatusEffect(MandateEffects.StagnationSpikeEntry)
     if !maintained then
@@ -527,7 +527,7 @@ object MandateOverworld:
       }
 
     // Sensory phenomenon layer (design note 06 §3): the world itself is the
-    // instrument panel. The profile binds silence to `BurnoutNoCycle` only —
+    // instrument panel. The profile binds silence to the burnout-phase reasons only —
     // never to an oscillating `Regime.Burnout`.
     val profile = MandatePhenomena.classifyPhenomena(readout, world.isNight)
     if profile.precursorSpore then

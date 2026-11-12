@@ -31,6 +31,32 @@ import moe.chestnut.awa.voy.inner.veins.{
   */
 sealed trait EventDTO
 
+/** What a physical pulse does to the gameplay pulse ledger (design note 08).
+  *
+  * This axis is NOT the physics: a pulse enters the fast-variable equations
+  * either way. It says whether the same arrival also counts as a *counted
+  * pulse* for the discrete pulse mechanisms — shelter window, tolerance book
+  * and acute overload lockout (`inner.veins.PulseLedger`).
+  *
+  * It deliberately does not name the emitter or the reason: the emitter kind
+  * already travels on `FirePulse.transmitter`, and the reason a strike does
+  * not count belongs to the verdict that refused it (the bell dispatch's
+  * `SpikeSwallowed`). The core only needs to know whether the ledger sees
+  * this arrival.
+  */
+enum PulseBookkeeping:
+  /** The arrival is counted: it may open a shelter window, charge tolerance,
+    * or be refused into an overload lockout.
+    */
+  case Counted
+
+  /** The pulse only enters the equations: it sounds, but it is not a
+    * maintenance act (design note 08 §3).
+    */
+  case PhysicsOnly
+
+  def counted: Boolean = this == PulseBookkeeping.Counted
+
 object EventMsg:
   // ==== Timer ==== //
 
@@ -77,18 +103,22 @@ object EventMsg:
     * cell's `synapseTau` to the transmitter's constant before firing,
     * exactly as the prototype does.
     *
-    * `heartbeat` separates *physics* from *bookkeeping*: the pulse always
-    * enters the equations (the bell always sounds), but only a strike that the
-    * six-way bell dispatch allows to count may open a stagnation suppression
-    * window. `SpikeSwallowed` fires the pulse with `heartbeat = false`
-    * (design note 08 §3); crystal-link pulses, which have no dispatch, are
-    * always heartbeats.
+    * `bookkeeping` separates *physics* from *ledger*: the pulse always
+    * enters the equations (the bell always sounds), but only a strike the
+    * six-way bell dispatch allows to count may enter the pulse ledger, which
+    * opens the shelter window, charges tolerance and can be refused into an
+    * acute overload lockout. `SpikeSwallowed` fires the pulse with
+    * `bookkeeping = PulseBookkeeping.PhysicsOnly` (design note 08 §3);
+    * crystal-link pulses, which have no dispatch, are always counted.
+    * Keeping the emitter kind on `transmitter` is what lets a later
+    * mechanism tell an endogenous/link arrival from an external strike
+    * without re-reading the ledger.
     */
   final case class FirePulse(
       cell: CellCoord,
       area: Double,
       transmitter: PulseTransmitter = PulseTransmitter.Bell,
-      heartbeat: Boolean = true
+      bookkeeping: PulseBookkeeping = PulseBookkeeping.Counted
   ) extends EventDTO
 
   /** Set the sustenance level `M ∈ [0, 1]` of a cell — the endogenous
@@ -96,8 +126,8 @@ object EventMsg:
     * window (design note 06, §7.1). `M = 1` is the native state; lowering it
     * collapses the recovery offset
     * `a = alpha - sustenanceDepth * (1 - M) - k * s` toward the burnout
-    * knee, so a fully withdrawn cell is `BurnoutNoCycle` no matter how
-    * calm it is.
+    * knee, so a fully withdrawn cell has no cycle phase no matter how calm it
+    * is.
     *
     * This event is an instantaneous SET — the narrative hand (blight,
     * re-inoculation). Between events the engine runs its own Fisher-KPP

@@ -17,7 +17,7 @@ enum GastrodiaBedVerdict(val wire: String):
     */
   case Stalled extends GastrodiaBedVerdict("stalled")
 
-  /** Deep incapacitation (`BurnoutNoCycle`) or dead mycelial network
+  /** Deep incapacitation (no cycle phase: offset below the knee or an acute overload lockout) or dead mycelial network
     * (`M < sustenanceFloor`): the symbiotic threads blacken and the bed
     * withers until refurbished with fresh inoculated timber.
     */
