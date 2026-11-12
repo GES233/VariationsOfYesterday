@@ -209,6 +209,11 @@ class MandatePhenomenaSpec:
       MandatePhenomena.classifyEconomy(CellReadout.zero),
       "chunks outside the live lattice are barren by mechanism (draft-01 §7.8)"
     )
+    assertEquals(
+      MandatePhenomena.EconomyStagnant,
+      MandatePhenomena.classifyEconomy(readout(v = -1.9)),
+      "the negative repolarisation overshoot is not a spike for the economy either"
+    )
     // Golden values: the whole point is legible severity, so pin the numbers.
     assertEquals(0, MandatePhenomena.EconomyMaintained.tradePriceBonus)
     assertEquals(2, MandatePhenomena.EconomyStagnant.tradePriceBonus)
@@ -324,6 +329,53 @@ class MandatePhenomenaSpec:
       MandatePhenomena.canRefurbishGastrodiaBed(deadAndLocked),
       "a dead network cannot be refurbished just because the lockout expired"
     )
+
+  @Test def `silent blight and bed death use different M thresholds`(): Unit =
+    // `0 < M < floor` is REACHABLE transiently: the dynamics snap M to 0 only
+    // when it falls below the floor AND the local trend is non-positive, so
+    // diffusion from living neighbours (or the narrative `SetSustenance`
+    // channel) can leave a sub-floor positive value. The two facts keep
+    // different thresholds on purpose: the signature marks the absorbing state
+    // (M <= 0), the bed rule marks "below the Allee floor". Do not merge them.
+    val vanishing = readout(s = 0.10, sustenance = 0.0)
+    assertTrue(vanishing.isMyceliumAbsent)
+    assertFalse(vanishing.isMyceliumViable)
+    assertTrue(MandatePhenomena.hasSilentBlight(vanishing))
+    assertTrue(MandatePhenomena.isGastrodiaBedDeepDead(vanishing))
+
+    val belowFloorButPositive = readout(s = 0.10, sustenance = 0.5 * StressParam().sustenanceFloor)
+      // The depth is zeroed only so the readout offset stays above the knee and
+      // the two M thresholds can be observed independently; with the live depth
+      // an M this low drags a_eff below the knee as well.
+      .copy(stressParam = StressParam(sustenanceDepth = 0.0))
+    assertFalse(belowFloorButPositive.isMyceliumAbsent, "not the absorbing state")
+    assertFalse(belowFloorButPositive.isMyceliumViable, "below the Allee floor")
+    assertFalse(
+      MandatePhenomena.hasSilentBlight(belowFloorButPositive),
+      "silent blight binds to M <= 0, not to the Allee floor"
+    )
+    assertTrue(
+      MandatePhenomena.isGastrodiaBedDeepDead(belowFloorButPositive),
+      "the bed rule uses the Allee floor"
+    )
+    assertEquals(
+      GastrodiaBedVerdict.Withered,
+      MandatePhenomena.evaluateGastrodiaBed(belowFloorButPositive)
+    )
+
+    // [BATCH-2 REGRESSION LOCK] an acute lockout still fires both facts; the
+    // network is alive, so neither fact comes from M here.
+    val locked = readout(
+      s = 0.30,
+      phase = PhaseReading.Undefined(UndefinedReason.OverloadLocked),
+      sustenance = 0.80
+    ).copy(
+      pulseLedger = PulseLedger(overload = OverloadLock(200.0)),
+      simTime = 100.0
+    )
+    assertTrue(locked.isMyceliumViable, "the network is alive during a short lockout")
+    assertTrue(MandatePhenomena.hasSilentBlight(locked))
+    assertTrue(MandatePhenomena.isGastrodiaBedDeepDead(locked))
 
   @Test def `zh_cn and en_us language files keep identical key sets`(): Unit =
     import com.google.gson.JsonParser

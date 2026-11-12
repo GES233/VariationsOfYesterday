@@ -3,6 +3,8 @@
 > 状态：**0.1 结构冻结**。
 >
 > 方程组结构、通道语义、格子场架构、加载不变性原则、相位调制与 α 突触脉冲结构保持稳定，实现期间只调参数。
+>
+> **2026-11-12 名实订正**：第一批（`c91ab0e`）已把 `UndefinedReason.BurnoutNoCycle` 拆为两个读数原因——`OffsetBelowKnee`（读数规则 `effectiveA <= burnoutA`，`effectiveA` 含读数侧叠脉冲修正，ODE 只推进 `a_slow`）与 `OverloadLocked`（`PulseLedger` 的过载锁闭，机制规则）；`PulseToleranceState` 改为 `PulseLedger`，`FirePulse.heartbeat` 改为 `FirePulse.bookkeeping: PulseBookkeeping`（`Counted` / `PhysicsOnly`）。本文正文旧词已按此订正；方程结构、数值与设计意图未变。
 
 ## 0. 定位与创作原则
 
@@ -53,7 +55,7 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
    - **基线安抚 $c_0$**：撑大宽容容量，拆钟/毁堰会导致安全余量缩水；
    - **阈下单次激发（预兆事件）**：静息态下强踢动触发单次孤立脉冲后自行回落；
    - **双通道反馈**：每次注入扰动伴随即时阈下视听响应，与延迟的真正灾变构成归因闭环。
-3. **烧毁边界与通道拆分**：常规输入下 $s$ 截断于 $s_{\max}=1.0$（对应 $a = -0.30 > a_{\text{burnout}}$），仍在自持振荡窗口内。方程级烧毁态（`BurnoutNoCycle`）有两条路径：契约切片（$M=1$、M 动力学默认休眠）中只能由叙事通道抽走维持源触发（`EventMsg.SetSustenance`，见札记 06 §7.1）；gameplay 下 `VoyConfig` 默认启用 M 的酸蚀项，持续高应力亦可耗尽 M 进入深度失能（札记 06 §7.1 实测）。
+3. **烧毁边界与通道拆分**：常规输入下 $s$ 截断于 $s_{\max}=1.0$（对应 $a = -0.30 > a_{\text{burnout}}$），仍在自持振荡窗口内。读数规则判定的无周期相位（`OffsetBelowKnee`，判据 `a_eff <= a_burnout`；`a_eff` 在 ODE 的 `a_slow` 上叠加读数侧脉冲驱动，ODE 本身不含该修正）有两条慢性路径：契约切片（$M=1$、M 动力学默认休眠）中只能由叙事通道抽走维持源触发（`EventMsg.SetSustenance`，见札记 06 §7.1）；gameplay 下 `VoyConfig` 默认启用 M 的酸蚀项，持续高应力亦可耗尽 M 进入深度失能（札记 06 §7.1 实测）。
 4. **相位调制与占空比反转（Duty-Cycle Inversion）**：
    - 截面相位以 $v$ 上穿 $1.2$ 为相位 $0$；真实尖峰（相位传感口径）定义为「上穿截面且峰值 $\ge 1.8$ 后回落穿过 $0$」；读数层的尖峰标签为正向 $v \ge +1.8$（札记 08）。
    - **近临界起振区（$s = 0.30, a = 0.40$，周期 $T \approx 43.7$）**：去极化高台期（$v > 0$）仅占周期的 **28.1%**，周期中段（$\varphi = 0.50$）落在左支超极化恢复段，正向脉冲 `alpha_shock` 当场触发提前尖峰（`-17.38`）。
@@ -120,7 +122,7 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
 
 - **读数投影层（`MandateReadout`）**：呈现层不直接读取裸浮点数，统一通过 `ReadoutParam` 映射为：
   - **慢变量分级（`Regime`）**：`Calm` / `Strained` / `Oscillating` / `Burnout`；
-  - **快变量相位读数（`PhaseReading`）**：周期轨道 `Cycle(label, fraction)`（四相标签 `Excitation` / `AbsoluteRefractory` / `RelativeRefractory` / `Resting` 及 20 格刻度 `dialTick`）、静息域 `Basin(Resting)`、无周期 `Undefined(BurnoutNoCycle | TransientNoCycle | NoCycleReference)`。
+  - **快变量相位读数（`PhaseReading`）**：周期轨道 `Cycle(label, fraction)`（四相标签 `Excitation` / `AbsoluteRefractory` / `RelativeRefractory` / `Resting` 及 20 格刻度 `dialTick`）、静息域 `Basin(Resting)`、无周期 `Undefined(reason)`，`reason ∈ {OffsetBelowKnee, OverloadLocked, TransientNoCycle, NoCycleReference}`（前两者并集即 `CellReadout.isBurnoutPhase`）。
 - **Tick 事件驱动调度**：`END_SERVER_TICK` 投递固定步长 `TickArrived(dt = 0.05, tickRate)` 进入引擎单线程 actor（`inner/actor` 内核上的 `MandateAgent`），与通道事件（`StressInject` / `SetDisturbance` / `SetCalming` / `SetBaselineCalming` / `HoldImpulse` / `FirePulse` / `SetSustenance`）、拓扑事件（`RegisterCell` / `RemoveCell` / `UpsertEdge` / `RemoveEdge` / `AddLink` / `RemoveLink`）及持久化控制 `FlushNow` 同信箱全序处理，仿真时间恒等于游戏时间。无玩家在线时不投递 tick。游戏线程只读 `@volatile` 快照（`MandateRuntime`）并在下一 tick 消费动作回包（`MandateOverworld`）。
 
 ## 2. 地势与谷地：因果的方向
@@ -139,10 +141,10 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
 ### 3.2 沉滞（Stagnation）与心跳维持闭环
 > 2026-11-08 按札记 08 定稿修订：沉滞来源由「无 $c_0$」改为「无脉冲保鲜窗」，$c_0$ 与沉滞解耦。
 > 2026-11-09 再裁定：沉滞的咬合面从玩家身体回归 2026-09-28 定稿的**原版经济**（动机闭环），玩家身体只在尖峰/过载时承担。
-- **沉滞的来源是「太久没有脉冲」**：一次有效正脉冲（敲钟 / 水晶链路；尖峰吞没的 `SpikeSwallowed` 一击只进方程、不计心跳）为区块开启抵消窗（默认约一个自然振荡周期 ≈40 s，随耐受递减）；窗内主动解除 `voy:stagnation`，窗外每 20 tick 重新施加。
+- **沉滞的来源是「太久没有脉冲」**：一次有效正脉冲（敲钟 / 水晶链路；尖峰吞没的 `SpikeSwallowed` 一击只进方程、不进账本，即 `bookkeeping = PhysicsOnly`）为区块开启抵消窗（默认约一个自然振荡周期 ≈40 s，随耐受递减）；窗内主动解除 `voy:stagnation`，窗外每 20 tick 重新施加。
 - **沉滞压在原版经济上**：无庇护区块内交易加价（special price +2，尖峰期 +5）、村民繁殖/铁傀儡召唤/作物随机刻生长按 keep 概率被吞（基线 0.5 / 尖峰 0.25 量级，数值见 `MandatePhenomena.EconomyProfile`，钩子走 mixin 层 `VillagerEntityMixin` / `CropBlockMixin`）；村民以 `voy:stagnation` 标记 + 环境粒子显形。**格子场外的休眠区按 `CellReadout.zero` 判为沉滞**——「谷外安全但贫瘠」由修辞落地为字面机制。
 - **玩家身体只在急性档承担**：基础档不碰玩家（标记只给村民显形，「这块地没有庇护」由经济与村民状态表达）；尖峰爆发/饱和失能期玩家才吃 `voy:stagnation_spike`（挖掘 ×0.09）与缓慢、灰烬粒子（见 `MandateEffects` / `MandateOverworld`）。
-- **脉冲过密即过载烧毁**：间隔小于安全窗（默认 8 s）或耐受饱和的脉冲把细胞顶进急性 `BurnoutNoCycle`（去极化阻滞），抵消窗作废，敲钟者即刻吃 `voy:pulse_saturation`（挖掘 ×0.75、移速 ×0.85），且耐受加深使后续抵消窗缩短——刷钟会把自己锁进无法靠敲钟脱身的沉滞。
+- **脉冲过密即过载锁闭**：间隔小于安全窗（默认 8 s）或耐受饱和的脉冲把细胞顶进急性 `OverloadLocked`（去极化阻滞的机制规则锁闭），抵消窗作废，敲钟者即刻吃 `voy:pulse_saturation`（挖掘 ×0.75、移速 ×0.85），且耐受加深使后续抵消窗缩短——刷钟会把自己锁进无法靠敲钟脱身的沉滞。
 - $c_0$ 退居慢变量安抚通道（`-ρc₀` 项）与感官签名庇护条件（菌光/前兆孢子，札记 06 §3），不再提供沉滞免疫。维持生存 = 维持地脉的心跳节律与菌网健康；盲目采掘击穿宽容区 → 酸蚀耗菌 → 慢性菌竭烧毁（`M → 0`），届时敲钟毫无回音，只能泄压后再接种。
 
 ## 4. ARG 叙事与双模型主线

@@ -3,6 +3,8 @@
 > 状态：**实施规格（WO-1/3/4 已落地，WO-2 待排期）**。本文档面向实现者（含编码代理）：第 1–4 节是不可违背的设计约束与映射，第 5 节是分阶段工单（WO-1…WO-4），第 6 节是考据与证据分级。
 >
 > 前置阅读：`docs/design-draft-01-living-world.md` §1（动力学层）、`docs/design-note-02-kanren-worldview-engine.md`（世界模型）、`docs/design-note-05-medikanren-microchains.md`（五跳卷宗）、`docs/verification-report-01-mandate-slice.md`。脉冲耦合链路见 `docs/design-note-07-pulse-coupling.md`；制式验山盘见札记 09（已成稿但挂起，第一阶段不实现）。
+>
+> **2026-11-12 名实订正**：第一批（`c91ab0e`）已把 `UndefinedReason.BurnoutNoCycle` 拆为 `OffsetBelowKnee`（读数规则 `effectiveA <= burnoutA`，含读数侧叠脉冲修正，ODE 只推进 `a_slow`）与 `OverloadLocked`（`PulseLedger` 过载锁闭，机制规则），二者并集为 `CellReadout.isBurnoutPhase`；`PulseToleranceState` 改为 `PulseLedger`，`FirePulse.heartbeat` 改为 `FirePulse.bookkeeping: PulseBookkeeping`。本文 §2–§5 的实现描述已按新词订正；§7 中带日期的历史裁定保留原词作历史对照。
 
 ---
 
@@ -33,7 +35,7 @@
 | `a(s, M) = α − Δ·(1−M) − k·s` | **菌网完整度决定兴奋性**：网络越碎，`a` 越小，越容易被点燃、越难回到静息；维持源被彻底抽走（`M → 0`）则进入去极化阻滞 |
 | `dM/dt = r·M·(1−M) − c·max(s−s_T,0)·M + D·∇²M` | 菌丝 logistic 生长 − 酸中毒（应力越过毒性阈值 `s_T` 才杀，与 §2.2 AMD 一致）+ 沿土壤/水系连续体扩散；`M = 0` 吸收态 |
 | 尖峰（正向 `v ≥ +1.8`） | 菌网电暴发 + 伴生的地球化学脉冲（见 2.2） |
-| 烧毁（`BurnoutNoCycle`） | **去极化阻滞**（depolarization block）：菌网深度失能，静默；恢复靠再接种（`SetSustenance` / 菌种右键土壤，见 §7 开放问题 1） |
+| 烧毁（`isBurnoutPhase`：读数规则原因 `OffsetBelowKnee` 或账本锁闭 `OverloadLocked`） | **去极化阻滞**（depolarization block）：菌网深度失能，静默；恢复靠再接种（`SetSustenance` / 菌种右键土壤，见 §7 开放问题 1）。注意读数原因只是判据结论，不等于 ODE 已进入死亡态（职责表 §1.2） |
 
 ### 2.2 慢系统 = 土壤生物地球化学（酸性矿山排水，AMD）
 
@@ -66,10 +68,10 @@
 | 前兆（`Regime.Strained` 或 `Oscillating`，且 `c₀ ≥ 0.01` 庇护） | 溪涧水色渐黄、异味渐重（**先于**尖峰） | 单档低密度菌丝粒子（当前固定 4 颗；按 `s` 分档待做，不给数值） |
 | 尖峰过后（`q` 残留） | 水色持续发黄、底泥泛红、硫磺味持久 | 粒子按 `q` 分档（3 档） |
 | 安抚设施工作中 | **臭味**（湿地硫酸盐还原产 H₂S）——臭是好兆头 | 设施周边粒子 |
-| 静默（`PhaseReading` 为 `Undefined(BurnoutNoCycle)`） | 深度失能：无菌子、无荧光、作物枯败 | 生物群系级粒子抑制 + 枯败 |
+| 静默（`PhaseReading` 为 `Undefined(OffsetBelowKnee)` 或 `Undefined(OverloadLocked)`，即 `isBurnoutPhase`） | 深度失能：无菌子、无荧光、作物枯败 | 生物群系级粒子抑制 + 枯败 |
 | 健康（`Calm` + `c₀` 庇护） | 夜间微弱菌光、菌子可采 | 低亮度发光地衣粒子 |
 
-**注意**：`Regime.Burnout`（`s ≥ 0.95`）是应力读数标签（饱和失能），此时快系统可能仍在振荡；**静默签名必须绑 `BurnoutNoCycle`，不能绑 `Regime.Burnout`**。
+**注意**：`Regime.Burnout`（`s ≥ 0.95`）是应力读数标签（饱和失能），此时快系统可能仍在振荡；**静默签名必须绑 `isBurnoutPhase`（`OffsetBelowKnee` / `OverloadLocked` 并集），不能绑 `Regime.Burnout`**。
 
 原则：签名**先于**灾变、**弱于**灾变、**可误读**（三方机构对同一签名的记录不同，见札记 02 §3 的三方观测失真）。
 
@@ -105,7 +107,7 @@
 - **菌塘方块（`gastrodia_bed`）**：无独立动力学状态，每次随机刻与交互均为所在 Cell 快照的无状态投影（`MandatePhenomena.evaluateGastrodiaBed`）：
   - `Growing`（`condition = 0`）：`s < 0.45`（`Calm`）且 `M ≥ 0.60`（菌网完好），推进 `age = 0..3`；同时受沉滞经济档（`MandateEconomy.suppressCropGrowth`）调制；
   - `Stalled`（`condition = 1`）：`s ≥ 0.45`（`Strained` 及以上）或 `floor ≤ M < 0.60`（菌网受损），菌丝失水停滞；
-  - `Withered`（`condition = 2`）：`BurnoutNoCycle` 或 `M < floor`（菌网枯绝），菌丝黑腐枯死并锁存为死塘，须待地脉脱离失能且 `s < 0.60` 后手持**荧丝菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。
+  - `Withered`（`condition = 2`）：`isBurnoutPhase`（`OffsetBelowKnee` / `OverloadLocked`）或 `M < floor`（菌网枯绝），菌丝黑腐枯死并锁存为死塘，须待地脉脱离失能且 `s < 0.60` 后手持**荧丝菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。
 - **段木伴栽与荧丝菌材（`inoculated_timber`）**：
   - 在健康区块（`Growing`）手持野生菌种右键去皮原木可就地「段木发菌」转化为荧丝菌材（或工作台合制）；
   - 紧贴菌塘四周或正下方放置荧丝菌材构成「段木伴栽」，生长概率翻倍（`1/4 → 1/2`）、成熟起挖产量提升（`1–2 → 3–4`）；
@@ -113,7 +115,7 @@
   - 接种只抬地板、不降级：写入值取 `max(当前 M, 种子)`，已有活丝不会被更低的种子冲掉。
 - **收获物与药食闭环**：**鲜伏根（`fresh_gastrodia`）**为聚落礼物经济物产；烤制得**煨伏根（`roasted_gastrodia`）**，玩家食用后清除身体上的 `脉冲过载`（`voy:pulse_saturation`）与尖峰震麻带来的 `SLOWNESS` / `NAUSEA`（只作用于玩家身体，不改地脉 `s` / `M`）。
 - **可选软联动（农夫乐事 Farmer's Delight，零硬依赖）**：
-  - **沃土与堆肥互通**：`farmersdelight:rich_soil` / `rich_soil_farmland` 纳入可接种土壤（`isInoculableSoil`），垫于菌塘正下方时视作伴栽基底；后续可让有机堆肥（`organic_compost`）的熟化速率受所在区块 `M` 调制（`BurnoutNoCycle` 静默期失活停转），且沃土作物同样受 `MandateEconomy` 沉滞压制，绝不架空地脉约束；
+  - **沃土与堆肥互通**：`farmersdelight:rich_soil` / `rich_soil_farmland` 纳入可接种土壤（`isInoculableSoil`），垫于菌塘正下方时视作伴栽基底；后续可让有机堆肥（`organic_compost`）的熟化速率受所在区块 `M` 调制（`isBurnoutPhase` 静默期失活停转），且沃土作物同样受 `MandateEconomy` 沉滞压制，绝不架空地脉约束；
   - **小刀起根与砧板/厨锅扩展**：「起根动刀不动锄」——手持小刀（`#c:tools/knife` / `#farmersdelight:tools/knives`）起挖成熟菌塘额外多产 1 枚鲜伏根；后续可通过带 `fabric:load_conditions` 的数据包配方扩展砧板劈菌材、鲜伏根切片留种芽，以及厨锅炖「菌塘伏根汤」（提供短暂「定风」豁免一次尖峰震麻硬直）与伴生菌子实体菜肴。
 - **叙事钩子**：垦殖破坏菌网 → 伏根绝收 + 土地失稳，**经济与地质共用同一底层**。
 
@@ -134,7 +136,7 @@
 - 验收：新单元测试（mock 快照 → 断言总线求和值与装甲累积）；既有测试全绿。
 
 ### WO-3 菌塘与感官签名（**已落地，签名/再接种 2026-11-07，菌塘/荧丝菌材闭环 2026-11-09**）
-- 感官签名（§3）已由 `MandatePhenomena`（纯映射，可单测）+ `MandateOverworld.emitChunkPhenomena`（服务端统一发射，不进客户端逻辑）落地：黄水三档（铁锈色 `DustParticleEffect` 扫表层水体，计数按档）、健康夜光（`GLOW`，低密度封顶）、深度失能静默（`WHITE_ASH`，绑 `BurnoutNoCycle` 而非 `Regime.Burnout`）；
+- 感官签名（§3）已由 `MandatePhenomena`（纯映射，可单测）+ `MandateOverworld.emitChunkPhenomena`（服务端统一发射，不进客户端逻辑）落地：黄水三档（铁锈色 `DustParticleEffect` 扫表层水体，计数按档）、健康夜光（`GLOW`，低密度封顶）、深度失能静默（`WHITE_ASH`，绑 `isBurnoutPhase` 而非 `Regime.Burnout`）；
 - **菌网再接种**：手持菌种（发光地衣/蘑菇/菌丝体）**不潜行**右键土壤，或手持荧丝菌材**潜行**右键土壤 → `evaluateReInoculation` 纯判定（`Seeded` / `AcidTooToxic` / `AlreadyViable`）→ `EventMsg.SetSustenance`（野生菌种 `M = 0.05`，荧丝菌材 `M = 0.12`；写入取 `max(当前 M, 种子)`）；酸毒未退（s ≥ 0.6）时接种失败且菌种照常消耗——失败是身体证据，不是禁令；
 - **菌塘与共生闭环（`blocks/VoyBlocks`、`GastrodiaBedBlock`）**：已落地 `gastrodia_bed`（菌塘）、`inoculated_timber`（荧丝菌材）、`fresh_gastrodia`（鲜伏根）、`roasted_gastrodia`（煨伏根），以及农夫乐事沃土基底/小刀起根零依赖软兼容钩子；交互只接管与菌塘相关的点击（空手、营养物、小刀、潜行），其余一律 `PASS` 交还原版，摆放方块与意外收割互不干扰。
 - 验收：签名与菌塘裁决金样测试见 `MandatePhenomenaSpec`（全量测试数见 `AGENTS.md` 构建与测试）；服务器侧无渲染引用；专用服务器可用。

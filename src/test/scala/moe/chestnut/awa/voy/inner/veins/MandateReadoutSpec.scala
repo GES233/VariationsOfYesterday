@@ -408,4 +408,129 @@ class MandateReadoutSpec:
     assertEquals(PulseBookkeeping.PhysicsOnly, outcome.bookkeeping)
     assertFalse(outcome.triggersOverloadPenalty, "a dead cell is not an over-pulse fault")
 
+  @Test def `survival, slow-offset and spike facts each answer from their own criterion`(): Unit =
+    // Coupling C7 (docs/mechanism-state-responsibilities.md §5): `a_slow`
+    // across the knee is not a dead network. M = 0.5, s = 0.7 gives
+    // a_slow = 0.7 - 1.2*0.5 - 0.7 = -0.6 <= -0.4667, yet M >= floor.
+    val aliveBelowKnee = CellReadout(
+      MandateCurrent(-1.2, -0.6, 0.7, 0.0),
+      Regime.Strained,
+      PhaseReading.Undefined(UndefinedReason.OffsetBelowKnee),
+      sustenance = 0.5
+    )
+    assertTrue(aliveBelowKnee.isMyceliumViable, "M = 0.5 is a living, damaged network")
+    assertFalse(aliveBelowKnee.isMyceliumAbsent, "M = 0.5 is not the absorbing state")
+    assertTrue(aliveBelowKnee.isSlowOffsetBelowKnee, "the ODE offset itself is across the knee")
+    assertTrue(aliveBelowKnee.isEcologicalDeath, "the shared guard fires on the slow offset")
+    assertTrue(
+      Readout.isEcologicalBurnout(aliveBelowKnee, fast),
+      "the dispatch fact agrees even though the network still lives"
+    )
+
+    // The readout rule and the dynamical fact are different quantities: stacked
+    // pulse drive pushes a_eff across the knee while a_slow stays above it. The
+    // displayed phase is deliberately unrelated here — facts never come from it.
+    val stacked = CellReadout(
+      MandateCurrent(-1.2, -0.6, 0.5, 0.0),
+      Regime.Calm,
+      PhaseReading.Basin(PhaseLabel.Resting),
+      sustenance = 1.0,
+      pulseDrive = 2.1
+    )
+    assertTrue(stacked.isOffsetBelowKnee, "the readout rule labels the cell no-cycle")
+    assertFalse(stacked.isSlowOffsetBelowKnee, "but the ODE's own offset is above the knee")
+    assertFalse(stacked.isEcologicalDeath, "so the shared death guard does not fire")
+    assertFalse(
+      Readout.isEcologicalBurnout(stacked, fast),
+      "the dispatch fact trusts a_slow / M, not the stacked-drive readout label"
+    )
+
+    // A living cell keeps that fact even when the phase slot shows the
+    // mechanism reason (the display is not evidence about M).
+    val displayedLocked = aliveBelowKnee.copy(
+      phase = PhaseReading.Undefined(UndefinedReason.OverloadLocked)
+    )
+    assertTrue(displayedLocked.isMyceliumViable)
+    assertFalse(displayedLocked.isOverloadLocked, "no lockout is held by this ledger")
+
+    // Positive-spike fact: only the positive excursion counts.
+    def withV(v: Double): CellReadout =
+      CellReadout(
+        MandateCurrent(v, -0.6, 0.05, 0.0),
+        Regime.Calm,
+        PhaseReading.Basin(PhaseLabel.Resting)
+      )
+    assertTrue(withV(1.9).hasActivePositiveSpike(), "v >= spikeLevel is a spike")
+    assertFalse(
+      withV(-1.9).hasActivePositiveSpike(),
+      "the negative repolarisation overshoot is NOT a spike"
+    )
+    assertFalse(withV(1.0).hasActivePositiveSpike(), "below the threshold is not a spike")
+    assertTrue(
+      withV(-1.9).copy(pulseSuppressed = true).isMaintained,
+      "the shelter fact uses the positive-spike convention"
+    )
+    assertFalse(withV(1.9).copy(pulseSuppressed = true).isMaintained)
+
+  @Test def `the composed shelter fact keeps the historical conjunction`(): Unit =
+    // Differential check over a fact matrix: the batch-2 composition must agree
+    // with the pre-batch expression for every combination of its four inputs.
+    val p = ReadoutParam()
+    def legacy(r: CellReadout): Boolean =
+      r.pulseSuppressed &&
+        r.sustenance >= r.stressParam.sustenanceFloor &&
+        !(r.isOffsetBelowKnee || r.isOverloadLocked) &&
+        r.current.dissonance < p.spikeLevel
+    var checked = 0
+    for
+      m <- List(0.0, 0.00005, 0.3, 1.0)
+      drive <- List(0.0, 2.1)
+      v <- List(-1.9, 0.0, 1.9)
+      suppressed <- List(false, true)
+      locked <- List(false, true)
+    do
+      val r = CellReadout(
+        MandateCurrent(v, -0.6, 0.7, 0.0),
+        Regime.Strained,
+        PhaseReading.Basin(PhaseLabel.Resting),
+        pulseSuppressed = suppressed,
+        sustenance = m,
+        pulseDrive = drive,
+        pulseLedger = if locked then PulseLedger(overload = OverloadLock(100.0)) else PulseLedger.zero,
+        simTime = 10.0
+      )
+      assertEquals(
+        legacy(r),
+        r.isMaintained,
+        s"M=$m drive=$drive v=$v suppressed=$suppressed locked=$locked"
+      )
+      checked += 1
+    assertEquals(4 * 2 * 3 * 2 * 2, checked, "the matrix must cover every combination")
+
+  @Test def `the ecological death guard equals the dispatch fact below one bell kernel`(): Unit =
+    // Above a single kernel the dispatch fact deliberately adds the readout
+    // rule (stacked drive); at or below it a_eff == a_slow, so the guard and
+    // the dispatch fact must coincide. Keep that seam pinned.
+    var checked = 0
+    for
+      m <- List(0.0, 0.00005, 0.3, 0.59, 1.0)
+      s <- List(0.05, 0.45, 0.7, 1.0)
+      drive <- List(0.0, 0.8)
+    do
+      val r = CellReadout(
+        MandateCurrent(-1.2, -0.6, s, 0.0),
+        Readout.regime(MandateCurrent(-1.2, -0.6, s, 0.0)),
+        PhaseReading.Basin(PhaseLabel.Resting),
+        sustenance = m,
+        pulseDrive = drive
+      )
+      assertEquals(
+        r.isEcologicalDeath,
+        Readout.isEcologicalBurnout(r, fast),
+        s"M=$m s=$s drive=$drive"
+      )
+      checked += 1
+    assertEquals(5 * 4 * 2, checked)
+
+
 

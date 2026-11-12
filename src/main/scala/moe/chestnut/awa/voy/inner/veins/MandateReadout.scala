@@ -119,6 +119,54 @@ object Readout:
   ): Double =
     fast.alpha - depth * (1.0 - sustenance) - coupling * stress
 
+  /** Per-cell fact: the mycelial network still holds viable threads (`M` at or
+    * above the Allee floor). This is NETWORK SURVIVAL — independent of whether
+    * the dynamics currently admit a cycle phase and independent of any pulse
+    * ledger rule. It does not say the land is healthy: `M` between the floor
+    * and 0.60 is a damaged network that still lives (design note 06 §4.3).
+    */
+  def isMyceliumViable(sustenance: Double, floor: Double): Boolean =
+    sustenance >= floor
+
+  /** Per-cell fact: the ODE's own recovery offset `a_slow` sits at or below the
+    * burnout knee. This is the dynamical-side statement — as close as the
+    * readout gets to "this offset admits no limit cycle". It is NOT the
+    * quantity that gates the displayed phase (that is the readout-rule
+    * [[effectiveA]]/[[isOffsetBelowKnee]]), and it does NOT mean the network is
+    * dead: `M` is the separate fact [[isMyceliumViable]]. A cell can be below
+    * the knee and still alive, and can be alive while the readout rule labels
+    * it no-cycle.
+    */
+  def isSlowOffsetBelowKnee(
+      stress: Double,
+      sustenance: Double,
+      fast: MandateParam,
+      coupling: Double,
+      depth: Double
+  ): Boolean =
+    slowA(fast, stress, sustenance, coupling, depth) <= burnoutA(fast)
+
+  /** The ecological-death guard: dead network or a collapsed slow offset. The
+    * agent's "dead cells do not bookkeep" rule calls this directly; the bell
+    * dispatch reaches the same two clauses through [[isEcologicalBurnout]].
+    * Raw numbers so the agent can ask before a [[CellReadout]] snapshot exists;
+    * the snapshot overload is [[isEcologicalDeath(readout:CellReadout)]].
+    *
+    * This is a guard, not a damage model: it does not add a load-to-damage
+    * path. The physical route `p -> v -> q -> s -> M` is the only way a pulse
+    * currently reaches `M` (docs/work-in-progress-mechanism-decoupling.md §3.7).
+    */
+  def isEcologicalDeath(
+      sustenance: Double,
+      stress: Double,
+      fast: MandateParam,
+      coupling: Double,
+      depth: Double,
+      floor: Double
+  ): Boolean =
+    !isMyceliumViable(sustenance, floor) ||
+      isSlowOffsetBelowKnee(stress, sustenance, fast, coupling, depth)
+
   /** READOUT-RULE recovery offset: the ODE's `slowA` minus a correction for
     * stacked pulse drive above a single bell peak.
     *
@@ -162,16 +210,75 @@ object Readout:
     )
     aEff <= burnoutA(readout.fastParam)
 
+  /** Per-cell fact: the mycelial network is still viable (`M >= floor`, the
+    * cell's own Allee floor). See the raw overload for the boundary.
+    */
+  def isMyceliumViable(readout: CellReadout): Boolean =
+    isMyceliumViable(readout.sustenance, readout.stressParam.sustenanceFloor)
+
+  /** Per-cell fact: the network is truly gone (`M <= 0`, the absorbing state).
+    * STRICTER than `!isMyceliumViable`: the dynamics snap `M` to `0` only when
+    * it falls below the Allee floor AND the local trend is non-positive
+    * (`MandateState`), so a patch at the edge of a dead spot can be refilled by
+    * diffusion from living neighbours, or set by the narrative `SetSustenance`
+    * channel, and sit at `0 < M < floor` in live play. The silent signature
+    * binds to THIS fact (`M <= 0`), not to the Allee floor (design note 06 §3).
+    */
+  def isMyceliumAbsent(readout: CellReadout): Boolean =
+    readout.sustenance <= 0.0
+
+  /** Per-cell fact: `a_slow` — the offset the ODE actually integrates — is at
+    * or below the knee, using the cell's published parameters. Unlike
+    * [[isOffsetBelowKnee]] this carries no stacked-pulse correction, so it is
+    * the closer-to-dynamics statement; it still says nothing about `M`.
+    */
+  def isSlowOffsetBelowKnee(readout: CellReadout): Boolean =
+    isSlowOffsetBelowKnee(
+      readout.current.stress,
+      readout.sustenance,
+      readout.fastParam,
+      readout.stressParam.coupling,
+      readout.stressParam.sustenanceDepth
+    )
+
+  /** Per-cell fact: the cell has passed the ecological-death guard (dead
+    * network or `a_slow` below the knee), using the cell's own parameters.
+    */
+  def isEcologicalDeath(readout: CellReadout): Boolean =
+    isEcologicalDeath(
+      readout.sustenance,
+      readout.current.stress,
+      readout.fastParam,
+      readout.stressParam.coupling,
+      readout.stressParam.sustenanceDepth,
+      readout.stressParam.sustenanceFloor
+    )
+
+  /** Per-cell fact: the cell carries a POSITIVE spike (`v >= spikeLevel`). The
+    * negative repolarisation overshoot is not a spike (same convention as
+    * [[label]]); consumers that need "any excursion" test `|v|` explicitly, as
+    * the seep classifier does.
+    */
+  def hasActivePositiveSpike(readout: CellReadout, p: ReadoutParam = ReadoutParam()): Boolean =
+    readout.current.dissonance >= p.spikeLevel
+
   /** Chronic burnout (mycelial depletion or the ODE's slow offset across the
     * knee), as opposed to an acute pulse-overload lockout.
     *
-    * Batch 1: the former third clause is restated in the new vocabulary. It
-    * reads the *readout-rule* condition with no stacked pulse drive (the
-    * mechanism reason is `UndefinedReason.OverloadLocked`, so it can no longer
-    * leak in here) and is a strict consequence of the second clause whenever
-    * the pulse drive is at or below a single bell peak (`a_eff == a_slow`
-    * there); it is kept explicit so the intent is visible instead of being an
-    * accident of one shared label.
+    * Batch 2 restates the three clauses as named facts:
+    *   - dead network: `!isMyceliumViable` (the raw overload keeps the
+    *     historical explicit-parameter seam for the frozen-slice tests);
+    *   - `a_slow` across the knee: [[isSlowOffsetBelowKnee]];
+    *   - the readout rule with no stacked pulse drive beyond one bell kernel:
+    *     [[isOffsetBelowKnee]] AND `pulseDrive <= singlePulsePeak` (at or below
+    *     one kernel `a_eff == a_slow`, so this clause is then a consequence of
+    *     the second one; it stays explicit because it is the intent).
+    *
+    * Note on parameters: the explicit-argument overload defaults `fast` to the
+    * CORE default and `coupling`/`depth` to their defaults, exactly as before.
+    * A caller that wants the cell's own numbers must pass them (the bell
+    * dispatch does); the snapshot overlays ([[isEcologicalDeath(readout:CellReadout)]],
+    * `readout.isEcologicalDeath`) use the cell's published set.
     */
   def isEcologicalBurnout(
       readout: CellReadout,
@@ -180,9 +287,14 @@ object Readout:
       depth: Double = StressParam().sustenanceDepth,
       pulseParam: PulseToleranceParam = PulseToleranceParam()
   ): Boolean =
-    val slow = slowA(fast, readout.current.stress, readout.sustenance, coupling, depth)
-    readout.sustenance < readout.stressParam.sustenanceFloor ||
-      slow <= burnoutA(fast) ||
+    isEcologicalDeath(
+      readout.sustenance,
+      readout.current.stress,
+      fast,
+      coupling,
+      depth,
+      readout.stressParam.sustenanceFloor
+    ) ||
       (readout.isOffsetBelowKnee && readout.pulseDrive <= pulseParam.singlePulsePeak)
 
   /** Whether a limit cycle exists at this recovery offset. */
@@ -214,22 +326,35 @@ object Readout:
     else PhaseLabel.Resting
 
   /** Heartbeat shelter (design note 08): a fresh pulse window, a living
-    * mycelial network, a non-burnout phase, and no active positive spike.
+    * mycelial network, no no-cycle reason, and no active positive spike.
     *
-    * Batch 1 keeps the existing outcome: BOTH no-cycle reasons block shelter
-    * (`CellReadout.isBurnoutPhase`), so an acute overload lockout still
-    * withdraws the shelter it just collapsed. Whether a *short* lockout
-    * should block shelter at all is a pending gameplay decision, not an
-    * implementation detail — see docs/mechanism-state-responsibilities.md.
+    * Batch 2 spells the four clauses out as named facts (`pulseSuppressed`,
+    * [[isMyceliumViable]], [[CellReadout.isBurnoutPhase]],
+    * [[hasActivePositiveSpike]]). The VALUE is unchanged: both no-cycle reasons
+    * still block shelter, so an acute overload lockout still withdraws the
+    * shelter it just collapsed. Whether a *short* lockout should block shelter
+    * at all is a pending gameplay decision, not an implementation detail — see
+    * docs/mechanism-state-responsibilities.md §8.4/§8.5.
+    *
+    * This remains the single entry point for shelter, economy and player
+    * effects (couplings C8/C9/C13 in the same document). Splitting consumers
+    * onto the individual facts is the stage-C decision that batch 2 only
+    * prepared, not performed.
+    *
+    * Edge (outside the domain): NaN input makes the negated facts behave
+    * differently from the pre-batch strict comparisons. Normal finite config
+    * and save data never produce NaN, but a non-finite config value, an
+    * extreme `tickDt` overflowing RK4, or a corrupt save double can. The readout
+    * is only defined for finite values, so this is documented, not compensated.
     */
   def isMaintained(
       readout: CellReadout,
       p: ReadoutParam = ReadoutParam()
   ): Boolean =
     readout.pulseSuppressed &&
-      readout.sustenance >= readout.stressParam.sustenanceFloor &&
+      readout.isMyceliumViable &&
       !readout.isBurnoutPhase &&
-      readout.current.dissonance < p.spikeLevel
+      !readout.hasActivePositiveSpike(p)
 
   /** Cycle fraction `[0, 1)` -> 20-division dial index `0..19`. */
   def dialTick(phase: PhaseReading, divisions: Int = 20): Option[Int] =
@@ -253,6 +378,13 @@ end Readout
   * `isOffsetBelowKnee` from this cell's own threshold condition and
   * `isOverloadLocked` from its ledger — and `isBurnoutPhase` is their union.
   * Never reverse-infer a fact from the displayed reason.
+  *
+  * Batch 2 adds the survival and dynamical facts next to the pulse ones:
+  * [[isMyceliumViable]] / [[isMyceliumAbsent]] (network survival, two different
+  * thresholds), [[isSlowOffsetBelowKnee]] (the ODE-side offset, closer to
+  * dynamics than the readout rule), [[isEcologicalDeath]] (the guard shared by
+  * the agent and the bell dispatch) and [[hasActivePositiveSpike]]. Each is
+  * computed from its own criterion, so none of them is read off another.
   */
 final case class CellReadout(
     current: MandateCurrent,
@@ -294,6 +426,35 @@ final case class CellReadout(
     * when the display publishes the offset-threshold reason instead.
     */
   def isOverloadLocked: Boolean = pulseLedger.overloadedAt(simTime)
+
+  /** Network-survival fact (`M >= floor`): the mycelium still lives, whether
+    * or not the dynamics have a phase and whether or not a pulse rule fires.
+    */
+  def isMyceliumViable: Boolean = Readout.isMyceliumViable(this)
+
+  /** Absorbing-state fact (`M <= 0`): the network is gone, not merely
+    * depleted. The silent signature binds to this, not to the Allee floor.
+    */
+  def isMyceliumAbsent: Boolean = Readout.isMyceliumAbsent(this)
+
+  /** Dynamical fact: the ODE's own offset `a_slow` is at or below the knee
+    * (no stacked-pulse correction; see [[Readout.isOffsetBelowKnee]] for the
+    * readout rule that gates the displayed phase).
+    */
+  def isSlowOffsetBelowKnee: Boolean = Readout.isSlowOffsetBelowKnee(this)
+
+  /** Shared death guard (dead network OR `a_slow` below the knee), evaluated
+    * with this cell's published parameters. The agent calls this directly to
+    * skip bookkeeping; the bell dispatch reaches it through
+    * `Readout.isEcologicalBurnout`.
+    */
+  def isEcologicalDeath: Boolean = Readout.isEcologicalDeath(this)
+
+  /** Positive-spike fact (`v >= spikeLevel`); the negative repolarisation
+    * overshoot does not count.
+    */
+  def hasActivePositiveSpike(p: ReadoutParam = ReadoutParam()): Boolean =
+    Readout.hasActivePositiveSpike(this, p)
 
   /** The coarse "no cycle phase, cell reads as burnt out" predicate the
     * batch-1 consumers share. Its value is the union of the two facts above,

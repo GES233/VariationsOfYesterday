@@ -4,6 +4,8 @@
 > 本文前身为同日的对齐备忘（罗列代码现状与 G1–G15 缺口清单、Q1–Q6 待拍板项）；
 > 经 2026-11-07–08 两轮「心跳语义」讨论，分叉已裁定，机制已实施。
 > 本文记录**定案后的机制口径与落地事实**；重构前的旧行为仅以对照方式保留。
+>
+> **2026-11-12 名实订正**（第一批 `c91ab0e`）：`PulseToleranceState` → `PulseLedger`（`ShelterWindow` / `ToleranceBook` / `OverloadLock`），`onPulse` → `onCountedPulse`；`FirePulse.heartbeat: Boolean` → `FirePulse.bookkeeping: PulseBookkeeping`（`Counted` / `PhysicsOnly`）；`UndefinedReason.BurnoutNoCycle` 拆为 `OffsetBelowKnee`（读数规则 `effectiveA <= burnoutA`，含读数侧叠脉冲修正，ODE 只推进 `a_slow`）与 `OverloadLocked`（账本锁闭，机制规则）。§2–§4 的现行口径已按新词订正；§1 Q5 的「不改枚举名」与 §5 的文件名/`heartbeat` 字段为 2026-11-08 当时记录，仅作历史对照。
 
 ---
 
@@ -11,7 +13,7 @@
 
 地脉是活的：**一次脉冲（敲钟）是一拍心跳**——来一拍，`沉滞` 短期退去；
 太久没有脉冲，沉滞重新漫上来；**脉冲太密会把地脉顶进急性烧毁**
-（`BurnoutNoCycle`，去极化阻滞），即刻反噬玩家并加深耐受。
+（急性过载锁闭 `OverloadLocked`，去极化阻滞），即刻反噬玩家并加深耐受。
 `c0` 与慢变量通道维持不变，「烧毁」意象不变，但拆成**慢性（菌竭）**与**急性（过载）**两条路径。
 
 ---
@@ -38,21 +40,23 @@
 
 ### 2.1 脉冲抵消窗（保鲜）
 
-- 一次**正面积脉冲**（`FirePulse(area > 0, heartbeat = true)`：敲钟、水晶链路）到达活细胞时，开启
-  沉滞抵消窗：`suppressedUntil = t + W_eff(T)`，其中
+- 一次**正面积脉冲**（`FirePulse(area > 0, bookkeeping = Counted)`：敲钟、水晶链路）到达活细胞时，开启
+  沉滞抵消窗（`ShelterWindow`）：`shelter.until = t + W_eff(T)`，其中
   `W_eff(T) = W_0 · max(0, 1 − T/T_invert)`；敲钟分派为 `SpikeSwallowed` 的
-  那一击由分派置 `heartbeat = false`（见 §3），脉冲照常进方程但不记账；
+  那一击由分派置 `bookkeeping = PhysicsOnly`（见 §3），脉冲照常进方程但不记账；
 - 窗内 `沉滞`（`voy:stagnation`）**主动移除**（不再等 55 tick 自然衰减）；窗外每 20 tick
   重新施加。`isMaintained` 的新定义（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala)）：
 
   ```
-  isMaintained = pulseSuppressed && sustenance ≥ floor && phase ≠ BurnoutNoCycle && v < spikeLevel
+  isMaintained = pulseSuppressed && sustenance ≥ floor && !isBurnoutPhase && v < spikeLevel
   ```
 
-### 2.2 太快 = 过载烧毁（急性 BurnoutNoCycle）
+  （`isBurnoutPhase` 是 `isOffsetBelowKnee` 与 `isOverloadLocked` 的并集；消费者分账仍待拍板。）
+
+### 2.2 太快 = 过载烧毁（急性 `OverloadLocked`）
 
 脉冲间隔 `< I_min`（默认 8.0 模拟秒，≈1.6× 钟核 τ=5.0）或耐受饱和（`T ≥ T_invert`）时：
-1. **世界侧**：该细胞进入急性 `BurnoutNoCycle` 锁闭 `overloadBurnoutDuration`（默认 8 s），
+1. **世界侧**：该细胞进入急性过载锁闭（`OverloadLocked`），锁闭时长 `overloadBurnoutDuration`（默认 8 s），
    抵消窗作废；
 2. **玩家侧即刻小惩罚**：敲钟者获得 `voy:pulse_saturation`（脉冲过载，默认 120 tick：
    挖掘 ×0.75、移速 ×0.85）+ 低闷失谐钟声 + 灰烬粒子；
@@ -65,9 +69,10 @@
 读数层把突触核的脉冲驱动纳入有效恢复偏移（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala) `Readout.effectiveA`）：
 
 ```
-a_slow = α − Δ(1−M) − k·s                      （慢路径：菌竭烧毁）
-a_eff  = a_slow − gain · max(p − p_single, 0)   （快路径：过载烧毁，p = impulse + synapseP）
-BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
+a_slow = α − Δ(1−M) − k·s                      （ODE 推进的慢恢复偏移；菌竭路径）
+a_eff  = a_slow − gain · max(p − p_single, 0)   （读数规则叠加脉冲驱动 p = impulse + synapseP；ODE 不含该项；过载路径）
+事实 isOffsetBelowKnee ⟺ a_eff ≤ a_burnout = −0.4667（未锁闭时展示原因取它；两原因同时成立时展示优先 OverloadLocked，见职责表 §1.1）
+读数原因 OverloadLocked   ⟺ PulseLedger 过载锁闭窗口内（机制规则，不是方程观测）
 ```
 
 - **慢性菌竭**：高应力酸蚀耗尽 `M`（实测见札记 06 §7.1；`M = 0` 吸收态）——
@@ -79,17 +84,19 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
 
 ### 2.4 边界与克制
 
-- **负脉冲不记账**：`area ≤ 0`（如 `OverwhelmingNegativeSuppression`）不参与心跳簿记；
+- **负脉冲不记账**：`area ≤ 0`（如 `OverwhelmingNegativeSuppression`）不参与脉冲账本；
 - **死菌不吃脉冲**：`M ≤ floor` 或 `a_slow ≤ a_burnout` 的细胞跳过耐受簿记
   （死亡不是玩家的错，不叠耐受）；
 - **尖峰吞没不记账**：`SpikeSwallowed` 的一击照常把脉冲送进方程（`v/q/s` 仍记账），
-  但不写心跳抵消窗，也不会刷新已有的旧窗（`FirePulse.heartbeat = false`）；
+  但不写/不续 `ShelterWindow`，也不会刷新已有的旧窗（`FirePulse.bookkeeping = PhysicsOnly`）；
 - **水晶链路也心跳**：链路转发的正脉冲同样开启抵消窗（周期 ~39.5 s 的锁相链路
   恰好能自动维持一个区块的庇护——自动化心跳是涌现玩法；**当前无游戏侧 `AddLink` 发射者，仅为恢复/预留路径**，见札记 07 §6）；
 - **通道物理不变**：钟永远发声、山永远记账（`FirePulse` 照常进方程，
   过载脉冲同样喂养 `q`/`s` 的压力账）；
-- **账本随存档**：脉冲耐受四元组（`lastPulseTime / suppressedUntil / overloadUntil /
-  tolerance`）随 `MandateSnapshot` 整格落盘，以 `simTime` 闭式求值，重登/重启连续。
+- **账本随存档**：`PulseLedger` 的四项保存事实（`ShelterWindow.until` / `ToleranceBook.amount` /
+  `ToleranceBook.lastPulseTime` / `OverloadLock.until`）随 `MandateSnapshot` 整格落盘
+  （NBT 键名沿用 `suppressedUntil` / `pulseTolerance` / `lastPulseTime` / `overloadUntil`），
+  以 `simTime` 闭式求值，重登/重启连续。
 
 ---
 
@@ -100,9 +107,9 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
 | # | 条件 | Outcome | 效果 |
 |---|---|---|---|
 | 1 | 慢性菌竭（`M` 死透或 `a_slow ≤ a_burnout`） | `DeadMyceliumBurnout` | 不锚 `c0`、不抵消、不罚——死肉无回音；指路泄压+接种 |
-| 2 | 脉冲过密 / 耐受饱和 / 已在急性锁闭 / 相读 `BurnoutNoCycle` | `PulseOverloadBurnout` | 不锚 `c0`、抵消窗作废、`T+ΔT_over`、玩家吃 `voy:pulse_saturation` |
+| 2 | 脉冲过密 / 耐受饱和 / 已在急性锁闭 / 相读 `isBurnoutPhase`（`OffsetBelowKnee` 或 `OverloadLocked`） | `PulseOverloadBurnout` | 不锚 `c0`、抵消窗作废、`T+ΔT_over`、玩家吃 `voy:pulse_saturation` |
 | 3 | `Regime.Burnout`（s ≥ 0.95 但菌网活着） | `SaturatedNoAnchor` | 不锚 `c0`，**但正常开启抵消窗**（敲了有用但治不好） |
-| 4 | 未锚振荡 + `Cycle(Excitation)` | `SpikeSwallowed` | 尖峰吞没：不锚 `c0`、**不计心跳**（脉冲照常进方程，不写/不续抵消窗） |
+| 4 | 未锚振荡 + `Cycle(Excitation)` | `SpikeSwallowed` | 尖峰吞没：不锚 `c0`、**不进账本**（脉冲照常进方程，不写/不续 `ShelterWindow`） |
 | 5 | 未锚振荡 + `Cycle(Absolute/RelativeRefractory)` | `RefractoryReanchored` | 锚 `c0` + 抵消窗 + 推迟下一次尖峰 |
 | 6 | 其余（Calm/Strained/静息域/瞬态/无周期参照） | `AnchoredOrMaintained` | 锚 `c0` + 抵消窗（宽容：起振初期不设防） |
 
@@ -119,7 +126,7 @@ BurnoutNoCycle ⟺ a_eff ≤ a_burnout = −0.4667  或急性锁闭窗口内
 | `overpulseToleranceStep` | 0.35 | 过载脉冲的耐受增量 |
 | `invertTolerance` | 1.0 | 耐受反转阈值（抵消效力归零） |
 | `maxTolerance` | 1.5 | 耐受硬上限（保证衰减有界） |
-| `overloadBurnoutDuration` | 8.0 | 急性 `BurnoutNoCycle` 锁闭时长 |
+| `overloadBurnoutDuration` | 8.0 | 急性过载锁闭（`OverloadLock`）时长 |
 | `overloadPenaltyTicks` | 120 | `voy:pulse_saturation` 持续 tick 数 |
 | `singlePulsePeak` | 0.8829 | 单钟核峰值 `12/(e·5)`，过载增益的起扣点 |
 | `pulseBurnoutGain` | 1.6 | 超出部分的 `a_eff` 下压增益 |

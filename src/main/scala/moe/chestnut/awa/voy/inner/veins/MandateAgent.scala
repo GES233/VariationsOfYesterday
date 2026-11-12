@@ -145,16 +145,17 @@ object MandateAgent:
       if area > 0.0 then
         grid.cells.get(cell).foreach { state =>
           val cur = state.getState
-          val slow = Readout.slowA(
-            state.getParam,
-            cur.stress,
+          // The same ecological-death guard the readout publishes (dead
+          // network or a_slow below the knee), evaluated on the live cell so
+          // a dead cell cannot accumulate tolerance from counted pulses.
+          val ecoDead = Readout.isEcologicalDeath(
             state.sustenance,
+            cur.stress,
+            state.getParam,
             state.stressParam.coupling,
-            state.stressParam.sustenanceDepth
+            state.stressParam.sustenanceDepth,
+            state.stressParam.sustenanceFloor
           )
-          val ecoDead =
-            state.sustenance < state.stressParam.sustenanceFloor ||
-              slow <= Readout.burnoutA(state.getParam)
           if !ecoDead then
             val prev = pulseLedgers.getOrElse(cell, PulseLedger.zero)
             val (next, _) = prev.onCountedPulse(simTime, pulseParam)

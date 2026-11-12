@@ -43,14 +43,20 @@ object MandatePhenomena:
     */
   val EconomySpiking: EconomyProfile = EconomyProfile(5, 0.15, 0.25, 0.25)
 
-  /** Project a cell's semantic readout into its economic pressure tier. */
+  /** Project a cell's semantic readout into its economic pressure tier.
+    *
+    * Batch 2 names the two clauses: `isMaintained` (the composed shelter fact)
+    * and [[CellReadout.hasActivePositiveSpike]]. The tier VALUES are unchanged;
+    * whether the economy should stop hanging on the shelter window is coupling
+    * C9 (docs/mechanism-state-responsibilities.md §8.5, 待拍板).
+    */
   def classifyEconomy(
       readout: CellReadout,
       p: ReadoutParam = ReadoutParam()
   ): EconomyProfile =
     if readout.isMaintained then EconomyMaintained
     else if readout.regime == Regime.Burnout ||
-      readout.current.dissonance >= p.spikeLevel
+      readout.hasActivePositiveSpike(p)
     then EconomySpiking
     else EconomyStagnant
 
@@ -169,6 +175,33 @@ object MandatePhenomena:
     else if cur.activity >= 0.02 || cur.stress >= 0.25 then YellowSeepTier.Light
     else YellowSeepTier.None
 
+  /** Deep-incapacitation fact behind the silent signature: either no-cycle
+    * reason (`CellReadout.isBurnoutPhase`, the union of the readout rule and
+    * the ledger lockout) or a network that is truly gone (`M <= 0`, the
+    * absorbing state).
+    *
+    * Boundary: this `M` guard is `<= 0`, deliberately STRICTER than the Allee
+    * floor used by maintenance (`M >= floor`) and by the bed rule (`M < floor`).
+    * The signature marks the absorbing state, not merely a depleted patch.
+    * [BATCH-2 REGRESSION LOCK] a short acute lockout still reads as silent
+    * blight; whether it should is pending (§8.4).
+    */
+  def hasSilentBlight(readout: CellReadout): Boolean =
+    readout.isBurnoutPhase || readout.isMyceliumAbsent
+
+  /** Deep-dead fact behind the bed verdict: either no-cycle reason or `M`
+    * below the Allee floor (with the `1e-9` guard the bed rule has always
+    * used). Named separately from [[hasSilentBlight]] because the two use
+    * different `M` thresholds; do not merge them.
+    *
+    * [BATCH-2 REGRESSION LOCK] a short acute lockout still counts here, so each
+    * bed evaluated during it is persisted as `Withered` until refurbished.
+    * That pins CURRENT behaviour, not the target: §8.4 待拍板.
+    */
+  def isGastrodiaBedDeepDead(readout: CellReadout): Boolean =
+    readout.isBurnoutPhase ||
+      readout.sustenance < Math.max(readout.stressParam.sustenanceFloor, 1e-9)
+
   /** Project a cell's semantic readout and time-of-day into its sensory
     * phenomenon profile (design note 06 §3).
     *
@@ -184,7 +217,7 @@ object MandatePhenomena:
       readout: CellReadout,
       isNight: Boolean = false
   ): PhenomenonProfile =
-    val silentBlight = readout.isBurnoutPhase || readout.sustenance <= 0.0
+    val silentBlight = hasSilentBlight(readout)
     val seepTier = classifySeepTier(readout)
     // Glow and precursor spores bind to the slow `c0` anchor (a bell's lasting
     // duty), NOT to the pulse shelter window: the shelter window governs the
@@ -251,9 +284,7 @@ object MandatePhenomena:
       readout: CellReadout,
       p: ReadoutParam = ReadoutParam()
   ): GastrodiaBedVerdict =
-    val floor = Math.max(readout.stressParam.sustenanceFloor, 1e-9)
-    val deepDead = readout.isBurnoutPhase || readout.sustenance < floor
-    if deepDead then GastrodiaBedVerdict.Withered
+    if isGastrodiaBedDeepDead(readout) then GastrodiaBedVerdict.Withered
     else if readout.current.stress >= p.strained ||
       readout.sustenance < GastrodiaHealthySustenance
     then GastrodiaBedVerdict.Stalled

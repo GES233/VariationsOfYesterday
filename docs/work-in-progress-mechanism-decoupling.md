@@ -1,8 +1,8 @@
 # 临时施工备忘：机制解耦与玩法讨论接续
 
-> 更新：2026-11-12。状态：**第一批（阶段 B 结构解耦）已实施 2026-11-12；玩法仍待讨论**。
+> 更新：2026-11-12。状态：**第一批（阶段 B 结构解耦）已实施 2026-11-12；第二批（阶段 C-1 消费者事实分账 + 旧文档同步）已实施 2026-11-12；玩法仍待讨论**。
 > 用途：保存本轮会话的设计共识、源码审查发现、候选施工顺序与开放问题，供上下文压缩或后续会话接续。
-> 本文不是新一轮机制定稿，也不是立即改动代码的指令。当前任务仅为落盘备忘，下一步继续讨论玩法。本批实施记录见 §9，配套职责表见 [mechanism-state-responsibilities.md](mechanism-state-responsibilities.md)。
+> 本文不是新一轮机制定稿，也不是立即改动代码的指令。当前任务仅为落盘备忘，下一步继续讨论玩法。本批实施记录见 §9、§10，配套职责表见 [mechanism-state-responsibilities.md](mechanism-state-responsibilities.md)。
 
 ## 1. 接续会话时先读这里
 
@@ -148,15 +148,15 @@ Elixir 的 `Witness` 把实测 `safe_tick` 绑定到物证，`Chronicle` 和卷�
 ### 阶段 B：整理状态和事件边界
 
 - 拆清 `PulseToleranceState` 的职责及 `FirePulse.heartbeat` 所代表的多重含义。**（2026-11-12：结构层面已实施（行为不变）——已拆为 `PulseLedger`（`ShelterWindow` / `ToleranceBook` / `OverloadLock`）与 `PulseBookkeeping`（`Counted` / `PhysicsOnly`），见 §9。）**
-- 让相位观测、暂时失能、长期损伤和庇护效果能够分别表达。**（2026-11-12：结构层面已实施（行为不变）——读数原因已拆为 `OffsetBelowKnee`（轨迹事实）/ `OverloadLocked`（机制规则）；庇护已有独立 `ShelterWindow`。但长期损伤与消费者分账仍共用 `isBurnoutPhase`，属阶段 C。）**
+- 让相位观测、暂时失能、长期损伤和庇护效果能够分别表达。**（2026-11-12：结构层面已实施（行为不变）——读数原因已拆为 `OffsetBelowKnee`（读数规则条件）/ `OverloadLocked`（机制规则）；庇护已有独立 `ShelterWindow`。第二批已把消费者共用的粗判具名化（`isMyceliumViable` / `isMyceliumAbsent` / `isSlowOffsetBelowKnee` / `isEcologicalDeath` / `hasActivePositiveSpike` 等），但消费者读取对象未改，仍读合成事实 `isBurnoutPhase` / `isMaintained`，属阶段 C，见 §10。）**
 - 保持单一事件顺序和状态所有权；组合效果若必须一起成立，应在同一次明确裁决中处理，避免分离后产生半完成状态。
 - 初期优先保留 ODE 与输运实现，降低同时改变玩法和数值模型造成的验证负担；这不是禁止以后修改它们。
 
 ### 阶段 C：逐个接回消费者
 
 - 钟与拆钟：明确实际改变什么，不再直接代表全部维护条件。
-- 经济、玩家效果、菌塘与感官表现：分别选择所需状态，审查短时事件是否应留下持续损伤。
-- 读数与文案：解释实际生效的原因，避免仅换名字而保留隐藏耦合。
+- 经济、玩家效果、菌塘与感官表现：分别选择所需状态，审查短时事件是否应留下持续损伤。**（2026-11-12：C-1 只完成事实具名化，消费者读取对象未改；见 §10。）**
+- 读数与文案：解释实际生效的原因，避免仅换名字而保留隐藏耦合。**（2026-11-12：读数原因已拆、旧文档标签已同步；玩家文案仍两原因同词，见 §10。）**
 - 配置与存档：按新语义整理字段；**不编写旧档迁移路径，不为旧字段增加兼容层**。
 
 ### 阶段 D：同步内容与验证
@@ -201,23 +201,54 @@ Elixir 的 `Witness` 把实测 `safe_tick` 绑定到物证，`Chronicle` 和卷�
 - `onPulse` → `onCountedPulse`：只有 `PulseBookkeeping.Counted` 的到达才进入账本；一次结算同时给出三个子状态的新值。
 - `PulseStrikeVerdict` → `PulseSettlement`；`Suppressed` → `Sheltered`；`Overloaded` 增加 `OverloadCause`（`PulseTooSoon` / `AlreadyLocked` / `ToleranceSaturated`），作为一次结算的一次性解释，不保存。
 - `FirePulse.heartbeat: Boolean` → `FirePulse.bookkeeping: PulseBookkeeping(Counted | PhysicsOnly)`（[EventMsg.scala](../src/main/scala/moe/chestnut/awa/voy/inner/event/EventMsg.scala)）；物理与玩法账本不再共用“心跳”这个泛名。
-- `UndefinedReason.BurnoutNoCycle` → `OffsetBelowKnee`（`a_eff` 越膝的轨迹事实）+ `OverloadLocked`（账本锁闭的机制规则）；`CellReadout` 新增 `isOffsetBelowKnee` / `isOverloadLocked` / `isBurnoutPhase`，下游统一改读 `isBurnoutPhase` 以保持两者同判。
+- `UndefinedReason.BurnoutNoCycle` → `OffsetBelowKnee`（`a_eff` 越膝的读数规则条件）+ `OverloadLocked`（账本锁闭的机制规则）；`CellReadout` 新增 `isOffsetBelowKnee` / `isOverloadLocked` / `isBurnoutPhase`，下游统一改读 `isBurnoutPhase` 以保持两者同判。
 - 快照与持久化跟随改名：`CellSnapshot.pulseLedger`、`restorePulseLedgers`；NBT 的四个键名不变（`suppressedUntil` / `overloadUntil` / `lastPulseTime` / `pulseTolerance`），缺键即零态。
 - 配套职责表与组合场景检查：[mechanism-state-responsibilities.md](mechanism-state-responsibilities.md)。
 - 玩家可见面基本不动，仅两处文本随原因名变化、且都不在玩家面向：开发 HUD 的 `formatPhaseShort` 由 `Undef(BurnoutNoCycle)` 变为 `Undef(OffsetBelowKnee)` / `Undef(OverloadLocked)`；叩钟失锚文案里的“本次不计心跳”保留原文未改（代码标识不再用“心跳”，内容层统一留待文案定稿）。
-- 旧文档标签未同步：草案 01、札记 06/08、验证报告 01 仍按旧词 `BurnoutNoCycle` 叙述（其中札记 08 的 `isMaintained` 判据已与现状不符）。这属 §6 阶段 D 的同步工作，本批不越界改。
+- 旧文档标签未同步：草案 01、札记 06/08、验证报告 01 仍按旧词 `BurnoutNoCycle` 叙述（其中札记 08 的 `isMaintained` 判据已与现状不符）。这属 §6 阶段 D 的同步工作，本批不越界改。**（2026-11-12 第二批已同步：草案 01、札记 06/08/10、验证报告 01 按新名订正并各加一处「名实订正」说明；带日期的历史裁定保留原词作对照，见 §10。）**
 - 2026-11-12 上游审阅后的订正（仅文档 + 测试，未改行为）：①「锁闭可被延长」原写成「最长约 16 s」是错的——每次拒绝都把期限刷新到 `t + 8 s`，只要间隔 < 8 s 就可无限续期（链路持续流量也会触发）；②「没有负荷→损伤→存活路径」限定为「没有额外的账本负荷伤害路径」，并补记物理间接链 `p → v → q → s → M`；③ 明确本批不是转义层；④ 补四条测试覆盖（两原因同时成立的发布优先级、死亡+锁闭并存、counted 脉冲确实推动 v、脉冲经 q/s 间接酸蚀 M），并给刻意钉住旧后果的断言加 `[BATCH-1 REGRESSION LOCK]` 标记；⑤ `isOffsetBelowKnee` / `isOverloadLocked` 不再从互斥的 `phase` 反推：前者按本格 `effectiveA` 判据、后者按账本求值，`phase` 只承担展示优先级（同时成立时两个查询均为真，消费者统一读 `isBurnoutPhase` 故行为不变）；⑥ 澄清 `effectiveA` 是含读数侧叠脉冲修正的**规则判据**，ODE 积分的是 `a_slow`，故 `a_eff ≤ knee` 不得表述为「实际轨迹不存在极限环」。
 
 ### 9.2 本批明确没做
 
 - **未改数值**：庇护仍为 `W0 = 40 s` 基准、`I_min = 8 s`、耐受步进 0.10／0.35、衰减 `τ = 45 s`、锁闭 8 s、玩家惩罚 120 tick。
 - **未定玩法**：短时过载是否枯死菌塘、越膝是否算死亡、过载是否造成损伤、钟是否保留多职责、庇护／经济／玩家效果是否分账等，全部保留为【待拍板】——清单见新文档 §8。
-- **未拆消费者**：`isMaintained`、`classifyEconomy`、`isEcologicalBurnout`、`evaluateGastrodiaBed` 仍共用 `isBurnoutPhase` 的粗判（阶段 C）。
+- **未拆消费者**：`isMaintained`、`classifyEconomy`、`evaluateGastrodiaBed` 与静默签名仍共用 `isBurnoutPhase` 的粗判（`isEcologicalBurnout` 用的是 `isOffsetBelowKnee` + 自身两子句，本就不读该粗判），属阶段 C。
 - **未拆钟与转义层**：`evaluateBellStrike` 六分派，以及 `c0` 重锚／脉冲／账本／惩罚的绑定仍在（阶段 C；转义层接口仍属开放）。
 - **未加到期一次性效果**，未改 ODE、输运、契约数值与内容管线；未运行新的游戏盲测。
 
 ### 9.3 下一步入口
 
-- 玩法讨论先读新文档的 [§6 组合场景检查表](mechanism-state-responsibilities.md) 与 [§8 待定项](mechanism-state-responsibilities.md)；讨论收敛后仍按本文 §6 的阶段 C／D 施工。
+- 玩法讨论先读新文档的 [§6 组合场景检查表](mechanism-state-responsibilities.md) 与 [§8 待定项](mechanism-state-responsibilities.md)；第二批已做其中的 C-1（事实具名化），剩余阶段 C 的消费者分账与钟／转义层仍需玩法拍板（§10.3）。
 - 曾在本备忘 §2.2 列为“实现建议，尚未实施”的显式状态 / 转移要求，已就本机制链落第一笔；它仍不是全仓重构的许可，也不改变 §2.1 的方向性结论。
+
+## 10. 第二批实施记录（2026-11-12，阶段 C-1：消费者事实分账）
+
+> 定位：仍属**结构批**——只把消费者共用的粗判拆成具名事实，并同步旧文档标签；不改任何玩法数值、方程、输运、契约与玩家可见文案，每个消费者的结论与改前一致。
+
+### 10.1 本批做了什么
+
+- `Readout` / `CellReadout` 新增具名事实（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala)）：
+  - `isMyceliumViable`（`M >= floor`）与 `isMyceliumAbsent`（`M <= 0`，吸收态）：两套 `M` 阈值分开；
+  - `isSlowOffsetBelowKnee`（`a_slow <= burnoutA`，ODE 自己积分的偏移）与既有 `isOffsetBelowKnee`（读数规则）并列：读数阈值与动力学事实不再混称；
+  - `isEcologicalDeath`（`!isMyceliumViable || isSlowOffsetBelowKnee`）：`MandateAgent.recordPulse` 的「死菌不记账」守卫改为共享此定义；
+  - `hasActivePositiveSpike`（`v >= spikeLevel`，只算正向；负向回摆不算）。
+- `isEcologicalBurnout` 改为 `isEcologicalDeath || (isOffsetBelowKnee && pulseDrive <= 单钟峰值)`；`isMaintained` 改为 `pulseSuppressed && isMyceliumViable && !isBurnoutPhase && !hasActivePositiveSpike`。
+- `MandatePhenomena`：`silentBlight` 具名为 `hasSilentBlight = isBurnoutPhase || isMyceliumAbsent`；菌塘 `deepDead` 具名为 `isGastrodiaBedDeepDead = isBurnoutPhase || M < max(floor, 1e-9)`；`classifyEconomy` 的尖峰判据改用 `hasActivePositiveSpike`。
+- 内部判据（agent 的「死菌不记账」守卫、`silentBlight`、菌塘 `deepDead`、经济档尖峰判据）改为引用具名事实，结论与改前一致；游戏侧消费者只在 `MandateOverworld.applyChunkMandateEffects` 加了一条注释说明「现在读合成事实、分账待拍板」——**没有任何消费者被改成读取不同的事实集合**。
+- 测试：`MandateReadoutSpec` 新增三组（生存／慢偏移／尖峰事实各自独立；`isMaintained` 与改前字面表达式按 96 组组合逐一比对；`isEcologicalDeath` 与 `isEcologicalBurnout` 在单钟峰值以下 40 组组合一致）；`MandatePhenomenaSpec` 新增两套 `M` 阈值边界用例与负向回摆的经济档用例；短时锁闭仍判菌塘 `Withered`／静默的断言补 `[BATCH-2 REGRESSION LOCK]`。
+- 旧文档标签同步（阶段 D 的一小步）：草案 01、札记 06/08/10、验证报告 01 的 `BurnoutNoCycle` 旧词与札记 08 的 `isMaintained` 判据按新名订正，每份文档集中一处「2026-11-12 名实订正」；带日期的历史裁定保留原词作历史对照。
+- 配套职责表更新（[mechanism-state-responsibilities.md](mechanism-state-responsibilities.md)）：新增 §1.3 具名事实清单、§7.1 消费者依赖表，§5 的 C1/C2/C7/C8/C9 改按事实叙述。
+
+### 10.2 本批明确没做
+
+- **未改玩法**：`isMaintained` / `classifyEconomy` / `hasSilentBlight` / `isGastrodiaBedDeepDead` 的结论与改前完全一致；短时锁闭仍判菌塘枯死、仍发静默签名、仍撤销庇护——这些仍是【待拍板】（职责表 §8.4／§8.5）。
+- **未拆消费者**：玩家效果、经济、菌塘、静默、钟分派仍读合成事实；没有把哪个消费者改读 `isMyceliumViable` 之类的单项事实。
+- **未做转义层**：钟的六分派、`c0` 重锚／脉冲／账本／惩罚绑定仍在（职责表 §8.6）。
+- **未改**数值、ODE、输运、`contracts/mandate-slice-v1.json`、NBT key／`schemaVersion`、玩家面向文案与内容管线。
+- **NaN 例外**：`isMaintained` / `isEcologicalBurnout` 用取反的具名事实改写，NaN 输入（非有限配置、极端 `tickDt` 溢出、或损坏存档的 double；属定义域外）下与改前的严格比较结果不同；同一情形下 `MandateAgent.recordPulse` 的「死菌不记账」守卫会从「照记账」变为「跳过」。正常有限配置与正常存档不产出 NaN，已在代码注释与职责表 §7 注明。
+
+### 10.3 下一步入口
+
+- 阶段 C 剩余部分是**玩法拍板**：先按职责表 §8 决定「消费者各要哪个事实」，再改读取对象（改动点已由 §7.1 列好）。
+- 若先做架构，则是转义层（「事件 → 机制（1..n） → 效果」）的接口设计；当前仍只有方向，没有接口与数据结构决定。
 

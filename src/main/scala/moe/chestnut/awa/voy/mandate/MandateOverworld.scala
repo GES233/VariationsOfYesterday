@@ -439,6 +439,12 @@ object MandateOverworld:
     val chunkX = player.getChunkPos.x
     val chunkZ = player.getChunkPos.z
     val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
+    // Batch 2: `isMaintained` is now a composition of named facts (fresh pulse
+    // window + viable network + no no-cycle reason + no positive spike), but
+    // this consumer still reads the composition as one verdict. Which facts the
+    // player effects should actually need (shelter? land health? exposure?) is
+    // coupling C8/C13, still 待拍板 in
+    // docs/mechanism-state-responsibilities.md §8.5.
     val maintained = readout.isMaintained
 
     announceShelterChange(player, maintained)
