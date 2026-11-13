@@ -7,64 +7,33 @@ import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 /** The mandate engine actor: owns the lattice and integrates it on tick
   * events.
   *
-  * Scheduling semantics (design draft §1.4, 2026-09-30): every game tick is
-  * delivered as one `TickArrived` carrying a fixed simulation dt; world
-  * events share the same mailbox, so processing order is total and the
-  * event sequence is deterministic and replayable. The actor thread is the
-  * single writer of the grid; readers consume the published immutable
-  * snapshot instead of asking the actor.
-  *
-  * The mailbox is the in-repo kernel in `inner/actor`, not a third-party
-  * actor framework: the engine only needs one worker thread and a total
-  * order, and the kernel keeps the mod jar free of an extra runtime.
-  *
-  * @param snapshotSink called after each integration step with an immutable
-  *   state map (grid-local coordinates); production wiring republishes it
-  *   as a volatile snapshot, tests capture it directly.
-  * @param actionSink receives outbound actions (spike notifications, regime
-  *   transitions) produced during integration.
-  * @param readoutSink receives the semantic `CellReadout` projection per cell
-  *   after each integration step.
-  * @param initialSimTime restored integration clock on world load (0 for a
-  *   fresh lattice); pulse delays and phase readouts continue from it.
-  * @param defaultFastParam fast set for cells registered without an explicit
-  *   one; the wiring layer injects the config here.
-  * @param defaultStressParam slow set for the same cells (dormant core
-  *   default unless the wiring layer injects the config).
-  * @param persistSink receives the full `MandateSnapshot` on a slow cadence
-  *   for world persistence; the saved copy may lag the live lattice by at
-  *   most `persistPeriod` without losing anything a player can feel.
-  * @param persistPeriod snapshot cadence in simulation-time units.
-  * @param regimeDwell minimum simulation time a reclassified regime must
-  *   hold before it becomes the published one. The regime classifier is a
-  *   pure threshold function of the slow variables, so a cell hovering on a
-  *   boundary would otherwise flap the player-facing herald — and every
-  *   consumer of the readout's regime (economy tiers, sensory signatures) —
-  *   on consecutive ticks. `0` restores immediate publication.
+  * Scheduling semantics (design draft §1.4): every game tick is delivered as
+  * one `TickArrived` carrying a fixed simulation dt; world events share the
+  * same mailbox, so processing order is total and the event sequence is
+  * deterministic and replayable. The actor thread is the single writer of the
+  * grid; readers consume the published immutable snapshot.
   */
 object MandateAgent:
-  /** Core parameter sets used for a cell registered without explicit
-    * parameters when the wiring layer injects nothing. The game side always
-    * injects its configuration instead (`VoyConfig`), so "save > config >
-    * default" has a well-defined last resort: these.
-    */
   val DefaultFastParam: MandateParam =
     MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
 
   /** Dormant sustenance by default: the pure FHN core, as the contract
-    * slice and the fingerprint rigs instantiate it. */
+    * slice and the fingerprint rigs instantiate it.
+    */
   val DefaultStressParam: StressParam = StressParam()
 
-  /** Apply one channel or topology event to the lattice.
-    *
-    * The actor and the offline replay harness share this function so the
-    * mailbox semantics (address-by-cell, deterministic drop outside the
-    * live lattice, channel level vs. pulse, topology upserts) have exactly
-    * one implementation. `TickArrived` is not a channel event: integration
-    * is driven by the caller's step, so it is ignored here. Link events
-    * (`AddLink` / `RemoveLink`) are wiring, not lattice: they are handled by
-    * the caller's [[PulseLinkRunner]], and ignored here.
+  /** Per-cell runtime bookkeeping consolidated into one slot, eliminating
+    * parallel maps that had to be manually synchronized on cell add/remove.
     */
+  private final class CellSlot(
+      val tracker: PhaseTracker,
+      var pulseStamp: PulseStamp,
+      var publishedRegime: Regime,
+      var regimeCandidate: Option[(Regime, Double)] = None,
+      var inSpike: Boolean = false
+  )
+
+  /** Apply one channel or topology event to the lattice. */
   def applyEvent(
       grid: MandateGrid,
       event: EventDTO,
@@ -89,9 +58,6 @@ object MandateAgent:
           state.synapseTau = transmitter.tau
           state.firePulse(area)
         }
-      // Topology events rebuild the lattice itself (design draft §1.4):
-      // they share the mailbox's total order, so a replayed event stream
-      // reproduces the same topology history.
       case EventMsg.RegisterCell(cell, initial, fastParam) =>
         grid.registerCell(
           cell,
@@ -103,13 +69,10 @@ object MandateAgent:
         )
       case EventMsg.RemoveCell(cell) => grid.removeCell(cell)
       case EventMsg.UpsertEdge(edge) =>
-        // An edge whose endpoints are not both live is dropped
-        // deterministically, same as a channel event outside the lattice.
         if grid.cells.contains(edge.from) && grid.cells.contains(edge.to) then
           grid.upsertEdge(edge)
       case EventMsg.RemoveEdge(from, to) => grid.removeEdge(from, to)
       case EventMsg.AddLink(_) | EventMsg.RemoveLink(_, _) => ()
-      // Persistence control: no lattice effect (see `EventMsg.FlushNow`).
       case EventMsg.FlushNow => ()
 
   def apply(
@@ -124,30 +87,39 @@ object MandateAgent:
       defaultStressParam: StressParam = DefaultStressParam,
       persistSink: MandateSnapshot => Unit = (_ => ()),
       persistPeriod: Double = 1.0,
-      pulseParam: PulseToleranceParam = PulseToleranceParam(),
-      initialPulseLedgers: Map[CellCoord, PulseLedger] = Map.empty,
-    regimeDwell: Double = 5.0
+      pulseParam: PulseParam = PulseParam(),
+      initialPulseStamps: Map[CellCoord, PulseStamp] = Map.empty,
+      regimeDwell: Double = 5.0
   ): ActorRef[EventDTO] =
     val readoutParam = ReadoutParam()
     var simTime: Double = initialSimTime
-    // The full lattice snapshot for world persistence is published on a
-    // slow cadence (the dynamics' fastest timescale is seconds; the saved
-    // copy may lag the live one by at most persistPeriod without losing
-    // anything a player can feel).
     var nextPersistAt: Double = initialSimTime
-    // Always constructed: links are runtime wiring (AddLink/RemoveLink), so
-    // "no links yet" must not mean "no way to add one". The constructor's
-    // `links` are merely the initial wiring.
     val linkRunner = new PulseLinkRunner(links, criterion = spikeCriterion)
-    val pulseLedgers = scala.collection.mutable.HashMap.from(initialPulseLedgers)
 
-    def recordPulse(cell: CellCoord, area: Double): Unit =
+    def mkSlot(cell: MandateState, stamp: PulseStamp = PulseStamp.zero): CellSlot =
+      new CellSlot(
+        tracker = new PhaseTracker(
+          readoutParam,
+          cell.param,
+          cell.stressParam.coupling,
+          cell.stressParam.sustenanceDepth
+        ),
+        pulseStamp = stamp,
+        publishedRegime = Readout.regime(cell.getState, readoutParam)
+      )
+
+    val slots = scala.collection.mutable.HashMap.empty[CellCoord, CellSlot]
+    grid.cells.foreach { case (coord, cell) =>
+      slots(coord) = mkSlot(cell, initialPulseStamps.getOrElse(coord, PulseStamp.zero))
+    }
+
+    def currentStamps: Map[CellCoord, PulseStamp] =
+      slots.iterator.map { case (c, slot) => c -> slot.pulseStamp }.toMap
+
+    def recordPulse(coord: CellCoord, area: Double): Unit =
       if area > 0.0 then
-        grid.cells.get(cell).foreach { state =>
+        grid.cells.get(coord).foreach { state =>
           val cur = state.getState
-          // The same ecological-death guard the readout publishes (dead
-          // network or a_slow below the knee), evaluated on the live cell so
-          // a dead cell cannot accumulate tolerance from counted pulses.
           val ecoDead = Readout.isEcologicalDeath(
             state.sustenance,
             cur.stress,
@@ -157,46 +129,12 @@ object MandateAgent:
             state.stressParam.sustenanceFloor
           )
           if !ecoDead then
-            val prev = pulseLedgers.getOrElse(cell, PulseLedger.zero)
-            val (next, _) = prev.onCountedPulse(simTime, pulseParam)
-            pulseLedgers(cell) = next
+            val slot = slots.getOrElseUpdate(coord, mkSlot(state))
+            val (next, _) = slot.pulseStamp.onCountedPulse(simTime, pulseParam)
+            slot.pulseStamp = next
         }
 
-    /** A phase tracker reading the cell's LIVE sustenance and pulse drive:
-      * the burnout knee is crossed either when sustenance collapses (slow
-      * ecological burnout) or when rapid pulses stack above a single bell
-      * kernel (acute pulse-overload burnout). The tracker learns about an
-      * active overload LOCKOUT separately, as the ledger's own mechanism
-      * fact, so the readout can name which of the two happened.
-      */
-    def trackerFor(coord: CellCoord, cell: MandateState): PhaseTracker =
-      new PhaseTracker(
-        readoutParam,
-        cell.param,
-        cell.stressParam.coupling,
-        () => cell.sustenance,
-        cell.stressParam.sustenanceDepth,
-        () => cell.impulse + cell.synapseOutput,
-        () => pulseLedgers.getOrElse(coord, PulseLedger.zero).overloadedAt(simTime),
-        pulseParam
-      )
-
-    val trackers = scala.collection.mutable.HashMap.empty[CellCoord, PhaseTracker]
-    grid.cells.foreach { case (coord, cell) =>
-      trackers(coord) = trackerFor(coord, cell)
-    }
-    var prevRegimes: Map[CellCoord, Regime] = grid.cells.map { case (coord, cell) =>
-      coord -> Readout.regime(cell.getState, readoutParam)
-    }
-    // Candidate reclassifications awaiting their dwell: a new regime must
-    // hold for `regimeDwell` before it is published, so a cell hovering on a
-    // classification threshold cannot flap the herald every tick.
-    var regimeCandidates: Map[CellCoord, (Regime, Double)] = Map.empty
-    var inSpike: Set[CellCoord] = Set.empty
-
     def integrate(dt: Double): Unit =
-      // Links deliver before the step and observe after it, the same order
-      // the offline harness uses (design note 07).
       linkRunner
         .duePulses(simTime)
         .foreach { event =>
@@ -214,112 +152,75 @@ object MandateAgent:
         val cur = cell.getState
         currentBuilder += (coord -> cur)
 
-        // Cells registered after startup get their tracker on first sight.
-        val tracker = trackers.getOrElseUpdate(coord, trackerFor(coord, cell))
-        val phase = tracker.observe(simTime, cur)
+        val slot = slots.getOrElseUpdate(coord, mkSlot(cell))
+        val phase = slot.tracker.observe(simTime, cur, cell.sustenance)
 
-        // Debounce the raw classification into the published regime: a
-        // reclassification becomes official only after holding for
-        // `regimeDwell` simulation time; a relapse drops the candidate.
+        // Debounce raw regime classification by `regimeDwell`
         val rawRegime = Readout.regime(cur, readoutParam)
-        prevRegimes.get(coord) match
-          case Some(oldRegime) if oldRegime == rawRegime =>
-            regimeCandidates = regimeCandidates - coord
-          case Some(oldRegime) =>
-            val since = regimeCandidates.get(coord) match
-              case Some((candidate, t)) if candidate == rawRegime => t
-              case _                                              => simTime
-            if simTime - since >= regimeDwell then
-              prevRegimes = prevRegimes.updated(coord, rawRegime)
-              regimeCandidates = regimeCandidates - coord
-              actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, rawRegime, phase))
-            else
-              regimeCandidates = regimeCandidates.updated(coord, (rawRegime, since))
-          case None =>
-            // A cell registered after startup: adopt its current regime as
-            // the baseline instead of fabricating a transition.
-            prevRegimes = prevRegimes.updated(coord, rawRegime)
-        val regime = prevRegimes(coord)
+        if slot.publishedRegime == rawRegime then
+          slot.regimeCandidate = None
+        else
+          val since = slot.regimeCandidate match
+            case Some((cand, t)) if cand == rawRegime => t
+            case _                                    => simTime
+          if simTime - since >= regimeDwell then
+            val oldRegime = slot.publishedRegime
+            slot.publishedRegime = rawRegime
+            slot.regimeCandidate = None
+            actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, rawRegime, phase))
+          else
+            slot.regimeCandidate = Some((rawRegime, since))
 
-        val ps = pulseLedgers.getOrElse(coord, PulseLedger.zero)
+        val regime = slot.publishedRegime
         val pDrive = cell.impulse + cell.synapseOutput
+
         readoutBuilder += (coord -> CellReadout(
-          cur,
-          regime,
-          phase,
-          cell.baselineCalming,
-          cell.sustenance,
+          current = cur,
+          regime = regime,
+          phase = phase,
+          sustenance = cell.sustenance,
+          baselineCalming = cell.baselineCalming,
           pulseDrive = pDrive,
-          pulseSuppressed = ps.shelteredAt(simTime),
-          pulseTolerance = ps.toleranceAt(simTime, pulseParam),
-          pulseLedger = ps,
+          pulseStamp = slot.pulseStamp,
           simTime = simTime,
-          fastParam = cell.getParam,
-          stressParam = cell.stressParam,
-          pulseParam = pulseParam
+          sustenanceFloor = cell.stressParam.sustenanceFloor,
+          toxicityThreshold = cell.stressParam.sustenanceBurnThreshold
         ))
 
         val spikingNow = cur.dissonance >= readoutParam.spikeLevel
-        if spikingNow && !inSpike.contains(coord) then
-          inSpike += coord
+        if spikingNow && !slot.inSpike then
+          slot.inSpike = true
           actionSink(ActionMsgPool.CellSpikeTriggered(coord, cur, regime))
-        else if !spikingNow && inSpike.contains(coord) then
-          inSpike -= coord
+        else if !spikingNow && slot.inSpike then
+          slot.inSpike = false
       }
 
       snapshotSink(currentBuilder.result())
       readoutSink(readoutBuilder.result())
 
       if simTime >= nextPersistAt then
-        persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, pulseLedgers.toMap))
+        persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentStamps))
         nextPersistAt = simTime + persistPeriod
 
     def handle(event: EventDTO): Unit =
-      // tickRate is reserved for the step-coarsening ("weathering")
-      // mechanism (§1.4) and intentionally ignored for now.
       event match
         case EventMsg.TickArrived(dt, _) => integrate(dt)
-        // Link wiring lives in the runner, not the grid.
         case EventMsg.AddLink(link) => linkRunner.addLink(link)
         case EventMsg.RemoveLink(src, dst) => linkRunner.removeLink(src, dst)
-        // Save-time flush (persistence only): publish the current lattice
-        // without advancing the clock, then resume the normal cadence.
         case EventMsg.FlushNow =>
-          persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, pulseLedgers.toMap))
+          persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentStamps))
           nextPersistAt = simTime + persistPeriod
         case other @ EventMsg.RegisterCell(cell, _, _) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
-          // Re-registration resets the dynamics, and the pulse ledger goes
-          // with it: shelter window, tolerance and overload lockout are part
-          // of the cell state this event replaces. Pinned by
-          // MandateAgentSpec — nothing game-side re-registers live cells
-          // today, so any future feature that does must re-decide whether the
-          // land forgets being pulsed.
-          pulseLedgers.remove(cell)
-          regimeCandidates = regimeCandidates - cell
-          // A (re-)registered cell restarts phase tracking — the dynamics
-          // were just reset.
           grid.cells.get(cell).foreach { c =>
-            trackers(cell) = trackerFor(cell, c)
+            slots(cell) = mkSlot(c)
           }
         case other @ EventMsg.RemoveCell(cell) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
-          // Drop the per-cell bookkeeping so a stale detector cannot leak
-          // into a cell later re-registered at the same coordinate.
-          trackers.remove(cell)
-          pulseLedgers.remove(cell)
-          prevRegimes = prevRegimes - cell
-          regimeCandidates = regimeCandidates - cell
-          inSpike = inSpike - cell
+          slots.remove(cell)
           linkRunner.forgetCell(cell)
-        // Channel events apply to a single cell; events addressed outside
-        // the active lattice are dropped deterministically (§1.4 loading
-        // invariance: presence of a cell must not depend on chunk load
-        // order).
         case other @ EventMsg.FirePulse(cell, area, _, bookkeeping) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
-          // Physics always applies; the pulse ledger only records arrivals
-          // the bookkeeping axis counts (SpikeSwallowed is PhysicsOnly).
           if bookkeeping.counted then recordPulse(cell, area)
         case other => applyEvent(grid, other, defaultFastParam, defaultStressParam)
 

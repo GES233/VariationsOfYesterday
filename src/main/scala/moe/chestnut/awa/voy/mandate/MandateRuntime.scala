@@ -13,47 +13,19 @@ import moe.chestnut.awa.voy.inner.actor.ActorRef
 import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg, PulseBookkeeping}
 import moe.chestnut.awa.voy.inner.veins.*
 
-/** Game-side bridge between Minecraft and the mandate engine actor
-  * (design draft §1.4, 2026-09-30): owns the engine actor lifecycle, the
-  * tick gate, snapshot publication, and the action drain.
-  *
-  * Discipline: the game thread only TELLS events and READS the published
-  * snapshot; the actor thread is the single writer of the lattice.
-  * Outbound actions are queued by the actor and drained back onto the
-  * server thread at the next tick.
-  *
-  * TODO: the lattice defaults to world chunks [-16, 15] in both axes, with its
-  * disturbance hotspot around chunk (0, 0); geometry is injectable via
-  * `VoyConfig.lattice`. Future iterations should anchor it to the spawn point,
-  * follow the player's local region, or derive cells from real world topology.
-  * The saved snapshot records the geometry it was captured under
-  * (`MandatePersistence.geometry`), so a lattice-geometry change discards the
-  * stale save loudly instead of silently misplacing cells.
-  *
-  * Persistence (2026-11-07): the lattice survives restarts via the
-  * dimension-scoped `PersistentState` carrier `MandatePersistence`. The
-  * actor publishes a full `MandateSnapshot` on a slow cadence and the
-  * manager serializes the latest one on world save; on start the lattice,
-  * crystal links and the integration clock are restored from it.
+/** Game-side bridge between Minecraft and the mandate engine actor: owns the
+  * engine actor lifecycle, the tick gate, snapshot publication, and the action
+  * drain.
   */
 object MandateRuntime:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  // Lattice geometry and tuning come from the external config
-  // (`VoyConfig`, loaded during mod init); they are defs so every read
-  // sees the active configuration.
   private def lattice = VoyConfig.current.lattice
   private def width = lattice.width
   private def height = lattice.height
   private def originX = lattice.originX
   private def originZ = lattice.originZ
 
-  /** Fixed simulation step per game tick: 20 tps x 0.05 = 1 time unit per
-    * game second by default. Provisional mapping pending calibration
-    * against the "first catastrophe at 3-5 play hours" target — now a
-    * runtime config knob (`tickDt` / `stressParam.gamma`), no longer a
-    * contract change (draft-01 §7.3).
-    */
   private def TickDt = VoyConfig.current.tickDt
 
   @volatile private var system: Option[ActorRef[EventDTO]] = None
@@ -65,35 +37,24 @@ object MandateRuntime:
   private val pendingActions =
     new ConcurrentLinkedQueue[MandateActionProtocol]()
 
-  /** Latch for the save-time flush: set by [[flush]], counted down by the
-    * actor's next publish (flush or cadence). Atomic because the actor
-    * thread counts it down while the server thread waits. */
   private val flushLatch = new AtomicReference[CountDownLatch](null)
 
-  /** Convert world chunk coordinates to lattice-local cell coordinates. */
   def worldToGrid(chunkX: Int, chunkZ: Int): CellCoord =
     CellCoord(chunkX - originX, chunkZ - originZ)
 
-  /** Convert lattice-local cell coordinates back to world chunk coordinates. */
   def gridToWorld(cell: CellCoord): (Int, Int) =
     (cell.x + originX, cell.z + originZ)
 
-  /** Whether a world chunk lies inside the active prototype lattice. */
   def isLiveChunk(chunkX: Int, chunkZ: Int): Boolean =
     val c = worldToGrid(chunkX, chunkZ)
     c.x >= 0 && c.x < width && c.z >= 0 && c.z < height
 
-  /** Forward one channel event to the running Mandate actor, if started. */
   def tell(event: EventDTO): Unit =
     system.foreach(_ ! event)
 
   def injectStressAt(chunkX: Int, chunkZ: Int, amount: Double): Unit =
     tell(EventMsg.StressInject(worldToGrid(chunkX, chunkZ), amount))
 
-  /** Fire one pulse on a cell. `bookkeeping` says whether the same arrival
-    * also enters the pulse ledger; the physics applies either way (see
-    * [[PulseBookkeeping]]).
-    */
   def firePulseAt(
       chunkX: Int,
       chunkZ: Int,
@@ -111,11 +72,6 @@ object MandateRuntime:
   def setSustenanceAt(chunkX: Int, chunkZ: Int, level: Double): Unit =
     tell(EventMsg.SetSustenance(worldToGrid(chunkX, chunkZ), level))
 
-
-  /** Prototype lattice: disturbance hotspot around its centre, calming ring
-    * further out. Constructed per engine start so restarts get a fresh
-    * world state; all geometry and tuning come from `VoyConfig`.
-    */
   private def buildGrid(): MandateGrid = MandateGrid.rectangular(
     width,
     height,
@@ -132,9 +88,6 @@ object MandateRuntime:
       val cell = MandateState(
         state,
         VoyConfig.current.fastParam,
-        // The game opts into the mycelial sustenance dynamics (design note
-        // 06 §7.1); the frozen defaults keep the contract slice and the
-        // fingerprint rigs on the bare FHN core.
         VoyConfig.current.stressParam
       )
       cell.disturbance =
@@ -145,17 +98,11 @@ object MandateRuntime:
       cell
   )
 
-  /** Start the engine, restoring the saved lattice when one exists.
-    * Idempotent while running.
-    */
   def start(server: MinecraftServer): Unit = synchronized {
     if system.isEmpty then
       val persistence = server.getOverworld.getPersistentStateManager
         .getOrCreate(MandatePersistence.StateType, MandatePersistence.Id)
 
-      // Restore only a snapshot captured under the same lattice geometry;
-      // a geometry change (default -16..15, overridable via VoyConfig) discards
-      // the stale save loudly.
       val expectedGeometry = (originX, originZ, width, height)
       val restored = persistence.snapshot.filter { _ =>
         val matches = persistence.geometry == expectedGeometry
@@ -167,7 +114,7 @@ object MandateRuntime:
         matches
       }
 
-      val (grid, links, initialSimTime, initialPulseLedgers) = restored match
+      val (grid, links, initialSimTime, initialPulseStamps) = restored match
         case Some(snap) =>
           logger.info(
             s"Restoring mandate lattice from saved state " +
@@ -175,28 +122,20 @@ object MandateRuntime:
               s"simTime = ${snap.simTime})."
           )
           val grid = MandateSnapshot.restoreGrid(snap)
-          val pulseLedgers = MandateSnapshot.restorePulseLedgers(snap)
-          // Restore precedence: the SAVE wins for every value it carries
-          // (state and per-cell parameters); the config is the fallback for
-          // what the payload cannot provide, and the core default is the
-          // last resort. Tuning the config therefore affects NEWLY
-          // registered cells only — `logSavedParameters` says so loudly,
-          // because silently ignoring a knob is worse than not having one.
+          val pulseStamps = MandateSnapshot.restorePulseStamps(snap)
           logSavedParameters(snap)
-          (grid, snap.links, snap.simTime, pulseLedgers)
+          (grid, snap.links, snap.simTime, pulseStamps)
         case None =>
           logger.info(
             s"Starting fresh mandate lattice (${width}x$height cells); " +
-              s"parameters from config `$VoyConfig.FileName` " +
+              s"parameters from config `${VoyConfig.FileName}` " +
               "(core defaults if absent)."
           )
-          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, PulseLedger])
+          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, PulseStamp])
 
       persistence.geometry = expectedGeometry
-      // Seed the carrier immediately so a save landing before the first
-      // cadence publish never writes an empty payload over a valid save.
       persistence.snapshot = Some(
-        MandateSnapshot.capture(grid, links, initialSimTime, initialPulseLedgers)
+        MandateSnapshot.capture(grid, links, initialSimTime, initialPulseStamps)
       )
       persistence.markDirty()
 
@@ -209,30 +148,20 @@ object MandateRuntime:
           publishReadout,
           links = links,
           initialSimTime = initialSimTime,
-          // Defaults for cells registered later: the config, not the core
-          // (restore precedence save > config > default applies here too).
           defaultFastParam = VoyConfig.current.fastParam,
           defaultStressParam = VoyConfig.current.stressParam,
           persistSink = snap => {
             persistence.snapshot = Some(snap)
             persistence.markDirty()
-            // A publish of any kind satisfies a pending save-time flush: by
-            // mailbox order it already reflects every event before the
-            // `FlushNow` request.
             val pending = flushLatch.getAndSet(null)
             if pending != null then pending.countDown()
           },
           pulseParam = VoyConfig.current.pulseParam,
-          initialPulseLedgers = initialPulseLedgers
+          initialPulseStamps = initialPulseStamps
         )
       )
   }
 
-  /** Say, once per load, what physics the save carries and where it came
-    * from. The restore precedence is save > config > core default, so a
-    * tuned config does NOT apply to the existing cells of an existing
-    * world: reporting it is the difference between a knob and a silent lie.
-    */
   private def logSavedParameters(snap: MandateSnapshot): Unit =
     val sets = MandateSnapshot.parameterSets(snap)
     logger.info(
@@ -264,7 +193,6 @@ object MandateRuntime:
           "the config applies to newly registered cells only."
       )
 
-  /** Stop the engine and drop the published state. */
   def stop(): Unit = synchronized {
     system.foreach(_.stop())
     system = None
@@ -273,15 +201,6 @@ object MandateRuntime:
     pendingActions.clear()
   }
 
-  /** One server tick: drain pending actions back onto the game thread, then
-    * deliver the tick event. No players online -> no tick events, the
-    * simulation pauses (design draft §1.4 gate: the 3-5h first-catastrophe
-    * target is measured in play time).
-    *
-    * The nominal tick rate is polled each tick and stamped into the event
-    * (§1.4: the actor must stay a pure function of the event stream, so the
-    * rate may not be measured wall-clock-side). Changes are logged once.
-    */
   def onTick(server: MinecraftServer): Unit =
     drainActions(server)
     val tickRate = server.getTickManager.getTickRate
@@ -292,15 +211,6 @@ object MandateRuntime:
       system.foreach(_ ! EventMsg.TickArrived(TickDt, tickRate))
       MandateOverworld.onServerTick(server)
 
-  /** Make the carrier current before a world save (`BEFORE_SAVE`): ask the
-    * actor to publish now and wait, bounded, so the save writes the latest
-    * integrated tick instead of a snapshot up to one persist period old.
-    *
-    * Server-thread only. No-op when the engine is not running. The wait is
-    * bounded because a wedged actor must not hang every autosave: on timeout
-    * the save still happens, just with the previous snapshot (a warning says
-    * so). Crashes and `kill -9` are outside this path by construction.
-    */
   def flush(): Unit =
     system match
       case None => ()
@@ -317,17 +227,9 @@ object MandateRuntime:
           else logger.debug("Persistence flushed for save.")
         finally flushLatch.set(null)
 
-  /** HUD / Overworld read: world chunk -> semantic readout (`Regime`,
-    * `PhaseReading`, and `baselineCalming`); `CellReadout.zero` outside the
-    * lattice or while the engine is stopped.
-    */
   def readoutAt(chunkX: Int, chunkZ: Int): CellReadout =
     readoutSnapshot.getOrElse((chunkX, chunkZ), CellReadout.zero)
 
-  /** Actor-thread callback: republish the grid-local snapshot with world
-    * chunk coordinates. The map is immutable, so the volatile handoff is
-    * safe for render-thread readers.
-    */
   private def publishSnapshot(cells: Map[CellCoord, MandateCurrent]): Unit =
     snapshot = cells.iterator.map { case (coord, state) =>
       (coord.x + originX, coord.z + originZ) -> state
@@ -338,13 +240,9 @@ object MandateRuntime:
       (coord.x + originX, coord.z + originZ) -> readout
     }.toMap
 
-  /** Outbound actions produced by the engine; consumed on the server
-    * thread.
-    */
   private def drainActions(server: MinecraftServer): Unit =
     var action = pendingActions.poll()
     while action != null do
       logger.info(s"Mandate action: $action")
       MandateOverworld.onAction(server, action)
       action = pendingActions.poll()
-

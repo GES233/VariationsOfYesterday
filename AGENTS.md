@@ -36,7 +36,7 @@
     - `MandateEffects.scala` — 自定义状态效果（`voy:stagnation` 基础档=无属性标记 / `voy:stagnation_spike` 尖峰档 ×0.09 / `voy:pulse_saturation` 脉冲过载）
     - `MandatePersistence.scala` + `inner/veins/MandateSnapshot.scala` — 维度级持久化（`PersistentState`，整格快照含 `M`、通道、参数、边、链路与 `simTime`；状态与逐格参数来自存档，配置只作用于新注册格子、核心默认兜底）
   - `blocks/` — 菌网共生与设施方块层（`VoyBlocks` 注册表与创造栏、`GastrodiaBedBlock` 菌塘及荧丝菌材/鲜伏根/煨伏根，含农夫乐事沃土与小刀零依赖软兼容钩子）
-  - `inner/veins/` — 核心模拟（「地脉」= 山的身体，`mandate/` = 人间制度的授命）：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`、`PhaseResponse`、`PulseCoupling`、`PulseLedger`（脉冲账本三事实：庇护窗口／耐受簿记／过载锁闭）、`MandateSnapshot`
+  - `inner/veins/` — 核心模拟（「地脉」= 山的身体，`mandate/` = 人间制度的授命）：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`、`PhaseResponse`、`PulseCoupling`、`PulseLedger`（`PulseStamp` 极简庇护短窗与冷却间隔）、`MandateSnapshot`
   - `inner/actor/Actor.scala` — 单线程 actor 内核（`ActorRef` 信箱，`tell` / `!` / `stop`）
   - `inner/event/EventMsg.scala` — 入向通道与拓扑协议 `EventDTO`（通道电平/脉冲 + 格子、输运边、链路的增删；`PulseBookkeeping` 区分物理脉冲与玩法记账）
   - `inner/action/ActionMsg.scala` — 出向动作协议 `MandateActionProtocol`
@@ -44,7 +44,7 @@
   - `helpers/ODESolver.scala` — RK4 / Euler 求解器
 - `src/client/scala/moe/chestnut/awa/voy/` — 客户端入口与开发 HUD（`hud/MandateHud.scala`，`/voy hud [on|off]`）
 - `src/main/java/moe/chestnut/awa/voy/mixin/` — mixin 层（`VillagerEntityMixin` 交易/繁殖/铁傀儡、`CropBlockMixin` 作物生长，均委托 `MandateEconomy`；Java 源与 Scala 联合编译，见 `build.gradle` 的 sourceSets 配置）
-- `src/test/scala/moe/chestnut/awa/voy/` — 19 个 JUnit 5 测试规范 / 147 个用例（`GridBenchmarkSpec` 默认跳过）；`inner/veins/` 下 15 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
+- `src/test/scala/moe/chestnut/awa/voy/` — 19 个 JUnit 5 测试规范（`GridBenchmarkSpec` 默认跳过）；`inner/veins/` 下 15 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
 - `tools/voy_world/` — Elixir 关系世界模型：
   - `lib/voy/kanren/` — microKanren 内核与 DSL

@@ -5,22 +5,18 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.render.RenderTickCounter
-import moe.chestnut.awa.voy.mandate.{MandateOverworld, MandatePhenomena, MandateRuntime, MandateWording}
-import moe.chestnut.awa.voy.inner.veins.{CellReadout, PhaseLabel, PhaseReading, ReadoutParam, Regime}
+import moe.chestnut.awa.voy.mandate.{MandatePhenomena, MandateRuntime, MandateWording}
+import moe.chestnut.awa.voy.inner.veins.{CellReadout, PhaseLabel, PhaseReading, Regime}
 
 /** Development HUD overlay that visualises the mandate readout
-  * (`Regime`, `PhaseReading`, `c0` maintenance status, and continuous
+  * (`Regime`, `PhaseReading`, `MycelialHealth`, `c0` status, and continuous
   * state) of the chunks around the player using uniform-size color tiles.
-  *
-  * Toggled via the client-side `/voy hud [on|off]` command, registered only
-  * in development environments by [[moe.chestnut.awa.voy.VariationsOfYesterdayClient]].
   */
 object MandateHud:
   private val radius = 3 // 7x7 chunk matrix
   private val tileSize = 9
   private val tileGap = 2
   private val tileStep = tileSize + tileGap
-  private val readoutParam = ReadoutParam()
   private var enabled = false
 
   // Palette (ARGB)
@@ -57,12 +53,6 @@ object MandateHud:
           enabled = false
           1
         })
-      // The client-registered `voy` root CONSUMES same-root commands whose
-      // parse fails client-side (Fabric swallows them instead of forwarding),
-      // so the server-side `/voy debug` (MandateOverworld) would be
-      // unreachable without an explicit forwarder node here. The forwarder
-      // must send the command packet directly: `sendChatCommand` is itself
-      // intercepted by Fabric and would re-enter this very node forever.
       def forward(command: String): Int =
         val handler = MinecraftClient.getInstance.getNetworkHandler
         if handler != null then
@@ -100,17 +90,17 @@ object MandateHud:
     drawBoxBorder(context, x0 - 4, y0 - 4, panelWidth + 4, panelHeight + 4, ColPanelBorder)
 
     // Header & telemetry lines
-    val shelterTag = if readout.isMaintained then "脉冲庇护" else "沉滞(STAGNANT)"
+    val shelterTag = if readout.isSheltered then "庇护" else "沉滞(STAGNANT)"
     context.drawTextWithShadow(
       textRenderer,
-      f"VOY Mandate [$centerX%d, $centerZ%d]  [$shelterTag]",
+      f"VOY Mandate [$centerX%d, $centerZ%d]  [$shelterTag]  菌:${readout.mycelium.word}",
       x0,
       y0,
       tileColor(centerX, centerZ, readout)
     )
     context.drawTextWithShadow(
       textRenderer,
-      f"v=${center.dissonance}%+.2f  s=${center.stress}%.3f  q=${center.activity}%.3f  M=${readout.sustenance}%.2f  c0=${readout.baselineCalming}%.2f  p=${readout.pulseDrive}%.2f  tol=${readout.pulseTolerance}%.2f  win=${readout.pulseLedger.remainingShelterAt(readout.simTime)}%.1f",
+      f"v=${center.dissonance}%+.2f  s=${center.stress}%.3f  q=${center.activity}%.3f  M=${readout.sustenance}%.2f  c0=${readout.baselineCalming}%.2f  p=${readout.pulseDrive}%.2f  win=${readout.pulseStamp.remainingShelterAt(readout.simTime)}%.1f  cd=${readout.pulseStamp.remainingCooldownAt(readout.simTime)}%.1f",
       x0,
       y0 + lineHeight,
       0xFFE2E6EC
@@ -140,13 +130,11 @@ object MandateHud:
 
       context.fill(tx, ty, tx + tileSize, ty + tileSize, color)
 
-      // Small inner dot if the chunk carries an active c0 baseline calming source
       if cellReadout.baselineCalming >= MandatePhenomena.C0ShelterLevel then
         val dotX = tx + tileSize / 2 - 1
         val dotY = ty + tileSize / 2 - 1
         context.fill(dotX, dotY, dotX + 2, dotY + 2, ColC0Dot)
 
-      // Crisp 1px white frame around the player's current chunk
       if dx == 0 && dz == 0 then
         drawBoxBorder(context, tx - 1, ty - 1, tileSize + 2, tileSize + 2, ColPlayerBorder)
 
@@ -195,7 +183,7 @@ object MandateHud:
 
   private def tileColor(chunkX: Int, chunkZ: Int, r: CellReadout): Int =
     if !MandateRuntime.isLiveChunk(chunkX, chunkZ) then ColOutside
-    else if r.current.dissonance >= readoutParam.spikeLevel then ColSpike
+    else if r.isSpiking then ColSpike
     else
       r.regime match
         case Regime.Burnout => ColBurnout
@@ -204,7 +192,7 @@ object MandateHud:
         case Regime.Calm =>
           r.phase match
             case PhaseReading.Cycle(PhaseLabel.Excitation, _) => ColSpike
-            case _ => if r.isMaintained then ColCalmMaintained else ColCalmStagnant
+            case _ => if r.isSheltered then ColCalmMaintained else ColCalmStagnant
 
   private def drawBoxBorder(
       context: DrawContext,

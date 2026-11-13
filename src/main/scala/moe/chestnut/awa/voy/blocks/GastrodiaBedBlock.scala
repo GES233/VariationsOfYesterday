@@ -18,7 +18,7 @@ import net.minecraft.util.{ActionResult, Hand, Identifier}
 import net.minecraft.world.World
 
 import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
-import moe.chestnut.awa.voy.mandate.{MandateEconomy, MandatePhenomena, MandateRuntime, MandateWording}
+import moe.chestnut.awa.voy.mandate.{MandatePhenomena, MandateRuntime, MandateWording}
 
 /** `菌塘` (mycelial bed, design note 06 §4.3 & WO-3).
   *
@@ -250,14 +250,6 @@ final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(se
 
       case GastrodiaBedVerdict.Growing =>
         if currentCond == ConditionWithered then return
-        if !playerBoosted && MandateEconomy.suppressCropGrowth(chunkX, chunkZ) then
-          if currentCond != ConditionHealthy then
-            world.setBlockState(
-              pos,
-              state.`with`(CONDITION, Integer.valueOf(ConditionHealthy)),
-              Block.NOTIFY_LISTENERS
-            )
-          return
 
         val companion = hasCompanionTimber(world, pos)
         val shouldAdvance =

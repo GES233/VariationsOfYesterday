@@ -20,20 +20,13 @@ import moe.chestnut.awa.voy.inner.veins.{
   MandateCurrent,
   MandateParam,
   MandateSnapshot,
-  OverloadLock,
-  PulseLedger,
   PulseLink,
+  PulseStamp,
   PulseTransmitter,
-  ShelterWindow,
-  ToleranceBook,
   StressParam
 }
 
-/** NBT round-trip of the world-persistence codec: a snapshot serialized
-  * into a `NbtCompound` and read back through the registered
-  * `PersistentState.Type` deserializer must come back exactly, and a
-  * payload from an unknown schema version must be discarded whole.
-  */
+/** NBT round-trip of the world-persistence codec. */
 class MandatePersistenceSpec:
   private val geometry = (-16, -16, 32, 32)
 
@@ -51,29 +44,24 @@ class MandatePersistenceSpec:
         fastParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
         stressParam =
           StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-        pulseLedger = PulseLedger(
-          shelter = ShelterWindow(54336.0),
-          tolerance = ToleranceBook(amount = 0.25, lastPulseTime = 54300.0),
-          overload = OverloadLock.closed
+        pulseStamp = PulseStamp(
+          shelterUntil = 54336.0,
+          cooldownUntil = 54308.0
         )
       ),
       CellSnapshot(
         CellCoord(31, 31),
         MandateCurrent(0.9, 0.4, 0.0, 0.0),
-        sustenance = 0.0, // a dead patch the world must remember
+        sustenance = 0.0,
         disturbance = 0.0,
         calming = 0.0,
         baselineCalming = 0.0,
         impulse = 0.0,
         fastParam = MandateParam(alpha = 0.65, beta = 0.75, epsilon = 0.1),
         stressParam = StressParam(coupling = 1.4, stressMax = 0.9),
-        // A cell saved mid-lockout: the finite overload deadline, a closed
-        // shelter window and a tolerance sitting on the hard cap all have to
-        // survive the round trip (the first cell covers an OPEN window).
-        pulseLedger = PulseLedger(
-          shelter = ShelterWindow.closed,
-          tolerance = ToleranceBook(amount = 1.5, lastPulseTime = 54290.0),
-          overload = OverloadLock(54310.0)
+        pulseStamp = PulseStamp(
+          shelterUntil = Double.NegativeInfinity,
+          cooldownUntil = 54310.0
         )
       )
     ),
@@ -115,17 +103,6 @@ class MandatePersistenceSpec:
       "an incompatible payload must fall back to a fresh lattice"
     )
 
-  // ==== The real load path (regression: the carrier's DataFixTypes) ==== //
-  //
-  // The two tests above call the deserializer directly, which never touches
-  // `PersistentStateManager` — and that is exactly where a null
-  // `DataFixTypes` used to kill every reload: `readNbt` dereferences it
-  // unconditionally, the NPE is caught and logged, the manager returns a
-  // FRESH state, and the next save overwrites the old file.
-
-  /** No-op data fixer: our payload has no vanilla schema, so the level fixer
-    * must hand it back untouched; the test is about the manager's plumbing.
-    */
   private val noFixer: DataFixer = new DataFixer:
     def update[T](
         `type`: DSL.TypeReference,
@@ -139,7 +116,6 @@ class MandatePersistenceSpec:
     new PersistentStateManager(dir, noFixer, null)
 
   @Test def `a second manager loads the saved lattice back`(): Unit =
-    // `readNbt` stamps the game's save version into the payload.
     SharedConstants.createGameVersion()
     val dir = Files.createTempDirectory(Path.of("build"), "persist-")
 
@@ -150,7 +126,6 @@ class MandatePersistenceSpec:
     state.markDirty()
     first.save()
 
-    // A fresh manager is what a server restart looks like.
     val second = newManager(dir)
     val loaded =
       second.getOrCreate(MandatePersistence.StateType, MandatePersistence.Id)

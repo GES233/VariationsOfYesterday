@@ -439,31 +439,16 @@ object MandateOverworld:
     val chunkX = player.getChunkPos.x
     val chunkZ = player.getChunkPos.z
     val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-    // Batch 2: `isMaintained` is now a composition of named facts (fresh pulse
-    // window + viable network + no no-cycle reason + no positive spike), but
-    // this consumer still reads the composition as one verdict. Which facts the
-    // player effects should actually need (shelter? land health? exposure?) is
-    // coupling C8/C13, still 待拍板 in
-    // docs/mechanism-state-responsibilities.md §8.5.
-    val maintained = readout.isMaintained
+    val sheltered = readout.isSheltered
 
-    announceShelterChange(player, maintained)
+    announceShelterChange(player, sheltered)
 
-    if maintained then
-      // A fresh pulse window swept the stagnation off: remove it actively so
-      // the shelter relief is felt at once instead of decaying out.
+    if sheltered then
       player.removeStatusEffect(MandateEffects.StagnationEntry)
       player.removeStatusEffect(MandateEffects.StagnationSpikeEntry)
-    if !maintained then
-      val spikingOrBurnout =
-        readout.regime == Regime.Burnout ||
-          readout.current.dissonance >= ReadoutParam().spikeLevel
-
-      // The baseline tier never touches the player: stagnation's bite lands
-      // on the vanilla economy (see the mixins). Only the acute tier turns
-      // bodily — `voy:stagnation_spike` plus `SLOWNESS` and ash while the
-      // ground is spiking or burnout-saturated.
-      if spikingOrBurnout then
+    else
+      val acuteBodyStrain = MandatePhenomena.shouldApplyAcuteBodyStrain(readout)
+      if acuteBodyStrain then
         player.addStatusEffect(
           new StatusEffectInstance(
             MandateEffects.StagnationSpikeEntry,
@@ -496,9 +481,6 @@ object MandateOverworld:
           0.01
         )
 
-      // Nearby villagers visibly wear the stagnation (§3.2): the marker with
-      // ambient particles reads as the settlement going listless; the
-      // economic bite itself lives in the mixins (`MandateEconomy`).
       val box = new Box(
         player.getX - 24.0,
         player.getY - 12.0,
@@ -518,7 +500,7 @@ object MandateOverworld:
             false
           )
         )
-        if spikingOrBurnout then
+        if acuteBodyStrain then
           world.spawnParticles(
             ParticleTypes.ASH,
             villager.getX,

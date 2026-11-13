@@ -6,15 +6,10 @@ import com.google.gson.{GsonBuilder, JsonObject, JsonParser}
 import net.fabricmc.loader.api.FabricLoader
 import org.slf4j.{Logger, LoggerFactory}
 
-import moe.chestnut.awa.voy.inner.veins.{MandateAgent, MandateParam, PulseToleranceParam, StressParam}
+import moe.chestnut.awa.voy.inner.veins.{MandateAgent, MandateParam, PulseParam, StressParam}
 
-/** Geometry and tuning of the prototype lattice (formerly hardcoded in
-  * `MandateRuntime`). Chunk-grained: the lattice spans chunks
-  * `[originX, originX + width)` x `[originZ, originZ + height)`.
-  *
-  * Changing the geometry changes the persistence fingerprint: a saved
-  * lattice captured under different geometry is discarded loudly on load
-  * (see `MandateRuntime.start`).
+/** Geometry and tuning of the prototype lattice. Chunk-grained: the lattice
+  * spans chunks `[originX, originX + width)` x `[originZ, originZ + height)`.
   */
 final case class LatticeConfig(
     originX: Int = -16,
@@ -33,20 +28,8 @@ final case class LatticeConfig(
 
 /** External runtime configuration (`config/variations-of-yesterday.json`).
   *
-  * Discipline: these values are injected at the WIRING layer
-  * (`MandateRuntime`), never at the simulation core. The defaults here are
-  * exactly the previously hardcoded gameplay values, so a missing config
-  * file reproduces the old behaviour bit for bit — and the frozen
-  * contract slice, which instantiates `StressParam()` / `MandateParam`
-  * defaults directly, is unaffected by anything in this file. That is
-  * what makes the gamma time-scale calibration (design draft 01 §7.3) a
-  * runtime tuning knob instead of a contract regeneration.
-  *
-  * Restore semantics on world load (save > config > core default): the
-  * save wins for every value it carries, including per-cell parameters;
-  * the config applies to a fresh world and to newly registered cells,
-  * with the core defaults as the last resort. Tuning a knob therefore
-  * does NOT retroactively change the physics of an existing world's cells.
+  * Injected at the wiring layer (`MandateRuntime`), never at the simulation
+  * core. Restore precedence on world load: save > config > core default.
   */
 final case class VoyConfig(
     tickDt: Double = 0.05,
@@ -54,35 +37,23 @@ final case class VoyConfig(
     fastParam: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
     stressParam: StressParam =
       StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-    pulseParam: PulseToleranceParam = PulseToleranceParam()
+    pulseParam: PulseParam = PulseParam()
 )
 
 object VoyConfig:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  /** Config file name inside the Fabric config directory. */
   val FileName = "variations-of-yesterday.json"
 
-  /** The active configuration; replaced atomically by [[reload]]. */
   @volatile private var currentV: VoyConfig = VoyConfig()
   def current: VoyConfig = currentV
 
-  /** Load (or create) the config file in the Fabric config directory and
-    * make it active. Called once during mod init, before the engine
-    * starts; mid-run reload is not supported (lattice geometry is read
-    * live by the game thread).
-    */
   def reload(): VoyConfig =
     val path = FabricLoader.getInstance().getConfigDir.resolve(FileName)
     currentV = loadFrom(path)
     logger.info(s"Mandate config: $currentV")
     currentV
 
-  /** Load from an explicit path: defaults for a missing or unreadable
-    * file (a missing file is additionally written out with every default
-    * value, so all knobs are discoverable), per-field overrides from a
-    * present one. Kept Fabric-free so it round-trips in unit tests.
-    */
   def loadFrom(path: Path): VoyConfig =
     if !Files.exists(path) then
       val defaults = VoyConfig()
@@ -106,8 +77,6 @@ object VoyConfig:
       case e: Exception =>
         logger.warn(s"Unreadable config at $path ($e); using defaults.")
         VoyConfig()
-
-  // ==== JSON codec (manual, so every field documents itself in the file) ====
 
   private def dbl(obj: JsonObject, key: String, fallback: Double): Double =
     if obj != null && obj.has(key) && obj.get(key).isJsonPrimitive then
@@ -149,8 +118,6 @@ object VoyConfig:
     )
 
   private def stressFrom(o: JsonObject): StressParam =
-    // Fallbacks must be the *gameplay* defaults (M acid-burn enabled), not the
-    // dormant core `StressParam()` used by the frozen contract slice.
     val d = VoyConfig().stressParam
     StressParam(
       gamma = dbl(o, "gamma", d.gamma),
@@ -169,20 +136,12 @@ object VoyConfig:
       sustenanceFloor = dbl(o, "sustenanceFloor", d.sustenanceFloor)
     )
 
-  private def pulseFrom(o: JsonObject): PulseToleranceParam =
-    val d = PulseToleranceParam()
-    PulseToleranceParam(
-      suppressionWindow = dbl(o, "suppressionWindow", d.suppressionWindow),
-      minSafeInterval = dbl(o, "minSafeInterval", d.minSafeInterval),
-      toleranceDecayTau = dbl(o, "toleranceDecayTau", d.toleranceDecayTau),
-      normalToleranceStep = dbl(o, "normalToleranceStep", d.normalToleranceStep),
-      overpulseToleranceStep = dbl(o, "overpulseToleranceStep", d.overpulseToleranceStep),
-      invertTolerance = dbl(o, "invertTolerance", d.invertTolerance),
-      maxTolerance = dbl(o, "maxTolerance", d.maxTolerance),
-      overloadBurnoutDuration = dbl(o, "overloadBurnoutDuration", d.overloadBurnoutDuration),
-      overloadPenaltyTicks = int(o, "overloadPenaltyTicks", d.overloadPenaltyTicks),
-      singlePulsePeak = dbl(o, "singlePulsePeak", d.singlePulsePeak),
-      pulseBurnoutGain = dbl(o, "pulseBurnoutGain", d.pulseBurnoutGain)
+  private def pulseFrom(o: JsonObject): PulseParam =
+    val d = PulseParam()
+    PulseParam(
+      shelterWindow = dbl(o, "shelterWindow", d.shelterWindow),
+      minInterval = dbl(o, "minInterval", d.minInterval),
+      overloadPenaltyTicks = int(o, "overloadPenaltyTicks", d.overloadPenaltyTicks)
     )
 
   private def defaultsJson(cfg: VoyConfig): String =
@@ -230,17 +189,9 @@ object VoyConfig:
 
     val pp = cfg.pulseParam
     val p = JsonObject()
-    p.addProperty("suppressionWindow", pp.suppressionWindow)
-    p.addProperty("minSafeInterval", pp.minSafeInterval)
-    p.addProperty("toleranceDecayTau", pp.toleranceDecayTau)
-    p.addProperty("normalToleranceStep", pp.normalToleranceStep)
-    p.addProperty("overpulseToleranceStep", pp.overpulseToleranceStep)
-    p.addProperty("invertTolerance", pp.invertTolerance)
-    p.addProperty("maxTolerance", pp.maxTolerance)
-    p.addProperty("overloadBurnoutDuration", pp.overloadBurnoutDuration)
+    p.addProperty("shelterWindow", pp.shelterWindow)
+    p.addProperty("minInterval", pp.minInterval)
     p.addProperty("overloadPenaltyTicks", pp.overloadPenaltyTicks)
-    p.addProperty("singlePulsePeak", pp.singlePulsePeak)
-    p.addProperty("pulseBurnoutGain", pp.pulseBurnoutGain)
     root.add("pulseParam", p)
 
     GsonBuilder().setPrettyPrinting().create().toJson(root)

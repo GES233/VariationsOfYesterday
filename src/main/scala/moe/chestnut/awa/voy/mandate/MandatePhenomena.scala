@@ -3,24 +3,16 @@ package moe.chestnut.awa.voy.mandate
 import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
 import moe.chestnut.awa.voy.inner.veins.*
 
-/** Pure sensory phenomenon classification, economic pressure tiers, and
-  * mycelial re-inoculation rules (design note 06 §1 constraint 5, §2.1, §3,
-  * §7.1, §7.3, §7.4; design draft §3.2).
+/** Orthogonal consumer projections over [[CellReadout]] (no Minecraft classes,
+  * no mutation, no cross-consumer coupling):
   *
-  * Every function here is a pure projection of [[CellReadout]] (no Minecraft
-  * classes, no mutation) so the sensory bindings, economy tiers and narrative
-  * re-inoculation gates can be unit-tested deterministically.
+  *   1. **Settlement economy** ([[classifyEconomy]])
+  *   2. **Player bodily exposure** ([[shouldApplyAcuteBodyStrain]])
+  *   3. **Sensory phenomena** ([[classifyPhenomena]], [[classifySeepTier]])
+  *   4. **Mycelial symbiosis & re-inoculation** ([[evaluateGastrodiaBed]],
+  *      [[canRefurbishGastrodiaBed]], [[evaluateReInoculation]])
   */
 object MandatePhenomena:
-  /** Economic pressure tier of a chunk (design draft §3.2, 2026-11-09 revision:
-    * stagnation's primary target returns to the vanilla economy per the
-    * original §7.8 decision — trade, breeding, golem spawn, crop growth —
-    * while the player's body only suffers during spikes).
-    *
-    * `*KeepChance` is the probability that one vanilla attempt proceeds; a
-    * stagnated chunk rolls against it per attempt, so the degradation reads
-    * as sluggishness rather than a hard stop.
-    */
   final case class EconomyProfile(
       tradePriceBonus: Int,
       breedingKeepChance: Double,
@@ -28,105 +20,34 @@ object MandatePhenomena:
       cropKeepChance: Double
   )
 
-  /** Sheltered chunk: vanilla economy runs untouched. */
   val EconomyMaintained: EconomyProfile = EconomyProfile(0, 1.0, 1.0, 1.0)
-
-  /** Stagnant chunk (no fresh pulse window): the economy sags at half
-    * strength. Chunks outside the live lattice land here as well — the
-    * "safe but barren" outskirts are barren by mechanism, not by rhetoric
-    * (draft-01 §7.8).
-    */
   val EconomyStagnant: EconomyProfile = EconomyProfile(2, 0.5, 0.5, 0.5)
-
-  /** Spiking or saturated-burnout chunk: the acute tier (§3.2). Transient for
-    * spikes, persistent for `Regime.Burnout`.
-    */
   val EconomySpiking: EconomyProfile = EconomyProfile(5, 0.15, 0.25, 0.25)
 
-  /** Project a cell's semantic readout into its economic pressure tier.
-    *
-    * Batch 2 names the two clauses: `isMaintained` (the composed shelter fact)
-    * and [[CellReadout.hasActivePositiveSpike]]. The tier VALUES are unchanged;
-    * whether the economy should stop hanging on the shelter window is coupling
-    * C9 (docs/mechanism-state-responsibilities.md §8.5, 待拍板).
-    */
-  def classifyEconomy(
-      readout: CellReadout,
-      p: ReadoutParam = ReadoutParam()
-  ): EconomyProfile =
-    if readout.isMaintained then EconomyMaintained
-    else if readout.regime == Regime.Burnout ||
-      readout.hasActivePositiveSpike(p)
-    then EconomySpiking
+  /** 1. Settlement economy tier: sheltered vs stagnant vs acute spiking/burnout. */
+  def classifyEconomy(readout: CellReadout): EconomyProfile =
+    if readout.isSheltered then EconomyMaintained
+    else if readout.regime == Regime.Burnout || readout.isSpiking then EconomySpiking
     else EconomyStagnant
 
-  /** Narrative seed sustenance level (`M`) restored when re-inoculating a
-    * depleted cell (matches `MandateSustenanceSpec` logistic regrowth seed).
+  /** 2. Player bodily exposure: only acute spiking or saturated burnout on
+    * unsheltered ground affects the player's body.
     */
+  def shouldApplyAcuteBodyStrain(readout: CellReadout): Boolean =
+    !readout.isSheltered && (readout.regime == Regime.Burnout || readout.isSpiking)
+
   val ReInoculationSeed: Double = 0.05
-
-  /** Richer seed sustenance level (`M`) restored when re-inoculating soil with
-    * prepared `菌材` (Inoculated Timber): skips the slowest initial lag of
-    * logistic regrowth while staying strictly below [[ReInoculationMaxSustenance]].
-    */
   val RichReInoculationSeed: Double = 0.12
-
-  /** Minimum sustenance (`M`) for an intact mycelial network ("完好") capable
-    * of feeding symbiotic Gastrodia tubers at full vigour.
-    */
-  val GastrodiaHealthySustenance: Double = 0.60
-
-  /** Above this sustenance level, living mycelial threads remain viable and
-    * will self-regrow logistically once stress drops below the burn threshold.
-    */
+  val GastrodiaHealthySustenance: Double = Readout.IntactSustenance
   val ReInoculationMaxSustenance: Double = 0.20
-
-  /** Soil stress threshold (`s_T = 0.6` by default) above which acid burn kills
-    * freshly introduced fungal inoculum (design note 06 §2.1 & §7.1). Read from
-    * the cell's own parameter set at the call site so a tuned config applies.
-    */
-  private def toxicityThreshold(readout: CellReadout): Double =
-    readout.stressParam.sustenanceBurnThreshold
-
-  /** Minimum `c0` (baseline calming) that still shelters a cell's sensory
-    * signatures (design note 08 §5: glow and precursor spores bind to the slow
-    * `c0` anchor, not to the pulse window).
-    */
   val C0ShelterLevel: Double = 0.01
 
-  /** Minimum sustenance required for healthy night-time mycelial bioluminescence
-    * (design note 06 §3 & §7.3).
-    */
-  val GlowMinSustenance: Double = 0.50
-
-  /** 3-tier iron-hydroxide ("yellow boy") water seep signature (design note 06 §3).
-    *
-    * Resolutions are strictly qualitative (3 tiers + None) so water colour never
-    * leaks a raw continuous float to the player (§1 constraint 5).
-    */
   enum YellowSeepTier(val level: Int, val particleCount: Int):
     case None extends YellowSeepTier(0, 0)
     case Light extends YellowSeepTier(1, 2)
     case Moderate extends YellowSeepTier(2, 5)
     case Heavy extends YellowSeepTier(3, 10)
 
-  /** Combined sensory phenomenon signature of a chunk at one instant
-    * (design note 06 §3).
-    *
-    * @param silentBlight
-    *   `true` iff the cell is in deep incapacitation / depolarization block
-    *   (`CellReadout.isBurnoutPhase` or
-    *   `sustenance <= 0.0`). Explicitly `false` for an oscillating
-    *   `Regime.Burnout` (`s >= 0.95`) cell (note 06 §3).
-    * @param seepTier
-    *   3-tier yellow-ochre water precipitate driven by active spike excursion,
-    *   precursor slow stress `s`, or post-spike acid residue `q`.
-    * @param mycelialGlow
-    *   Sheltered night-time bioluminescence in a healthy `Calm` chunk.
-    * @param precursorSpore
-    *   Critical slowing-down spore drift while `c0` still shelters a
-    *   `Strained` or `Oscillating` cell.
-    */
   final case class PhenomenonProfile(
       silentBlight: Boolean,
       seepTier: YellowSeepTier,
@@ -134,36 +55,12 @@ object MandatePhenomena:
       precursorSpore: Boolean
   )
 
-  /** Outcome of a player attempting to re-inoculate the mycelial network (`M`)
-    * in a chunk by applying fungal inoculum to soil (design note 06 §2.1 & §7.1).
-    */
   enum ReInoculationOutcome(val seedsSustenance: Boolean, val targetLevel: Double):
-    /** Mycelium is depleted (`M < 0.20`) and soil stress is below the acid burn
-      * threshold (`s < 0.60`): seeds `M = ReInoculationSeed` (`0.05`).
-      */
     case Seeded extends ReInoculationOutcome(true, ReInoculationSeed)
-
-    /** Mycelium is depleted (`M < 0.20`), but soil stress exceeds the acid burn
-      * threshold (`s >= 0.60`): acid kills the inoculum; player must relieve
-      * stress first.
-      */
     case AcidTooToxic extends ReInoculationOutcome(false, 0.0)
-
-    /** Mycelium still has viable living threads (`M >= 0.20`) and does not need
-      * external re-inoculation.
-      */
     case AlreadyViable extends ReInoculationOutcome(false, 0.0)
 
-  /** Classify the 3-tier iron-yellow water seep from `CellReadout`
-    * (design note 06 §3):
-    *
-    *  - Active spike excursion (`|v| >= spikeLevel`): `Heavy`;
-    *  - Else driven by precursor stress `s` and post-spike acid tracer `q`:
-    *    - `q >= 0.30` or `s >= 0.75` -> `Heavy`
-    *    - `q >= 0.10` or `s >= 0.45` (`Strained`) -> `Moderate`
-    *    - `q >= 0.02` or `s >= 0.25` -> `Light`
-    *    - Otherwise -> `None`.
-    */
+  /** 3a. 3-tier iron-yellow water seep signature. */
   def classifySeepTier(
       readout: CellReadout,
       p: ReadoutParam = ReadoutParam()
@@ -175,69 +72,27 @@ object MandatePhenomena:
     else if cur.activity >= 0.02 || cur.stress >= 0.25 then YellowSeepTier.Light
     else YellowSeepTier.None
 
-  /** Deep-incapacitation fact behind the silent signature: either no-cycle
-    * reason (`CellReadout.isBurnoutPhase`, the union of the readout rule and
-    * the ledger lockout) or a network that is truly gone (`M <= 0`, the
-    * absorbing state).
-    *
-    * Boundary: this `M` guard is `<= 0`, deliberately STRICTER than the Allee
-    * floor used by maintenance (`M >= floor`) and by the bed rule (`M < floor`).
-    * The signature marks the absorbing state, not merely a depleted patch.
-    * Still pending (C2): the signature covers BOTH no-cycle reasons, while the
-    * bed rule (batch 4) now only dies with the network. The mismatch is
-    * deliberate: the bed death cause is settled by the user's batch-4 proposal,
-    * the signature decision is not.
+  /** 3b. Silent blight binds strictly to genuine ecological incapacitation
+    * (`mycelium.isDead` or `isSlowOffsetBelowKnee`), never to short pulse
+    * cooldowns or oscillating `Regime.Burnout`.
     */
   def hasSilentBlight(readout: CellReadout): Boolean =
-    readout.isBurnoutPhase || readout.isMyceliumAbsent
+    readout.mycelium.isDead || readout.isSlowOffsetBelowKnee
 
-  /** Deep-dead fact behind the bed verdict: the mycelial network is below the
-    * Allee floor (with the `1e-9` guard the bed rule has always used). This is
-    * now the ONLY death cause for a bed (batch 4, assistant-proposed direction 1
-    * adopted by the user, pending user acceptance; 2026-11-12):
-    *
-    *  - a lockout and the readout-threshold reason only make the bed STALL —
-    *    neither is evidence that the medium itself was killed, so neither may
-    *    latch `condition = 2`;
-    *  - long-term environmental degradation reaches the bed through the actual
-    *    damage path (`p -> v -> q -> s -> M`), not through the phase label;
-    *  - a dead network still withers regardless of lockout / phase: death
-    *    outranks every rule.
-    *
-    * This removes the batch-3 artefact where a lockout temporarily "protected"
-    * the bed from the threshold reason: the threshold reason no longer kills at
-    * all, so there is nothing to protect against.
-    */
-  def isGastrodiaBedDeepDead(readout: CellReadout): Boolean =
-    readout.sustenance < Math.max(readout.stressParam.sustenanceFloor, 1e-9)
-
-  /** Project a cell's semantic readout and time-of-day into its sensory
-    * phenomenon profile (design note 06 §3).
-    *
-    * Batch-1 rule (unchanged outcome): `silentBlight` fires for BOTH
-    * no-cycle reasons (`CellReadout.isBurnoutPhase`) or a dead network, never
-    * for `Regime.Burnout`. In particular a *short* acute overload lockout
-    * currently reads as silent blight as well; whether it should is a pending
-    * gameplay decision (docs/mechanism-state-responsibilities.md 待拍板), and
-    * the split reasons make that decision a one-line change instead of a
-    * label archaeology.
-    */
+  /** 3c. Combined sensory phenomenon profile for a chunk. */
   def classifyPhenomena(
       readout: CellReadout,
       isNight: Boolean = false
   ): PhenomenonProfile =
     val silentBlight = hasSilentBlight(readout)
     val seepTier = classifySeepTier(readout)
-    // Glow and precursor spores bind to the slow `c0` anchor (a bell's lasting
-    // duty), NOT to the pulse shelter window: the shelter window governs the
-    // player's `沉滞`, while these signatures describe the land's own health.
     val c0Sheltered = readout.baselineCalming >= C0ShelterLevel
     val mycelialGlow =
       !silentBlight &&
         isNight &&
         readout.regime == Regime.Calm &&
         c0Sheltered &&
-        readout.sustenance >= GlowMinSustenance
+        readout.mycelium.isIntact
     val precursorSpore =
       !silentBlight &&
         c0Sheltered &&
@@ -249,89 +104,42 @@ object MandatePhenomena:
       precursorSpore = precursorSpore
     )
 
-  /** Qualitative 3-tier word for mycelial network integrity (`M`), obeying
-    * the readout discipline (design note 06 §1 constraint 5: never raw floats).
-    */
+  /** Qualitative 3-tier word for mycelial network integrity (`M`). */
   def sustenanceWord(
       sustenance: Double,
       floor: Double = StressParam().sustenanceFloor
   ): String =
-    if sustenance < floor then "枯绝"
-    else if sustenance < 0.60 then "受损"
-    else "完好"
+    Readout.mycelialHealth(sustenance, floor).word
 
-  /** Pure decision rule for mycelial re-inoculation (`SetSustenance` wiring,
-    * design note 06 §2.1 & §7.1).
-    */
+  /** 4a. Pure decision rule for mycelial re-inoculation into soil. */
   def evaluateReInoculation(readout: CellReadout): ReInoculationOutcome =
     if readout.sustenance >= ReInoculationMaxSustenance then
       ReInoculationOutcome.AlreadyViable
-    else if readout.current.stress >= toxicityThreshold(readout) then
+    else if readout.isToxicSoil then
       ReInoculationOutcome.AcidTooToxic
     else
       ReInoculationOutcome.Seeded
 
-  /** Pure symbiotic growth rule for a `菌塘` (mycelial bed, design note 06
-    * §4.3 & WO-3):
-    *
-    *  - Dead network ([[isGastrodiaBedDeepDead]]: `M` below the Allee floor) ->
-    *    [[GastrodiaBedVerdict.Withered]]; the block latches `condition = 2`
-    *    until refurbished;
-    *  - Else ANY no-cycle reason (`CellReadout.isBurnoutPhase`: an active acute
-    *    lockout OR the readout-threshold reason below the knee) ->
-    *    [[GastrodiaBedVerdict.Stalled]]: the bed PAUSES growth and re-evaluates
-    *    once the condition clears (batch 4, assistant-proposed direction 1,
-    *    pending user acceptance);
-    *  - Else `s >= 0.45` (`Strained`+) or damaged mycelial network
-    *    (`M < 0.60`) -> [[GastrodiaBedVerdict.Stalled]];
-    *  - Else (`s < 0.45` and `M >= 0.60`) -> [[GastrodiaBedVerdict.Growing]].
-    *
-    * The readout rule and the mechanism rule are both "the land is not in a
-    * working phase right now", which can slow a bed but is not evidence that
-    * the medium died. Only `M` carries the death cause. The silent signature
-    * does NOT follow this rule yet (C2, still pending).
+  /** 4b. Symbiotic growth verdict for a `菌塘` (mycelial bed):
+    *   - `Withered`: dead mycelial network (`mycelium.isDead`);
+    *   - `Stalled`: `isSlowOffsetBelowKnee`, non-`Calm` stress (`s >= 0.45`),
+    *     or damaged mycelial network (`!mycelium.isIntact`);
+    *   - `Growing`: `Calm` stress (`s < 0.45`) and `Intact` mycelial network (`M >= 0.60`).
     */
-  def evaluateGastrodiaBed(
-      readout: CellReadout,
-      p: ReadoutParam = ReadoutParam()
-  ): GastrodiaBedVerdict =
-    if isGastrodiaBedDeepDead(readout) then GastrodiaBedVerdict.Withered
-    else if readout.isBurnoutPhase then GastrodiaBedVerdict.Stalled
-    else if readout.current.stress >= p.strained ||
-      readout.sustenance < GastrodiaHealthySustenance
+  def evaluateGastrodiaBed(readout: CellReadout): GastrodiaBedVerdict =
+    if readout.mycelium.isDead then GastrodiaBedVerdict.Withered
+    else if readout.isSlowOffsetBelowKnee ||
+      readout.current.stress >= ReadoutParam().strained ||
+      !readout.mycelium.isIntact
     then GastrodiaBedVerdict.Stalled
     else GastrodiaBedVerdict.Growing
 
-  /** Whether a withered `菌塘` can be refurbished with fresh `荧丝菌材`
-    * (Inoculated Timber): requires a live-enough network (`M` at or above the
-    * Allee floor) and soil stress below the acid toxicity threshold.
-    *
-    * Batch 4 (assistant-proposed threshold 2, adopted by the user, pending
-    * acceptance; 2026-11-12): the gate deliberately
-    * does NOT look at the phase label or at a lockout. Death and refurbishing
-    * are different questions, and no mechanism currently shows that "a short
-    * lockout / an unreadable phase" prevents the inoculum from taking. Gating
-    * on `isBurnoutPhase` here would re-introduce the very coupling the bed
-    * verdict just dropped. The numeric protection (`s < toxicity`) stays: acid
-    * still kills fresh inoculum, which is a real mechanism.
-    *
-    * After refurbishing, the block re-evaluates the live conditions, so the bed
-    * becomes `Growing` or `Stalled` (taking hold does not guarantee growth).
+  /** 4c. Whether a withered `菌塘` can be refurbished with fresh inoculum:
+    * requires a viable mycelial network (`!mycelium.isDead`) and sub-toxic soil.
     */
-  def canRefurbishGastrodiaBed(
-      readout: CellReadout,
-      p: ReadoutParam = ReadoutParam()
-  ): Boolean =
-    readout.sustenance >= Math.max(readout.stressParam.sustenanceFloor, 1e-9) &&
-      readout.current.stress < toxicityThreshold(readout)
+  def canRefurbishGastrodiaBed(readout: CellReadout): Boolean =
+    readout.mycelium.isViable && !readout.isToxicSoil
 
-  /** Whether a stripped log in the world can be colonized in-situ into `菌材`
-    * (Inoculated Timber) by applying fungal inoculum: requires a healthy,
-    * calm mycelial network ([[GastrodiaBedVerdict.Growing]]).
-    */
-  def canInoculateTimberInField(
-      readout: CellReadout,
-      p: ReadoutParam = ReadoutParam()
-  ): Boolean =
-    evaluateGastrodiaBed(readout, p) == GastrodiaBedVerdict.Growing
-
+  /** 4d. Whether a stripped log in the world can be colonized in-situ into `菌材`. */
+  def canInoculateTimberInField(readout: CellReadout): Boolean =
+    evaluateGastrodiaBed(readout) == GastrodiaBedVerdict.Growing

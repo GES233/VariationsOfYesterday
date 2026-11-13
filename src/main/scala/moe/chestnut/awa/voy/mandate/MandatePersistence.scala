@@ -4,6 +4,7 @@ import net.minecraft.datafixer.DataFixTypes
 import net.minecraft.nbt.{NbtCompound, NbtElement, NbtList}
 import net.minecraft.registry.RegistryWrapper
 import net.minecraft.world.PersistentState
+import org.slf4j.{Logger, LoggerFactory}
 
 import moe.chestnut.awa.voy.inner.veins.{
   CellCoord,
@@ -12,42 +13,17 @@ import moe.chestnut.awa.voy.inner.veins.{
   MandateCurrent,
   MandateParam,
   MandateSnapshot,
-  OverloadLock,
-  PulseLedger,
   PulseLink,
+  PulseStamp,
   PulseTransmitter,
-  ShelterWindow,
-  StressParam,
-  ToleranceBook
+  StressParam
 }
 
 /** Dimension-scoped carrier for the mandate lattice snapshot, saved with
-  * the world via `PersistentStateManager`. The manager writes dirty states on
-  * world save (autosave and shutdown), so the flow is:
-  *
-  *  - the actor publishes a fresh `MandateSnapshot` on a slow cadence and
-  *    marks this state dirty;
-  *  - at save time `writeNbt` serializes the latest published snapshot;
-  *  - on engine start the runtime restores lattice, links and `simTime`
-  *    from `snapshot` — but only if `geometry` matches the runtime's
-  *    lattice constants, so a prototype-geometry change discards a stale
-  *    save loudly instead of silently misplacing cells.
-  *
-  * `schemaVersion` is the format version of the NBT payload itself.
+  * the world via `PersistentStateManager`.
   */
 final class MandatePersistence extends PersistentState:
-  /** `(originX, originZ, width, height)` of the lattice the snapshot was
-    * captured under; loaded from NBT or set by the runtime before the
-    * first save. Server-thread only (engine start and save), unlike
-    * `snapshot`.
-    */
   var geometry: (Int, Int, Int, Int) = (0, 0, 0, 0)
-
-  /** Latest published snapshot; `None` before the engine first reports.
-    * Written by the ENGINE ACTOR thread (`persistSink`) and read by the
-    * server thread at save time, hence `@volatile`: the reference swap is
-    * the entire handoff (the snapshot itself is immutable).
-    */
   @volatile var snapshot: Option[MandateSnapshot] = None
 
   override def writeNbt(
@@ -56,34 +32,24 @@ final class MandatePersistence extends PersistentState:
   ): NbtCompound =
     snapshot.foreach { snap =>
       MandatePersistence.writeSnapshot(nbt, geometry, snap)
+      MandatePersistence.logger.info(
+        f"Saved mandate lattice (${snap.cells.size}%d cells, ${snap.links.size}%d links, simTime = ${snap.simTime}%.2f)."
+      )
     }
     nbt
 
 object MandatePersistence:
-  /** Saved-data id: `data/voy_mandate.dat` inside the dimension folder. */
+  private val logger: Logger = LoggerFactory.getLogger(getClass)
   val Id = "voy_mandate"
-
-  /** Format version of the NBT payload; bump on incompatible changes. */
-  val SchemaVersion = 1
+  val SchemaVersion = 2
 
   val StateType: PersistentState.Type[MandatePersistence] =
     new PersistentState.Type[MandatePersistence](
       () => new MandatePersistence,
       (nbt, _) => fromNbt(nbt),
-      // This slot is the data-fix CARRIER, not a schema claim about our
-      // payload: the compound is ours, no vanilla fixer knows its keys, so
-      // the level fixer leaves it untouched. It must NOT be null —
-      // `PersistentStateManager.readNbt` dereferences it unconditionally on
-      // load, and a null here makes every reload throw (caught, logged as
-      // "Error loading saved data"), silently reset the lattice and then
-      // overwrite the stale save. `MandatePersistenceSpec` round-trips
-      // through the real manager to keep this honest.
       DataFixTypes.LEVEL
     )
 
-  // ==== NBT codec (kept pure so it round-trips in unit tests) ====
-
-  /** Serialize a snapshot under a fresh root compound. */
   def toNbt(
       geometry: (Int, Int, Int, Int),
       snapshot: MandateSnapshot
@@ -134,14 +100,8 @@ object MandatePersistence:
       c.putDouble("sustenanceBurn", sp.sustenanceBurn)
       c.putDouble("sustenanceBurnThreshold", sp.sustenanceBurnThreshold)
       c.putDouble("sustenanceFloor", sp.sustenanceFloor)
-      // Pulse ledger: the three mechanisms keep their own saved fact. The
-      // NBT key names are the ones the former fused state used — the payload
-      // shape did not change, only which owner each number belongs to.
-      val pl = cs.pulseLedger
-      c.putDouble("lastPulseTime", pl.tolerance.lastPulseTime)
-      c.putDouble("suppressedUntil", pl.shelter.until)
-      c.putDouble("overloadUntil", pl.overload.until)
-      c.putDouble("pulseTolerance", pl.tolerance.amount)
+      c.putDouble("shelterUntil", cs.pulseStamp.shelterUntil)
+      c.putDouble("cooldownUntil", cs.pulseStamp.cooldownUntil)
       cells.add(c)
     }
     nbt.put("cells", cells)
@@ -177,9 +137,12 @@ object MandatePersistence:
   private def fromNbt(nbt: NbtCompound): MandatePersistence =
     val state = MandatePersistence()
     if nbt.isEmpty then return state
-    // A payload from an incompatible format version is discarded: the
-    // runtime falls back to a fresh lattice, never to a half-parsed one.
-    if nbt.getInt("schemaVersion") != SchemaVersion then return state
+    val savedSchema = nbt.getInt("schemaVersion")
+    if savedSchema != SchemaVersion then
+      logger.warn(
+        s"Discarding saved mandate lattice with schemaVersion=$savedSchema (expected $SchemaVersion)."
+      )
+      return state
     state.geometry =
       (nbt.getInt("originX"), nbt.getInt("originZ"), nbt.getInt("width"), nbt.getInt("height"))
 
@@ -219,26 +182,13 @@ object MandatePersistence:
             sustenanceBurnThreshold = c.getDouble("sustenanceBurnThreshold"),
             sustenanceFloor = c.getDouble("sustenanceFloor")
           ),
-          // Absent keys mean "never pulsed on this cell": the ledger reads as
-          // inert (no window, no load, no lockout). No migration path is
-          // written here — this project has no old saves to carry over.
-          pulseLedger = PulseLedger(
-            shelter = ShelterWindow(
-              if c.contains("suppressedUntil") then c.getDouble("suppressedUntil")
+          pulseStamp = PulseStamp(
+            shelterUntil =
+              if c.contains("shelterUntil") then c.getDouble("shelterUntil")
+              else Double.NegativeInfinity,
+            cooldownUntil =
+              if c.contains("cooldownUntil") then c.getDouble("cooldownUntil")
               else Double.NegativeInfinity
-            ),
-            tolerance = ToleranceBook(
-              amount =
-                if c.contains("pulseTolerance") then c.getDouble("pulseTolerance")
-                else 0.0,
-              lastPulseTime =
-                if c.contains("lastPulseTime") then c.getDouble("lastPulseTime")
-                else Double.NegativeInfinity
-            ),
-            overload = OverloadLock(
-              if c.contains("overloadUntil") then c.getDouble("overloadUntil")
-              else Double.NegativeInfinity
-            )
           )
         )
     }.toSeq

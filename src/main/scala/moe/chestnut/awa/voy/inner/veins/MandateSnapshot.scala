@@ -4,35 +4,6 @@ package moe.chestnut.awa.voy.inner.veins
   * memory of the land, as pure data (no Minecraft types), so the engine
   * core stays replayable and unit-testable while the NBT codec lives on
   * the game side.
-  *
-  * What is captured (and why):
-  *
-  *  - per-cell fast/slow state (`current`) and `sustenance` M — the core
-  *    memory: `M = 0` is absorbing, so a dead patch must still be dead
-  *    after a restart (design note 06 §7.1: the land remembers);
-  *  - channel levels (`disturbance`, `calming`, `baselineCalming`,
-  *    `impulse`) — sustained game-side settings, not derivable from the
-  *    dynamics;
-  *  - per-cell parameters (`fastParam`, `stressParam`) — `RegisterCell`
-  *    allows per-cell parameter sets, so the snapshot may not assume the
-  *    global defaults;
-  *  - transport `edges` and crystal `links` — topology is data-driven via
-  *    topology events, and links are player-built wiring;
-  *  - `simTime` — the actor's integration clock, so pulse delays and
-  *    phase readouts continue across a restart;
-  *  - per-cell pulse ledger (`PulseLedger`: shelter window, tolerance book,
-  *    acute overload lockout) — the discrete pulse mechanisms are closed-form
-  *    on `simTime`, so they must be saved or a restart would re-open a
-  *    shelter window, forget accumulated tolerance, or lift a lockout early
-  *    (design note 08 §2.4). One ledger per cell, four doubles on the wire.
-  *
-  * What is deliberately NOT captured (transient, self-reconstructing):
-  * the alpha-synapse kernel state (decays within ~5 s), the flux scratch
-  * fields (recomputed every step), spike/phase detectors and pending
-  * link pulses (all re-derive within one fast cycle), and the regime
-  * bookkeeping (a restored cell adopts its current regime as baseline,
-  * the same semantics as a cell registered after startup — no spurious
-  * transitions).
   */
 final case class CellSnapshot(
     coord: CellCoord,
@@ -44,7 +15,7 @@ final case class CellSnapshot(
     impulse: Double,
     fastParam: MandateParam,
     stressParam: StressParam,
-    pulseLedger: PulseLedger = PulseLedger.zero
+    pulseStamp: PulseStamp = PulseStamp.zero
 )
 
 /** The full snapshot: cells, edges, links, and the integration clock. */
@@ -61,7 +32,7 @@ object MandateSnapshot:
       grid: MandateGrid,
       links: Seq[PulseLink],
       simTime: Double,
-      pulseLedgers: Map[CellCoord, PulseLedger] = Map.empty
+      pulseStamps: Map[CellCoord, PulseStamp] = Map.empty
   ): MandateSnapshot =
     val cells = grid.cells.iterator.map { case (coord, state) =>
       CellSnapshot(
@@ -74,26 +45,22 @@ object MandateSnapshot:
         state.impulse,
         state.getParam,
         state.stressParam,
-        pulseLedgers.getOrElse(coord, PulseLedger.zero)
+        pulseStamps.getOrElse(coord, PulseStamp.zero)
       )
     }.toSeq.sortBy(c => (c.coord.x, c.coord.z))
     MandateSnapshot(simTime, cells, grid.edges, links)
 
-  /** Extract the per-cell pulse ledger from a captured snapshot. */
-  def restorePulseLedgers(
+  /** Extract the per-cell pulse stamps from a captured snapshot. */
+  def restorePulseStamps(
       snapshot: MandateSnapshot
-  ): Map[CellCoord, PulseLedger] =
+  ): Map[CellCoord, PulseStamp] =
     snapshot.cells.iterator
-      .filter(_.pulseLedger != PulseLedger.zero)
-      .map(cs => cs.coord -> cs.pulseLedger)
+      .filter(_.pulseStamp != PulseStamp.zero)
+      .map(cs => cs.coord -> cs.pulseStamp)
       .toMap
 
   /** Rebuild a lattice from a snapshot. Edges whose endpoints are not
-    * both present are dropped, the same determinism the mailbox applies
-    * to `UpsertEdge` outside the live lattice. Channel levels are set
-    * directly (the snapshot bypasses the event protocol: it is injected
-    * at construction, before the actor starts, exactly like the initial
-    * links).
+    * both present are dropped.
     */
   def restoreGrid(snapshot: MandateSnapshot): MandateGrid =
     val cells = snapshot.cells.map { cs =>
@@ -111,10 +78,7 @@ object MandateSnapshot:
     MandateGrid(cells, edges)
 
   /** Distinct `(fastParam, stressParam)` pairs carried by the snapshot, most
-    * used first with a deterministic tie-break. This is what the save
-    * actually holds; the wiring layer logs it on load so a tuned config
-    * that does *not* apply to an existing world is visible instead of
-    * silent (precedence on restore: save > config > core default).
+    * used first with a deterministic tie-break.
     */
   def parameterSets(
       snapshot: MandateSnapshot
