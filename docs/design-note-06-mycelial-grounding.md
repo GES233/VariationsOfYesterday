@@ -4,7 +4,7 @@
 >
 > 前置阅读：`docs/design-draft-01-living-world.md` §1（动力学层）、`docs/design-note-02-kanren-worldview-engine.md`（世界模型）、`docs/design-note-05-medikanren-microchains.md`（五跳卷宗）、`docs/verification-report-01-mandate-slice.md`。脉冲耦合链路见 `docs/design-note-07-pulse-coupling.md`；制式验山盘见札记 09（已成稿但挂起，第一阶段不实现）。
 >
-> **2026-11-12 名实订正**：第一批（`c91ab0e`）已把 `UndefinedReason.BurnoutNoCycle` 拆为 `OffsetBelowKnee`（读数规则 `effectiveA <= burnoutA`，含读数侧叠脉冲修正，ODE 只推进 `a_slow`）与 `OverloadLocked`（`PulseLedger` 过载锁闭，机制规则），二者并集为 `CellReadout.isBurnoutPhase`；`PulseToleranceState` 改为 `PulseLedger`，`FirePulse.heartbeat` 改为 `FirePulse.bookkeeping: PulseBookkeeping`。本文 §2–§5 的实现描述已按新词订正；§7 中带日期的历史裁定保留原词作历史对照。
+> **2026-11-13 名实订正**：读数层已精简为三条正交轴——`UndefinedReason.SlowOffsetBelowKnee`（`a(s, M) <= burnoutA`）、`MycelialHealth ∈ {Intact, Damaged, Dead}` 与 `PulseStamp(shelterUntil, cooldownUntil)`；静默枯败签名（`hasSilentBlight`）绑定 `!mycelium.isViable || isSlowOffsetBelowKnee`。本文 §2–§5 的实现描述已按现行词表同步；§7 中带日期的历史裁定保留原词作历史对照。
 
 ---
 
@@ -35,7 +35,7 @@
 | `a(s, M) = α − Δ·(1−M) − k·s` | **菌网完整度决定兴奋性**：网络越碎，`a` 越小，越容易被点燃、越难回到静息；维持源被彻底抽走（`M → 0`）则进入去极化阻滞 |
 | `dM/dt = r·M·(1−M) − c·max(s−s_T,0)·M + D·∇²M` | 菌丝 logistic 生长 − 酸中毒（应力越过毒性阈值 `s_T` 才杀，与 §2.2 AMD 一致）+ 沿土壤/水系连续体扩散；`M = 0` 吸收态 |
 | 尖峰（正向 `v ≥ +1.8`） | 菌网电暴发 + 伴生的地球化学脉冲（见 2.2） |
-| 烧毁（`isBurnoutPhase`：读数规则原因 `OffsetBelowKnee` 或账本锁闭 `OverloadLocked`） | **去极化阻滞**（depolarization block）：菌网深度失能，静默；恢复靠再接种（`SetSustenance` / 菌种右键土壤，见 §7 开放问题 1）。注意读数原因只是判据结论，不等于 ODE 已进入死亡态（职责表 §1.2） |
+| 烧毁（`!mycelium.isViable \|\| isSlowOffsetBelowKnee`） | **去极化阻滞**（depolarization block）：菌网深度失能，静默；恢复靠泄压与再接种（`SetSustenance` / 菌种右键土壤，见 §7 开放问题 1） |
 
 ### 2.2 慢系统 = 土壤生物地球化学（酸性矿山排水，AMD）
 
@@ -68,10 +68,10 @@
 | 前兆（`Regime.Strained` 或 `Oscillating`，且 `c₀ ≥ 0.01` 庇护） | 溪涧水色渐黄、异味渐重（**先于**尖峰） | 单档低密度菌丝粒子（当前固定 4 颗；按 `s` 分档待做，不给数值） |
 | 尖峰过后（`q` 残留） | 水色持续发黄、底泥泛红、硫磺味持久 | 粒子按 `q` 分档（3 档） |
 | 安抚设施工作中 | **臭味**（湿地硫酸盐还原产 H₂S）——臭是好兆头 | 设施周边粒子 |
-| 静默（`PhaseReading` 为 `Undefined(OffsetBelowKnee)` 或 `Undefined(OverloadLocked)`，即 `isBurnoutPhase`） | 深度失能：无菌子、无荧光、作物枯败 | 生物群系级粒子抑制 + 枯败 |
-| 健康（`Calm` + `c₀` 庇护） | 夜间微弱菌光、菌子可采 | 低亮度发光地衣粒子 |
+| 静默（`!mycelium.isViable \|\| isSlowOffsetBelowKnee`，即 `MandatePhenomena.hasSilentBlight`） | 深度失能：无菌子、无荧光、作物枯败 | 生物群系级粒子抑制 + 枯败 |
+| 健康（`Calm` + `c₀` 庇护 + `mycelium.isViable`） | 夜间微弱菌光、菌子可采 | 低亮度发光地衣粒子 |
 
-**注意**：`Regime.Burnout`（`s ≥ 0.95`）是应力读数标签（饱和失能），此时快系统可能仍在振荡；**静默签名必须绑 `isBurnoutPhase`（`OffsetBelowKnee` / `OverloadLocked` 并集），不能绑 `Regime.Burnout`**。
+**注意**：`Regime.Burnout`（`s ≥ 0.95`）是应力读数标签（饱和失能），此时快系统可能仍在振荡；**静默签名必须绑 `hasSilentBlight`（`!mycelium.isViable || isSlowOffsetBelowKnee`），不能绑 `Regime.Burnout`**。
 
 原则：签名**先于**灾变、**弱于**灾变、**可误读**（三方机构对同一签名的记录不同，见札记 02 §3 的三方观测失真）。
 
@@ -105,9 +105,9 @@
 现实原型（内部考据，玩家文案不出现真实物种，见 §6）：一类无根无叶、全靠地下巨型菌丝网络供养的块根植物。菌网完整 = 块根收成，保护土地从道德劝诫变成经济利益。玩家侧一律使用虚构词 **荧丝 / 菌塘 / 鲜伏根 / 煨伏根**（札记 10 §1.1）。
 
 - **菌塘方块（`gastrodia_bed`）**：无独立动力学状态，每次随机刻与交互均为所在 Cell 快照的无状态投影（`MandatePhenomena.evaluateGastrodiaBed`）：
-  - `Growing`（`condition = 0`）：`s < 0.45`（`Calm`）且 `M ≥ 0.60`（菌网完好），推进 `age = 0..3`；同时受沉滞经济档（`MandateEconomy.suppressCropGrowth`）调制；
-  - `Stalled`（`condition = 1`）：`s ≥ 0.45`（`Strained` 及以上）或 `floor ≤ M < 0.60`（菌网受损），或任一 no-cycle 原因（`isBurnoutPhase`：短时过载锁闭或读数越膝；批次 4 起都只暂停生长，解除后重判），菌丝失水停滞；
-  - `Withered`（`condition = 2`）：**只由菌网低于存活下限**（`M < max(floor, 1e-9)`）触发（批次 4，2026-11-12 按助手建议实现，待用户验收）；菌丝黑腐枯死并锁存为死塘，须待 `M >= max(floor, 1e-9)` 且 `s < 0.60` 后手持**荧丝菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`，重铺门槛不再看相位／锁闭）。越膝只停长，见职责表 §5 C1。
+  - `Growing`（`condition = 0`）：`Regime.Calm`（`s < 0.45`）、`MycelialHealth.Intact`（`M ≥ 0.60`）且 `!isSlowOffsetBelowKnee`，推进 `age = 0..3`；
+  - `Stalled`（`condition = 1`）：`MycelialHealth.Damaged`（`floor ≤ M < 0.60`）、`s ≥ 0.45`（`Strained` 及以上）或 `isSlowOffsetBelowKnee`，菌丝失水暂停生长；
+  - `Withered`（`condition = 2`）：**只由菌网枯绝**（`MycelialHealth.Dead`，即 `M < max(floor, 1e-9)`）触发；菌丝黑腐枯死并锁存为死塘，须待 `mycelium.isViable` 且 `!isToxicSoil`（`s < 0.60`）后手持**荧丝菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。
 - **段木伴栽与荧丝菌材（`inoculated_timber`）**：
   - 在健康区块（`Growing`）手持野生菌种右键去皮原木可就地「段木发菌」转化为荧丝菌材（或工作台合制）；
   - 紧贴菌塘四周或正下方放置荧丝菌材构成「段木伴栽」，生长概率翻倍（`1/4 → 1/2`）、成熟起挖产量提升（`1–2 → 3–4`）；

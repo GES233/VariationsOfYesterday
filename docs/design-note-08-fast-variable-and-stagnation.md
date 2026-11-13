@@ -1,173 +1,83 @@
-# 札记 08（已定稿）：心跳脉冲语义——快变量读数与「沉滞」来源重构
+# 札记 08（已定稿）：心跳脉冲语义——快变量读数、三正交轴与极简脉冲短窗
 
-> 状态：**已拍板并落地**（2026-11-08，分支 `refactor/fast-var-stagnation`）。
-> 本文前身为同日的对齐备忘（罗列代码现状与 G1–G15 缺口清单、Q1–Q6 待拍板项）；
-> 经 2026-11-07–08 两轮「心跳语义」讨论，分叉已裁定，机制已实施。
-> 本文记录**定案后的机制口径与落地事实**；重构前的旧行为仅以对照方式保留。
+> 状态：**已定稿落地**（2026-11-08 初版落地；**2026-11-13 重构精简为三正交读数轴 + `PulseStamp` 极简短窗/冷却**）。
 >
-> **2026-11-12 名实订正**（第一批 `c91ab0e`）：`PulseToleranceState` → `PulseLedger`（`ShelterWindow` / `ToleranceBook` / `OverloadLock`），`onPulse` → `onCountedPulse`；`FirePulse.heartbeat: Boolean` → `FirePulse.bookkeeping: PulseBookkeeping`（`Counted` / `PhysicsOnly`）；`UndefinedReason.BurnoutNoCycle` 拆为 `OffsetBelowKnee`（读数规则 `effectiveA <= burnoutA`，含读数侧叠脉冲修正，ODE 只推进 `a_slow`）与 `OverloadLocked`（账本锁闭，机制规则）。§2–§4 的现行口径已按新词订正；§1 Q5 的「不改枚举名」与 §5 的文件名/`heartbeat` 字段为 2026-11-08 当时记录，仅作历史对照。
+> **2026-11-13 机制精简说明**：
+> - 移除早期的脉冲耐受度衰减账本（`ToleranceBook`）、世界侧急性锁闭窗（`OverloadLock`）与读数层叠加脉冲伪偏移（`Readout.effectiveA`），精简为双时间戳 `PulseStamp(shelterUntil, cooldownUntil)` 与三字段 `PulseParam(shelterWindow = 40.0, minInterval = 8.0, overloadPenaltyTicks = 120)`；存档 `schemaVersion` 升至 `2`。
+> - 读数层（`CellReadout`）解耦为三条正交轴：**动力学轴**（`regime`、`phase`、`isSpiking`、`isSlowOffsetBelowKnee`）、**菌网健康轴**（`mycelium: MycelialHealth ∈ {Intact, Damaged, Dead}`、`isToxicSoil`）与**庇护轴**（`isSheltered`、`isBaselineAnchored`）。
+> - 无周期原因 `UndefinedReason` 回归纯动力学：`SlowOffsetBelowKnee`（`a(s, M) <= burnoutA`）、`TransientNoCycle`、`NoCycleReference`。
 
 ---
 
 ## 0. 一句话
 
-地脉是活的：**一次脉冲（敲钟）是一拍心跳**——来一拍，`沉滞` 短期退去；
-太久没有脉冲，沉滞重新漫上来；**脉冲太密会把地脉顶进急性烧毁**
-（急性过载锁闭 `OverloadLocked`，去极化阻滞），即刻反噬玩家并加深耐受。
-`c0` 与慢变量通道维持不变，「烧毁」意象不变，但拆成**慢性（菌竭）**与**急性（过载）**两条路径。
+地脉是活的：**一次脉冲（敲钟）是一拍心跳**——来一拍，开启固定时长（默认 40 s）的脉动庇护窗，`沉滞` 短期退去；太久没有脉冲，沉滞重新漫上来；**脉冲间隔小于安全冷却窗（默认 8 s）会被拒绝并即刻反噬敲钟者**（施加 `voy:pulse_saturation`，不刷新庇护窗）。`c0` 与慢变量通道维持不变，只负责慢变量安抚（`-ρc₀`）与感官签名庇护。
 
 ---
 
-## 1. 裁定结果（对应旧备忘的 Q1–Q6）
+## 1. 核心裁定
 
-| 旧问题 | 裁定 |
+| 维度 | 现行口径 |
 |---|---|
-| Q1 快变量重写幅度 | **(a) 不动方程**：四维 RK4 方程与契约数值 oracle 零改动；只重写读数与玩家侧语义（同分支后续审计提交仅精简了 `MandateState.scala` 注释并同步更新 `numeric_source_digest` 与 `symbolic.claims`），`SliceContractSpec` 全程通过。 |
-| Q2 `v` 的叙事身份 | **(c) 分层**：`v` 是菌网生物电（电生理量），`Regime`/`PhaseReading` 是叙事读数。尖峰（spike）= **正向**除极暴发（`v ≥ +1.8`）。 |
-| Q3 沉滞主来源 | **脉冲保鲜窗（心跳）**：沉滞的基础来源从「无 `c0`」改为「**太久没有脉冲**」。一次有效脉冲开启抵消窗 `W_eff(T)`，窗过期沉滞回归；`c0` 退居慢变量安抚通道与感官签名的庇护条件。 |
-| Q4 `c0` 的角色 | **(c) 沉滞与 `c0` 解耦**：`c0` 只进慢变量方程（`-ρc0` 项）与菌光/前兆签名（见 §5）；不再提供沉滞免疫。 |
-| Q5 两个 `Burnout` | **(a) 语义分层，不改枚举名**（不破跨栈词汇）：`Regime.Burnout`（s ≥ 0.95）= 饱和失能，仍可振荡、仍可被脉冲短期压住沉滞；`BurnoutNoCycle`（`a_eff ≤ a_burnout`）= 去极化阻滞，分**慢性（菌竭）**与**急性（过载）**两条路径，共用同一膝点判据。 |
-| Q6 兼容与重放 | 存档 `schemaVersion` 不变（=1）：新增字段（脉冲耐受四元组）带向后兼容读取（缺省即零态）。不改 `Regime`/`PhaseReading` 枚举名，Elixir 侧 `Voy.World.Profile` 不动。 |
-
-旧备忘的 G5/G10（`|v|` 尖峰判据）随本次**一并修复**：`Excitation` 标签、`CellSpikeTriggered`
-事件、尖峰档沉滞与 HUD 着色统一改为**正向**判据 `v ≥ spikeLevel`；负向复极过冲
-（实测 `v_min ≈ −1.9`）不再被误读为尖峰。黄水渗色（`MandatePhenomena.classifySeepTier`）
-保留 `|v|` 判据，因为它对应 `dq/dt` 的酸负荷方程（同样按 `|v|` 计）。
+| 快变量与方程 | **不动四维 RK4 方程与契约数值 oracle**：尖峰（spike）统一采用**正向**除极暴发判据（`v ≥ +1.8`）；黄水渗色（`MandatePhenomena.classifySeepTier`）保留 `|v|` 判据，对应 `dq/dt` 的酸负荷方程。 |
+| 三条正交读数轴 | 1. **动力学轴**：`regime`（`Calm / Strained / Oscillating / Burnout`）、`phase`（`Cycle / Basin / Undefined`）、`isSpiking`、`isSlowOffsetBelowKnee`（`a(s, M) <= -0.4667`）；<br>2. **菌网轴**：`MycelialHealth` 三档（`Intact`：`M ≥ 0.60`；`Damaged`：`floor ≤ M < 0.60`；`Dead`：`M < floor`）与 `isToxicSoil`（`s ≥ 0.60`）；<br>3. **庇护轴**：`isSheltered = isPulseSheltered && mycelium.isViable && !isSlowOffsetBelowKnee && !isSpiking`。 |
+| 沉滞主来源 | **脉动庇护窗（`PulseStamp`）**：一次有效正脉冲开启 `[t, t + shelterWindow]`（默认 40.0 s）庇护窗与 `[t, t + minInterval]`（默认 8.0 s）冷却窗；窗外失去庇护，原版经济受沉滞压制。 |
+| `c0` 的角色 | **沉滞与 `c0` 解耦**：`c0` 只进慢变量方程（`-ρc0` 项）与菌光/前兆签名（`isBaselineAnchored`）；不再提供沉滞免疫。 |
+| 存档兼容 | `MandatePersistence.SchemaVersion = 2`：每格仅持久化 `shelterUntil` 与 `cooldownUntil` 两个 `Double`（旧 v1 存档加载时打印 `WARN` 日志并重置为初始态）。 |
 
 ---
 
-## 2. 核心机制：心跳三律
+## 2. 核心机制：极简脉冲印记（`PulseStamp`）
 
-### 2.1 脉冲抵消窗（保鲜）
+### 2.1 脉冲庇护窗与冷却窗
 
-- 一次**正面积脉冲**（`FirePulse(area > 0, bookkeeping = Counted)`：敲钟、水晶链路）到达活细胞时，开启
-  沉滞抵消窗（`ShelterWindow`）：`shelter.until = t + W_eff(T)`，其中
-  `W_eff(T) = W_0 · max(0, 1 − T/T_invert)`；敲钟分派为 `SpikeSwallowed` 的
-  那一击由分派置 `bookkeeping = PhysicsOnly`（见 §3），脉冲照常进方程但不记账；
-- 窗内 `沉滞`（`voy:stagnation`）**主动移除**（不再等 55 tick 自然衰减）；窗外每 20 tick
-  重新施加。`isMaintained` 的新定义（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala)）：
+- 一次**正面积记账脉冲**（`FirePulse(area > 0, bookkeeping = Counted)`：敲钟、水晶链路）到达活细胞（`mycelium.isViable && !isSlowOffsetBelowKnee`）时，由 `PulseLedger.settle` 结算：
+  - **正常结算（`PulseSettlement.Sheltered`）**：当 `simTime >= cooldownUntil` 时，更新 `PulseStamp(shelterUntil = t + shelterWindow, cooldownUntil = t + minInterval)`；
+  - **冷却拒绝（`PulseSettlement.CooldownRefused`）**：当 `simTime < cooldownUntil` 时，**保持原 `PulseStamp` 不变**（不延长、也不抹除已有庇护窗），敲钟者即刻承受 `voy:pulse_saturation`（默认 120 tick：挖掘 ×0.75、移速 ×0.85）+ 低闷失谐钟声 + 灰烬粒子。
+- 庇护窗内 `沉滞`（`voy:stagnation`）主动移除；窗外每 20 tick 重新评估。`CellReadout.isSheltered` 的定义（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala)）：
 
+  ```scala
+  def isSheltered: Boolean =
+    isPulseSheltered && mycelium.isViable && !isSlowOffsetBelowKnee && !isSpiking
   ```
-  isMaintained = pulseSuppressed && sustenance ≥ floor && !isBurnoutPhase && v < spikeLevel
-  ```
 
-  （`isBurnoutPhase` 是 `isOffsetBelowKnee` 与 `isOverloadLocked` 的并集；消费者分账仍待拍板。）
+### 2.2 边界与克制
 
-### 2.2 太快 = 过载烧毁（急性 `OverloadLocked`）
-
-脉冲间隔 `< I_min`（默认 8.0 模拟秒，≈1.6× 钟核 τ=5.0）或耐受饱和（`T ≥ T_invert`）时：
-1. **世界侧**：该细胞进入急性过载锁闭（`OverloadLocked`），锁闭时长 `overloadBurnoutDuration`（默认 8 s），
-   抵消窗作废；
-2. **玩家侧即刻小惩罚**：敲钟者获得 `voy:pulse_saturation`（脉冲过载，默认 120 tick：
-   挖掘 ×0.75、移速 ×0.85）+ 低闷失谐钟声 + 灰烬粒子；
-3. **后续更耐受**：`T ← T + ΔT_over`（默认 +0.35，远大于正常敲钟的 +0.10），
-   此后每次脉冲的抵消窗按 `1 − T/T_invert` 缩短，直到停手等 `T` 指数衰减
-   （`τ_tol` = 45 s，锚定弛豫周期尺度）。
-
-### 2.3 两条烧毁路径共用同一膝点
-
-读数层把突触核的脉冲驱动纳入有效恢复偏移（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala) `Readout.effectiveA`）：
-
-```
-a_slow = α − Δ(1−M) − k·s                      （ODE 推进的慢恢复偏移；菌竭路径）
-a_eff  = a_slow − gain · max(p − p_single, 0)   （读数规则叠加脉冲驱动 p = impulse + synapseP；ODE 不含该项；过载路径）
-事实 isOffsetBelowKnee ⟺ a_eff ≤ a_burnout = −0.4667（未锁闭时展示原因取它；两原因同时成立时展示优先 OverloadLocked，见职责表 §1.1）
-读数原因 OverloadLocked   ⟺ PulseLedger 过载锁闭窗口内（机制规则，不是方程观测）
-```
-
-- **慢性菌竭**：高应力酸蚀耗尽 `M`（实测见札记 06 §7.1；`M = 0` 吸收态）——
-  大死区实质永久，恢复只能泄压 + 再接种；敲钟**毫无回音**（`DeadMyceliumBurnout`）。
-- **急性过载**：连发脉冲把残余核 `p` 叠过单钟峰值（`p_single = 12/(e·5) ≈ 0.883`），
-  把活地脉瞬时顶穿膝点——土地越差（`M` 低、`s` 高，`a_slow` 越小），越经不起快敲。
-- **联动**：健康沃土（`a_slow = 0.70`）连敲两三下也顶不穿；受损地（`a_slow` 已逼近膝点）
-  稍快即过载——**土地状态决定敲钟的安全节奏**。
-
-### 2.4 边界与克制
-
-- **负脉冲不记账**：`area ≤ 0`（如 `OverwhelmingNegativeSuppression`）不参与脉冲账本；
-- **死菌不吃脉冲**：`M ≤ floor` 或 `a_slow ≤ a_burnout` 的细胞跳过耐受簿记
-  （死亡不是玩家的错，不叠耐受）；
-- **尖峰吞没不记账**：`SpikeSwallowed` 的一击照常把脉冲送进方程（`v/q/s` 仍记账），
-  但不写/不续 `ShelterWindow`，也不会刷新已有的旧窗（`FirePulse.bookkeeping = PhysicsOnly`）；
-- **水晶链路也心跳**：链路转发的正脉冲同样开启抵消窗（周期 ~39.5 s 的锁相链路
-  恰好能自动维持一个区块的庇护——自动化心跳是涌现玩法；**当前无游戏侧 `AddLink` 发射者，仅为恢复/预留路径**，见札记 07 §6）；
-- **通道物理不变**：钟永远发声、山永远记账（`FirePulse` 照常进方程，
-  过载脉冲同样喂养 `q`/`s` 的压力账）；
-- **账本随存档**：`PulseLedger` 的四项保存事实（`ShelterWindow.until` / `ToleranceBook.amount` /
-  `ToleranceBook.lastPulseTime` / `OverloadLock.until`）随 `MandateSnapshot` 整格落盘
-  （NBT 键名沿用 `suppressedUntil` / `pulseTolerance` / `lastPulseTime` / `overloadUntil`），
-  以 `simTime` 闭式求值，重登/重启连续。
+- **负脉冲不记账**：`area ≤ 0`（如 `OverwhelmingNegativeSuppression`）不参与脉冲印记；
+- **死菌或越膝不记账**：`!mycelium.isViable` 或 `isSlowOffsetBelowKnee` 的细胞跳过脉冲印记；
+- **尖峰吞没不记账**：`SpikeSwallowed` 的一击照常把脉冲送进方程（`v/q/s` 仍记账），但置 `FirePulse.bookkeeping = PhysicsOnly`，不更新 `PulseStamp`；
+- **通道物理不变**：钟永远发声、山永远记账（`FirePulse` 照常进方程，连敲脉冲同样进入突触核与 `q`/`s` 积分）。
 
 ---
 
 ## 3. 敲钟分派表（`evaluateBellStrike`，定稿）
 
-按序判定，先到先得（[BellRitual.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/BellRitual.scala)，原在 `MandateOverworld.scala`，其后抽出为无 Minecraft 依赖的纯函数层）：
+按序判定，先到先得（[BellRitual.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/BellRitual.scala)）：
 
 | # | 条件 | Outcome | 效果 |
 |---|---|---|---|
-| 1 | 慢性菌竭（`M` 死透或 `a_slow ≤ a_burnout`） | `DeadMyceliumBurnout` | 不锚 `c0`、不抵消、不罚——死肉无回音；指路泄压+接种 |
-| 2 | 脉冲过密 / 耐受饱和 / 已在急性锁闭 / 相读 `isBurnoutPhase`（`OffsetBelowKnee` 或 `OverloadLocked`） | `PulseOverloadBurnout` | 不锚 `c0`、抵消窗作废、`T+ΔT_over`、玩家吃 `voy:pulse_saturation` |
-| 3 | `Regime.Burnout`（s ≥ 0.95 但菌网活着） | `SaturatedNoAnchor` | 不锚 `c0`，**但正常开启抵消窗**（敲了有用但治不好） |
-| 4 | 未锚振荡 + `Cycle(Excitation)` | `SpikeSwallowed` | 尖峰吞没：不锚 `c0`、**不进账本**（脉冲照常进方程，不写/不续 `ShelterWindow`） |
-| 5 | 未锚振荡 + `Cycle(Absolute/RelativeRefractory)` | `RefractoryReanchored` | 锚 `c0` + 抵消窗 + 推迟下一次尖峰 |
-| 6 | 其余（Calm/Strained/静息域/瞬态/无周期参照） | `AnchoredOrMaintained` | 锚 `c0` + 抵消窗（宽容：起振初期不设防） |
+| 1 | 慢性菌竭或越膝（`!readout.mycelium.isViable \|\| readout.isSlowOffsetBelowKnee`） | `DeadMyceliumBurnout` | 不锚 `c0`、不记账、不罚——死肉无回音；指路泄压+接种 |
+| 2 | 冷却窗内过密敲击（`readout.pulseStamp.isInCooldownAt(readout.simTime)`） | `PulseOverloadBurnout` | 不锚 `c0`、不刷新印记、玩家吃 `voy:pulse_saturation` |
+| 3 | `Regime.Burnout`（`s ≥ 0.95` 但菌网尚存） | `SaturatedNoAnchor` | 不锚 `c0`，**但正常开启庇护窗**（敲了能缓口气但治不好饱和应力） |
+| 4 | 未锚振荡 + `Cycle(Excitation)` | `SpikeSwallowed` | 尖峰吞没：不锚 `c0`、`bookkeeping = PhysicsOnly`（脉冲进方程，不更新 `PulseStamp`） |
+| 5 | 未锚振荡 + `Cycle(Absolute/RelativeRefractory)` | `RefractoryReanchored` | 锚 `c0` + 开启庇护窗 + 推迟下一次尖峰 |
+| 6 | 其余（Calm/Strained/静息域/瞬态/无周期参照） | `AnchoredOrMaintained` | 锚 `c0` + 开启庇护窗 |
 
 ---
 
-## 4. 配置（`config/variations-of-yesterday.json` 新增 `pulseParam` 段）
+## 4. 配置（`config/variations-of-yesterday.json` 的 `pulseParam` 段）
 
 | 键 | 默认 | 含义 |
 |---|---|---|
-| `suppressionWindow` | 40.0 | `W_0`，锚定一个自然振荡周期（≈39.5 s） |
-| `minSafeInterval` | 8.0 | `I_min`，脉冲最小安全间隔（≈1.6τ_bell） |
-| `toleranceDecayTau` | 45.0 | 耐受指数衰减常数（模拟秒） |
-| `normalToleranceStep` | 0.10 | 正常脉冲的耐受增量 |
-| `overpulseToleranceStep` | 0.35 | 过载脉冲的耐受增量 |
-| `invertTolerance` | 1.0 | 耐受反转阈值（抵消效力归零） |
-| `maxTolerance` | 1.5 | 耐受硬上限（保证衰减有界） |
-| `overloadBurnoutDuration` | 8.0 | 急性过载锁闭（`OverloadLock`）时长 |
-| `overloadPenaltyTicks` | 120 | `voy:pulse_saturation` 持续 tick 数 |
-| `singlePulsePeak` | 0.8829 | 单钟核峰值 `12/(e·5)`，过载增益的起扣点 |
-| `pulseBurnoutGain` | 1.6 | 超出部分的 `a_eff` 下压增益 |
+| `shelterWindow` | 40.0 | 单次有效脉冲开启的庇护窗时长（模拟秒，锚定一个自然振荡周期 ≈39.5 s） |
+| `minInterval` | 8.0 | 脉冲最小冷却间隔（模拟秒，≈1.6τ_bell） |
+| `overloadPenaltyTicks` | 120 | 冷却期内强行敲钟施加 `voy:pulse_saturation` 的持续游戏刻数 |
 
 ---
 
-## 5. 落地修改面（2026-11-08 实施事实）
+## 5. 代码落点
 
-- **改（机制核，读数层）**：[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala)
-  —— `Readout.slowA` / `effectiveA` / `isEcologicalBurnout` 新增；`label` 与 `isMaintained`
-  改正向尖峰判据；`CellReadout` 增加 `pulseDrive / pulseSuppressed / pulseTolerance /
-  pulseState / simTime`；`PhaseTracker` 接受 `pulseDrive` 与 `overloaded` 探针。
-  [MandateAgent.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateAgent.scala)
-  —— 正脉冲簿记（`recordPulse`）、尖峰事件改正向判据、读数投影携带心跳状态。
-  [MandateSnapshot.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateSnapshot.scala)
-  / [MandatePersistence.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandatePersistence.scala)
-  —— 耐受四元组随格落盘（缺省读取，schemaVersion 不变）。
-- **改（游戏接线）**：[MandateOverworld.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandateOverworld.scala)
-  —— 六分派 `evaluateBellStrike`（其后已抽至 [BellRitual.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/BellRitual.scala)）、过载即刻反噬（效果 + 失谐钟声 + 灰烬）、
-  窗内主动移除沉滞、文案与验山读数改「脉动庇护」口径；
-  [MandateEffects.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandateEffects.scala)
-  —— 新增 `voy:pulse_saturation`；lang 双语同步（键集一致性由
-  `MandatePhenomenaSpec` 断言）。
-- **增**：[PulseTolerance.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/PulseTolerance.scala)
-  （纯函数耐受簿记）+ `PulseToleranceSpec`；`MandateReadoutSpec` / `MandateAgentSpec`
-  增加心跳/过载/死菌/吞没四组行为测试。
-- **协议二修（2026-11-08）**：`EventMsg.FirePulse` 增加 `heartbeat` 位（默认 true）；
-  六分派的 `SpikeSwallowed` 置 false，`BellStrikeOutcome.bookkeepsHeartbeat` 取代
-  原先未接线的 `suppressesStagnation`；`recordPulse` 只在 `heartbeat = true` 时记账
-  （链路脉冲无分派，恒为 true）。
-- **感官签名口径微调**：[MandatePhenomena.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandatePhenomena.scala)
-  的菌光与前兆孢子改绑 **`c0` 庇护**（`baselineCalming ≥ 0.01`）而非 `isMaintained`——
-  心跳管玩家的身体，签名管土地自己的健康；札记 06 §3 签名表因此不破。
-- **不动**：四维 RK4 方程（`MandateState.scala` / `ODESolver.scala` 数值实现）、契约数值 oracle、`Regime`/`PhaseReading` 枚举线级名与 `Voy.World.Profile` 阈值镜像（同分支对 `tools/voy_world` 的改动均为独立去重重构，不涉心跳机制）。
-
----
-
-## 6. 仍开放（后续排期）
-
-1. **心跳投影层**（音频节奏 / 菌丝地面亮度脉搏波）未实施，属表现层另排；
-2. 耐受数值（`W_0`、`I_min`、步进与衰减）为首批手感值，待 playtest 校准；
-3. 「敲钟近处心跳重一拍」的世界侧代价反馈（近处重拍音效）待做；
-4. 水晶链路自动心跳与 `minSafeInterval` 的交互（锁相周期 ≈ 39.5 s > `I_min` = 8 s，
-   现参数下单链路安全；多链路汇聚到同格的过密风险是涌现特性，保留观察）。前提是游戏侧已有 `AddLink` 接线（当前尚未落地，见札记 07 §6）。
+- [PulseLedger.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/PulseLedger.scala) —— `PulseParam`、`PulseStamp(shelterUntil, cooldownUntil)`、`PulseSettlement` 与 `PulseLedger.settle`；
+- [MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala) —— `MycelialHealth`（`Intact / Damaged / Dead`）、`UndefinedReason`（`SlowOffsetBelowKnee / TransientNoCycle / NoCycleReference`）、三正交轴 `CellReadout` 与纯数学 `PhaseTracker`；
+- [MandateAgent.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateAgent.scala) —— 单槽位 `CellSlot` 统一管理每格运行时簿记；
+- [MandatePhenomena.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandatePhenomena.scala) & [BellRitual.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/BellRitual.scala) —— 感官签名、经济压力档、菌塘生长与敲钟六裁决全部映射在三条正交轴上。

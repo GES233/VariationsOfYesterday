@@ -36,10 +36,10 @@
 
 系统将「既定先例」「未决山谷」与「玩家的运行时干预」严格分账：
 
-1. **双时域节点编译（`Chronicle` + `Projection` + `Node`）**：`horizon: :locked` 先例节点在生成期落定 `era3` 并投放全套五跳；`horizon: :open` 变奏节点在生成期按无干预基线编译 `era3`（`baseline_fate`，仍写入 `history`），只投放 Hop 1..4 + 2 张干扰卡，卷宗 `settled: false` 并携带 `reachable_transitions`（细节见 §3.1）。
+1. **双时域节点编译（`Chronicle` + `Texts` + `Witness`）**：`horizon: :locked` 先例节点在生成期落定 `era3` 并投放全套五跳；`horizon: :open` 变奏节点在生成期按无干预基线编译 `era3`（`baseline_fate`，仍写入 `history`），只投放 Hop 1..4 + 2 张干扰卡，卷宗 `settled: false` 并携带 `reachable_transitions`（细节见 §3.1）。
 2. **五跳局部卷宗（`Pathway` + `Witness` + `Content`）**：将因果链拆解为单跳卡片与同车间干扰卡，按世界种子绑定批号、工业载体和实测安全刻度 `safe_tick`（详见札记 05）。
 3. **三方观测与溯因反演（`Slice` + `Observation` + `Ascribe`）**：模拟总指挥部（月度汇总+行政甩锅）、技术内层（铅锤削顶+滞后读表）、老寨（物候先后+击打计数）对同一物理轨迹的观测失真，由 `Ascribe.abduceo/4` 在 24 候选空间内反演隐藏解释。
-4. **运行时干预与结局改写（`Facts` + `MandateOverworld`）**：在 `:open` 节点中，玩家通过 Hop 1→2→3 排除干扰寻回真载体，结合 Hop 4 读数在不应期推迟窗口（`safe_tick`）敲击重锚 $c_0$ 并配合上游降扰，把卷宗结算到目标结局并生成第 5 跳条规；生成期 `history.era3` 保持基线不改写，干预与结算追加式记录 `saw / did / said / predicted / settled`（`Facts` / `settle_open_dossier` 已在 Elixir 原型实现；Minecraft 侧接线见草案 01 §7 待完成项 4）。
+4. **运行时干预与结局改写（`Chronicle.solve_interventions` + `Witness.settle_open_dossier`）**：在 `:open` 节点中，玩家通过 Hop 1→2→3 排除干扰寻回真载体，结合 Hop 4 读数在不应期推迟窗口（`safe_tick`）敲击重锚 $c_0$ 并配合上游降扰，把卷宗结算到目标结局并生成第 5 跳条规（生成期 `history.era3` 保持基线不改写；Minecraft 侧接线见草案 01 §7 待完成项 4）。
 
 ### 3.1 六结局矩阵：先例分类表与未决山谷状态转移
 
@@ -60,10 +60,10 @@
 
 ---
 
-## 4. 向 Scala 3（`inner/`）对接与迁移原则
+## 4. 与 Scala 3（`inner/`）的职责边界
 
-- **契约先行**：Scala 侧 `SliceContract` 产出 `contracts/mandate-slice-v1.json`，Elixir 侧 `Export` 产出 `schema_version = 2` 的节点与卷宗 JSON bundle；Elixir 侧用 `test/fixtures/world_cases.json` 钉住 golden（其中种子物证值来自 Scala 契约），跨栈数值锚仍是 `contracts/mandate-slice-v1.json`。
-- **低频离散触发**：关系求解仅在 Node 激活、跨 Regime/Phase 跃迁或玩家操作勘定台时调用，绝不进入每 tick 的 RK4 积分循环。
+- **无跨栈运行时耦合**：Elixir 侧 `tools/voy_world` 专注作为**剧情/历史因果无冲突校验与文本沙盘**，不与 JVM 发生运行时通信，也不维护跨栈导出包。
+- **契约锚点**：Scala 侧 `SliceContract` 产出 `contracts/mandate-slice-v1.json`，Elixir 侧 `Contract` + `Witness` 读取其中的实测 `safe_ticks` 与占空比数值，并通过 `test/fixtures/world_cases.json` 与 `Canon` 静态检查保障四纪历史与五跳卷宗的一致性。
 
 ---
 

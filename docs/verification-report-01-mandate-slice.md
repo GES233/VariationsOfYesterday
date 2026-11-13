@@ -34,7 +34,7 @@
 
 > 表内 $a(s)$ 为当期口径；现行代码为 $a(s, M)$（`sustenance`，$M=1$ 时与上表等价）。
 >
-> **2026-11-12 名实订正**：表中 `BurnoutNoCycle` 为旧词（当时枚举名）；现读数原因拆为 `OffsetBelowKnee`（读数规则 `effectiveA <= burnoutA`，`effectiveA` 含读数侧叠脉冲修正，ODE 只推进 `a_slow`）与 `OverloadLocked`（`PulseLedger` 过载锁闭，机制规则）。该行「方程级」是当期对读数判据的称呼，不代表 ODE 状态；本表的实测数值与结论不因此改变。
+> **2026-11-13 名实订正**：表中 `BurnoutNoCycle` 为旧词（当时枚举名），现枚举名改称 `SlowOffsetBelowKnee`（`a(s, M) <= burnoutA`）。本表的实测数值与结论不因此改变。
 
 ---
 
