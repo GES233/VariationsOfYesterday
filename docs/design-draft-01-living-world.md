@@ -5,6 +5,8 @@
 > 方程组结构、通道语义、格子场架构、加载不变性原则、相位调制与 α 突触脉冲结构保持稳定，实现期间只调参数。
 >
 > **2026-11-13 名实订正**：读数层（`MandateReadout`）已精简为三条正交轴——**动力学轴**（`Regime` + `PhaseReading`，无周期原因 `UndefinedReason` 回归纯动力学 `SlowOffsetBelowKnee` / `TransientNoCycle` / `NoCycleReference`）、**菌网健康轴**（`MycelialHealth ∈ {Intact, Damaged, Dead}`）与**庇护轴**（`isSheltered`，由 `PulseStamp(shelterUntil, cooldownUntil)` 驱动）；`FirePulse.bookkeeping: PulseBookkeeping`（`Counted` / `PhysicsOnly`）区分记账脉冲与纯物理脉冲。本文正文已按此同步；方程结构、数值与设计意图未变。
+>
+> **2026-11-13 文档边界重划**：Elixir 关系世界模型与五跳卷宗规范（原札记 02 / 05）已迁入 `tools/voy_world/docs/`。模组运行时只运行连续动力学（§1–§3），不再由关系求解器锁死未来结局；§4 ARG 双模型主线与 §6 早期民俗参考书目保留为 0.1 冻结期历史记录。
 
 ## 0. 定位与创作原则
 

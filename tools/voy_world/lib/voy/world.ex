@@ -1,58 +1,29 @@
 defmodule Voy.World do
-  @moduledoc "Typed, JSON-safe entry points for the relational world model."
+  @moduledoc """
+  Clean entry point for the `Voy.World` relational graph and epistemic sandbox.
+  """
 
-  use Voy.Kanren
+  alias Voy.World.{Epistemic, Graph, Store}
 
-  alias Voy.World.{Chronicle, Schema, Witness}
+  def load_world(dir \\ Store.default_dir()), do: Store.load(dir)
+  def save_world(payload, dir \\ Store.default_dir()), do: Store.save(payload, dir)
 
-  def compile_branch(topo_fields) do
-    topo = Schema.topology(topo_fields)
-    slices = run_all(fn q -> Chronicle.compile_branch_sliceo(topo, q) end) |> terms()
+  def build_graph(nodes, edges, translations \\ []),
+    do: Graph.new(nodes, edges, translations)
 
-    case slices do
-      [] -> {:error, :unsupported_topography}
-      slices -> {:ok, Enum.map(slices, &Schema.to_public/1)}
-    end
+  def audit(eras, nodes, edges, translations \\ []) do
+    graph = Graph.new(nodes, edges, translations)
+    Epistemic.audit_world(eras, graph)
   end
 
-  def solve_interventions(topo_or_era2b, opts \\ []) do
-    with {:ok, transitions} <- Chronicle.solve_interventions(topo_or_era2b, opts) do
-      {:ok, Enum.map(transitions, &Schema.to_public/1)}
-    end
+  def check_wire(eras, nodes, edges, edge_a_id, edge_b_id, translations \\ []) do
+    graph = Graph.new(nodes, edges, translations)
+    Epistemic.check_wire(eras, graph, edge_a_id, edge_b_id)
   end
 
-  def settle_open_dossier(dossier, intervention, opts \\ []) do
-    with {:ok, settled} <- Witness.settle_open_dossier(dossier, intervention, opts) do
-      {:ok, Schema.to_public(settled)}
-    end
-  end
-
-  def reverse_worldgen(fate) do
-    with {:ok, fate} <- Schema.normalize_fate(fate) do
-      slices =
-        run_all(fn q ->
-          fresh [topo, slice, era3, up_type, pass_type, down_type, geology, access] do
-            eq(topo,
-              branch_id: :mystery_branch,
-              up_name: "未知源头",
-              pass_name: "未知隘口",
-              down_name: "未知聚落",
-              up_terrain: up_type,
-              pass_terrain: pass_type,
-              down_terrain: down_type,
-              up_geology: geology,
-              accessibility: access
-            )
-
-            Chronicle.compile_branch_sliceo(topo, slice)
-            propso(slice, era3: era3)
-            propso(era3, fate: fate)
-            eq(q, slice)
-          end
-        end)
-        |> terms()
-
-      {:ok, Enum.map(slices, &Schema.to_public/1)}
-    end
+  def query_paths(eras, nodes, edges, start_node, target_node, opts \\ []) do
+    {translations, path_opts} = Keyword.pop(opts, :translations, [])
+    graph = Graph.new(nodes, edges, translations)
+    Epistemic.query_paths(eras, graph, start_node, target_node, path_opts)
   end
 end

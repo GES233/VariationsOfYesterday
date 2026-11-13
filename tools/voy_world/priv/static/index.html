@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voy.World · 卡片接线与时代认知沙盘</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-seal">旧日·沙盘</div>
+      <div>
+        <h1>Voy.World 卡片接线与时代认知推演台</h1>
+        <p class="subtitle" id="audit-summary">正在加载世界图谱…</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="btn-auto-wire" class="btn">连上全部合法桥接</button>
+      <button id="btn-clear-wires" class="btn">清空连线</button>
+      <button id="btn-board-all" class="btn">全部上桌（含干扰/穿帮）</button>
+      <button id="btn-board-main" class="btn">仅留主链</button>
+      <button id="btn-save" class="btn primary">保存到文件</button>
+      <button id="btn-reset" class="btn">从磁盘还原</button>
+    </div>
+  </header>
+
+  <div class="workbench">
+    <!-- LEFT DRAWER: CARD & NODE LIBRARY -->
+    <aside class="drawer left-drawer">
+      <div class="drawer-header">
+        <h2>档案卡池 & 节点</h2>
+        <button id="btn-new-card" class="btn small primary">+ 新卡</button>
+      </div>
+      <div class="drawer-filter">
+        <select id="filter-era">
+          <option value="all">全部时代</option>
+        </select>
+      </div>
+      <div id="card-library" class="library-list"></div>
+
+      <div class="drawer-header" style="margin-top:0.6rem;border-top:1px solid var(--border);padding-top:0.6rem;">
+        <h2>图谱节点 (<span id="node-count">0</span>)</h2>
+        <button id="btn-new-node" class="btn small">+ 节点</button>
+      </div>
+      <div id="node-library" class="library-list compact"></div>
+    </aside>
+
+    <!-- CENTER: INTERACTIVE NODE-WIRE CANVAS -->
+    <main class="canvas-shell">
+      <div class="canvas-hud">
+        <span id="toast-msg" class="hud-pill">提示：拖动卡片标题可移动位置；从右端口（输出）拖线到左端口（输入）可即时校验因果与时代约束。</span>
+        <div class="zoom-controls">
+          <button id="btn-zoom-out" class="btn small">-</button>
+          <span id="zoom-label" class="mono">100%</span>
+          <button id="btn-zoom-in" class="btn small">+</button>
+        </div>
+      </div>
+
+      <div id="board-viewport" class="board-viewport">
+        <div id="board-stage" class="board-stage">
+          <svg id="wires-svg" class="wires-svg" width="2400" height="1600">
+            <defs>
+              <marker id="arrow-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#1d6f66" />
+              </marker>
+              <marker id="arrow-tr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#2b5b84" />
+              </marker>
+              <marker id="arrow-err" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#b43c2c" />
+              </marker>
+            </defs>
+            <g id="wires-layer"></g>
+            <path id="drag-wire" class="drag-wire" d="" style="display:none;" />
+          </svg>
+          <div id="cards-layer" class="cards-layer"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT DRAWER: INSPECTOR / ERAS / PATHFINDER -->
+    <aside class="drawer right-drawer">
+      <div class="subtabs">
+        <button class="subtab active" data-subtab="inspector">卡片/连线</button>
+        <button class="subtab" data-subtab="eras">时代模型</button>
+        <button class="subtab" data-subtab="aliases">同物转译</button>
+        <button class="subtab" data-subtab="pathfinder">Kanren寻路</button>
+      </div>
+
+      <div id="panel-inspector" class="subpanel active">
+        <div id="inspector-body" class="muted">点击画布上的卡片或连线进行编辑与检查。</div>
+      </div>
+
+      <div id="panel-eras" class="subpanel">
+        <div class="inline-row">
+          <select id="era-editor-select" style="flex:1;"></select>
+          <button id="btn-new-era" class="btn small">+ 新时代</button>
+        </div>
+        <div id="era-editor-body"></div>
+      </div>
+
+      <div id="panel-aliases" class="subpanel">
+        <div class="drawer-header">
+          <strong style="font-size:0.84rem;">跨时代同物异名转译 (aliaso/4)</strong>
+          <button id="btn-new-alias" class="btn small primary">+ 新转译</button>
+        </div>
+        <p class="muted" style="margin:0;">声明两个不同时代口径下的节点等价（如「镇山铜钲」⇄「土官旧铜器」），让卡片跨时代接通。</p>
+        <div id="aliases-list" class="stack-gap"></div>
+      </div>
+
+      <div id="panel-pathfinder" class="subpanel">
+        <div class="form-stack">
+          <label>起点节点 (start_node)
+            <select id="pf-start"></select>
+          </label>
+          <label>终点节点 (target_node)
+            <select id="pf-target"></select>
+          </label>
+          <button id="btn-find-paths" class="btn primary">运行 Kanren patho/5 寻路</button>
+        </div>
+        <div id="pf-results" class="stack-gap" style="margin-top:0.8rem;"></div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

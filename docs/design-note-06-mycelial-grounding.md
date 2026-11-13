@@ -2,7 +2,7 @@
 
 > 状态：**实施规格（WO-1/3/4 已落地，WO-2 待排期）**。本文档面向实现者（含编码代理）：第 1–4 节是不可违背的设计约束与映射，第 5 节是分阶段工单（WO-1…WO-4），第 6 节是考据与证据分级。
 >
-> 前置阅读：`docs/design-draft-01-living-world.md` §1（动力学层）、`docs/design-note-02-kanren-worldview-engine.md`（世界模型）、`docs/design-note-05-medikanren-microchains.md`（五跳卷宗）、`docs/verification-report-01-mandate-slice.md`。脉冲耦合链路见 `docs/design-note-07-pulse-coupling.md`；制式验山盘见札记 09（已成稿但挂起，第一阶段不实现）。
+> 前置阅读：[设计草案 01](design-draft-01-living-world.md) §1（动力学层）、[设计札记 07](design-note-07-pulse-coupling.md)（脉冲耦合链路）。历史与外置参考：[验证报告 01](archive/verification-report-01-mandate-slice.md)、[札记 02（关系世界模型）](../tools/voy_world/docs/design-note-02-kanren-worldview-engine.md)、[札记 05（五跳卷宗）](../tools/voy_world/docs/design-note-05-medikanren-microchains.md)；制式验山盘见 [札记 09](incubator/design-note-09-mountain-dial.md)（挂起，第一阶段不实现）。
 >
 > **2026-11-13 名实订正**：读数层已精简为三条正交轴——`UndefinedReason.SlowOffsetBelowKnee`（`a(s, M) <= burnoutA`）、`MycelialHealth ∈ {Intact, Damaged, Dead}` 与 `PulseStamp(shelterUntil, cooldownUntil)`；静默枯败签名（`hasSilentBlight`）绑定 `!mycelium.isViable || isSlowOffsetBelowKnee`。本文 §2–§5 的实现描述已按现行词表同步；§7 中带日期的历史裁定保留原词作历史对照。
 
