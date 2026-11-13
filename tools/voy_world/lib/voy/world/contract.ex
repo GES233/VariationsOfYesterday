@@ -421,7 +421,7 @@ defmodule Voy.World.Contract do
 
   @doc """
   The stock's stress-regime partition, sampled at declared points, as the
-  numeric side computes it. `Voy.World.Profile.regime/3` must reproduce it.
+  numeric side computes it.
   """
   @spec regime_samples(t()) :: [%{stress: number(), activity: number(), regime: atom()}]
   def regime_samples(%__MODULE__{data: data}) do
@@ -439,41 +439,4 @@ defmodule Voy.World.Contract do
   @doc "What the directed advection chain did, and whether phase composition is declared."
   @spec chain(t()) :: map()
   def chain(%__MODULE__{data: data}), do: data["oracle"]["chain"]
-
-  # ==== conformance ==== //
-
-  @doc """
-  Check the declared symbolic stock against the measured contract.
-
-  Two different questions, kept apart:
-
-    * the regime partition samples must agree exactly (a partition is a
-      definition, not a measurement);
-    * the declared cycle windows must agree with the contract's declared
-      windows (the stock may not name a window the contract does not).
-  """
-  @spec conformance(t(), Voy.World.Profile.t()) :: %{
-          regime: [map()],
-          windows: [map()],
-          ok?: boolean()
-        }
-  def conformance(%__MODULE__{} = contract, profile \\ Voy.World.Profile.default()) do
-    regime =
-      for sample <- regime_samples(contract),
-          actual = Voy.World.Profile.regime(profile, sample.stress, sample.activity),
-          actual != sample.regime do
-        Map.put(sample, :stock, actual)
-      end
-
-    declared = windows(contract)
-    stock = Voy.World.Profile.windows(profile)
-
-    windows =
-      for {name, bounds} <- declared,
-          Map.get(stock, name) != bounds do
-        %{window: name, contract: bounds, stock: Map.get(stock, name)}
-      end
-
-    %{regime: regime, windows: windows, ok?: regime == [] and windows == []}
-  end
 end

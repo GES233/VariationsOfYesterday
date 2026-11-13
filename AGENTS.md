@@ -46,9 +46,9 @@
 - `src/main/java/moe/chestnut/awa/voy/mixin/` — mixin 层（`VillagerEntityMixin` 交易/繁殖/铁傀儡、`CropBlockMixin` 作物生长，均委托 `MandateEconomy`；Java 源与 Scala 联合编译，见 `build.gradle` 的 sourceSets 配置）
 - `src/test/scala/moe/chestnut/awa/voy/` — 19 个 JUnit 5 测试规范（`GridBenchmarkSpec` 默认跳过）；`inner/veins/` 下 15 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
-- `tools/voy_world/` — Elixir 关系世界模型：
+- `tools/voy_world/` — Elixir 关系世界模型与叙事无冲突沙盘：
   - `lib/voy/kanren/` — microKanren 内核与 DSL
-  - `lib/voy/world/` — `Chronicle`（地形与四纪六结局）、`Pathway + Witness + Content`（五跳局部证据与种子物化）、`Observation + Ascribe + Slice + Contract`（三方观测与 24 候选反演）、`Facts`（运行时事实日志）、`Node + Naming + Export + Canon`（节点编译、schema v2 导出与静态检查）、`Profile`（跨栈 Regime 阈值镜像）、`Schema + Projection + Timeline + Texts`（地形 schema、结构投影、时间线与文本校验）、`Dynamics`（相位/Regime 词汇表）、`Fields`（keyword/map 字段访问统一）；门面 `Voy.World`、Mix 任务 `Mix.Tasks.Voy.Content`
+  - `lib/voy/world/` — `Chronicle`（地形与四纪六结局、玩家干预求解）、`Pathway + Witness + Content + Canon + Timeline`（五跳局部证据链、种子物化、散文卡片加载与无冲突静态检查）、`Observation + Ascribe + Slice + Contract`（三方有损观测与 24 候选假说溯因反演沙盘）、`Schema + Texts + Fields`（地形与六结局单一真相表、上中下游建筑描述投影、统一字段访问）；门面 `Voy.World`、Mix 任务 `Mix.Tasks.Voy.Content`
   - `content/documents/` — 唯一叙事散文来源（32 张主链卡 + 4 张干扰卡）
 - `docs/` — 中文设计文档（索引与状态见 `docs/README.md`）：草案 01 与札记 02/05/06/07/08/09/10、验证报告 01；原札记 03/04 已分别并入 05/02。
 

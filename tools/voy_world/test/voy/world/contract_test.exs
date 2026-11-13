@@ -1,7 +1,7 @@
 defmodule Voy.World.ContractTest do
   use ExUnit.Case, async: true
 
-  alias Voy.World.{Contract, Profile}
+  alias Voy.World.Contract
 
   setup_all do
     {:ok, contract: Contract.load!()}
@@ -126,19 +126,13 @@ defmodule Voy.World.ContractTest do
     assert length(Contract.world_pulses(contract)) == 4
   end
 
-  test "the declared stock reproduces the measured regime partition", %{contract: contract} do
-    report = Contract.conformance(contract)
-    assert report.regime == []
-    assert report.windows == []
-    assert report.ok?
-  end
+  test "regime samples and declared windows are structurally valid", %{contract: contract} do
+    samples = Contract.regime_samples(contract)
+    assert samples != []
+    assert Enum.all?(samples, &(&1.regime in [:Calm, :Strained, :Oscillating, :Burnout]))
 
-  test "a stock that names a window the contract does not is caught", %{contract: contract} do
-    stale = Profile.new(id: "stale_v1", window: %{absolute: {0.2, 0.3}, relative: {0.4, 0.6}})
-    report = Contract.conformance(contract, stale)
-
-    refute report.ok?
-    assert [%{window: :late}] = report.windows
+    windows = Contract.windows(contract)
+    assert Map.keys(windows) |> Enum.sort() == [:absolute, :late, :relative]
   end
 
   test "the chain refuses phase composition, with a measured reason", %{contract: contract} do

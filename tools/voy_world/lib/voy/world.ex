@@ -3,7 +3,7 @@ defmodule Voy.World do
 
   use Voy.Kanren
 
-  alias Voy.World.{Chronicle, Node, Schema, Witness}
+  alias Voy.World.{Chronicle, Schema, Witness}
 
   def compile_branch(topo_fields) do
     topo = Schema.topology(topo_fields)
@@ -24,26 +24,6 @@ defmodule Voy.World do
   def settle_open_dossier(dossier, intervention, opts \\ []) do
     with {:ok, settled} <- Witness.settle_open_dossier(dossier, intervention, opts) do
       {:ok, Schema.to_public(settled)}
-    end
-  end
-
-  def solve_node(spec_fields, feature_fields \\ []) do
-    with {:ok, candidates} <- Node.solve(spec_fields, feature_fields) do
-      {:ok, Enum.map(candidates, &Schema.to_public/1)}
-    end
-  end
-
-  def reverse_node(spec_fields), do: solve_node(spec_fields, [])
-
-  def compile_node(spec_fields, feature_fields) do
-    with {:ok, records} <- Node.compile(spec_fields, feature_fields) do
-      {:ok, Enum.map(records, &Schema.to_public/1)}
-    end
-  end
-
-  def materialize_node(spec_fields, candidate) do
-    with {:ok, record} <- Node.materialize(spec_fields, candidate) do
-      {:ok, Schema.to_public(record)}
     end
   end
 

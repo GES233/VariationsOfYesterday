@@ -1,5 +1,5 @@
 defmodule Voy.World.Schema do
-  @moduledoc "Canonical topography attributes and JSON-safe boundary conversion."
+  @moduledoc "Canonical topography attributes, domain vocabularies, fate metadata, and JSON-safe conversion."
 
   alias Voy.Kanren.ReifiedVar
   alias Voy.World.Fields
@@ -25,6 +25,10 @@ defmodule Voy.World.Schema do
     accessibility: [:tractor_road_accessible, :cliff_isolated]
   }
 
+  @relics [:ancestral_bronze_zheng, :carved_diversion_stele]
+  @c0_states [:c0_collapsed, :c0_intact]
+  @pulses [:alpha_shock, :OverwhelmingNegativeSuppression, :heavy_kick]
+
   @fates [
     :Fate_Assimilated_NewZhai,
     :Fate_Annihilated_BurnoutZone,
@@ -33,6 +37,69 @@ defmodule Voy.World.Schema do
     :Fate_Deferred_ChronicSeep,
     :Fate_Tolerated_FalseAlarm
   ]
+
+  @fate_specs %{
+    Fate_Assimilated_NewZhai: %{
+      c0_status: :c0_collapsed,
+      pulse: :alpha_shock,
+      regime: :Oscillating,
+      governance: :brigade_elder_joint_council,
+      hop2_relation: :requisitioned_as_scrap,
+      hop3_relation: :cast_into_industrial_vessel,
+      hop4_relation: :duty_cycle_inversion_diagnosed,
+      hop5_relation: :enacted_as_survival_ritual
+    },
+    Fate_Annihilated_BurnoutZone: %{
+      c0_status: :c0_collapsed,
+      pulse: :OverwhelmingNegativeSuppression,
+      regime: :Burnout,
+      governance: :depopulated_concrete_sealed_zone,
+      hop2_relation: :requisitioned_as_scrap,
+      hop3_relation: :cast_into_industrial_vessel,
+      hop4_relation: :overwhelming_grout_burnout_diagnosed,
+      hop5_relation: :enacted_as_concrete_quarantine
+    },
+    Fate_Deferred_ChronicSeep: %{
+      c0_status: :c0_collapsed,
+      pulse: :heavy_kick,
+      regime: :Strained,
+      governance: :deferred_evacuation_watchpost,
+      hop2_relation: :requisitioned_as_scrap,
+      hop3_relation: :cast_into_industrial_vessel,
+      hop4_relation: :subthreshold_chronic_seep_diagnosed,
+      hop5_relation: :enacted_as_watchpost_ledger_rule
+    },
+    Fate_Ancestral_ControlGroup: %{
+      c0_status: :c0_intact,
+      pulse: :heavy_kick,
+      regime: :Calm,
+      governance: :restored_ancestral_compact,
+      hop2_relation: :catalogued_in_situ_custody,
+      hop3_relation: :coupled_into_auxiliary_vessel,
+      hop4_relation: :intact_basin_control_diagnosed,
+      hop5_relation: :enacted_as_ancestral_compact
+    },
+    Fate_Tolerated_FalseAlarm: %{
+      c0_status: :c0_intact,
+      pulse: :alpha_shock,
+      regime: :Calm,
+      governance: :cliff_observation_hermitage,
+      hop2_relation: :catalogued_in_situ_custody,
+      hop3_relation: :coupled_into_auxiliary_vessel,
+      hop4_relation: :forty_seven_false_alarms_diagnosed,
+      hop5_relation: :enacted_as_hermitage_watch_rule
+    },
+    Fate_Ascended_SpatialRift: %{
+      c0_status: :c0_intact,
+      pulse: :OverwhelmingNegativeSuppression,
+      regime: :Strained,
+      governance: :rift_guarding_cliff_compact,
+      hop2_relation: :catalogued_in_situ_custody,
+      hop3_relation: :coupled_into_auxiliary_vessel,
+      hop4_relation: :excitation_zenith_rift_diagnosed,
+      hop5_relation: :enacted_as_rift_fire_oath
+    }
+  }
 
   @horizons [:locked, :open]
 
@@ -48,12 +115,29 @@ defmodule Voy.World.Schema do
   def topology_keys, do: @topology_keys
   def feature_keys, do: @feature_keys
   def feature_domain(key), do: Map.fetch!(@feature_domains, key)
+  def relics, do: @relics
+  def c0_states, do: @c0_states
+  def pulses, do: @pulses
   def fates, do: @fates
+  def fate_specs, do: @fate_specs
   def horizons, do: @horizons
   def interventions, do: @interventions
   def regimes, do: @regimes
 
+  def fate_spec(fate) do
+    case normalize_fate(fate) do
+      {:ok, normalized} ->
+        Map.fetch!(@fate_specs, normalized)
+
+      {:error, reason} ->
+        raise ArgumentError, "unknown fate #{inspect(fate)}: #{inspect(reason)}"
+    end
+  end
+
   def normalize_fate(fate), do: normalize_enum(fate, @fates, :unknown_fate)
+  def normalize_relic(relic), do: normalize_enum(relic, @relics, :unknown_relic)
+  def normalize_c0(c0), do: normalize_enum(c0, @c0_states, :invalid_c0_status)
+  def normalize_pulse(pulse), do: normalize_enum(pulse, @pulses, :invalid_pulse)
   def normalize_horizon(horizon), do: normalize_enum(horizon, @horizons, :invalid_horizon)
 
   def normalize_intervention(intervention),

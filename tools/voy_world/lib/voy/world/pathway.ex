@@ -51,76 +51,13 @@ defmodule Voy.World.Pathway do
     }
   ]
 
-  @fate_specs %{
-    Fate_Assimilated_NewZhai: %{
-      c0_status: :c0_collapsed,
-      pulse: :alpha_shock,
-      regime: :Oscillating,
-      hop2_relation: :requisitioned_as_scrap,
-      hop3_relation: :cast_into_industrial_vessel,
-      hop4_relation: :duty_cycle_inversion_diagnosed,
-      hop5_relation: :enacted_as_survival_ritual,
-      governance: :brigade_elder_joint_council
-    },
-    Fate_Annihilated_BurnoutZone: %{
-      c0_status: :c0_collapsed,
-      pulse: :OverwhelmingNegativeSuppression,
-      regime: :Burnout,
-      hop2_relation: :requisitioned_as_scrap,
-      hop3_relation: :cast_into_industrial_vessel,
-      hop4_relation: :overwhelming_grout_burnout_diagnosed,
-      hop5_relation: :enacted_as_concrete_quarantine,
-      governance: :depopulated_concrete_sealed_zone
-    },
-    Fate_Deferred_ChronicSeep: %{
-      c0_status: :c0_collapsed,
-      pulse: :heavy_kick,
-      regime: :Strained,
-      hop2_relation: :requisitioned_as_scrap,
-      hop3_relation: :cast_into_industrial_vessel,
-      hop4_relation: :subthreshold_chronic_seep_diagnosed,
-      hop5_relation: :enacted_as_watchpost_ledger_rule,
-      governance: :deferred_evacuation_watchpost
-    },
-    Fate_Ancestral_ControlGroup: %{
-      c0_status: :c0_intact,
-      pulse: :heavy_kick,
-      regime: :Calm,
-      hop2_relation: :catalogued_in_situ_custody,
-      hop3_relation: :coupled_into_auxiliary_vessel,
-      hop4_relation: :intact_basin_control_diagnosed,
-      hop5_relation: :enacted_as_ancestral_compact,
-      governance: :restored_ancestral_compact
-    },
-    Fate_Tolerated_FalseAlarm: %{
-      c0_status: :c0_intact,
-      pulse: :alpha_shock,
-      regime: :Calm,
-      hop2_relation: :catalogued_in_situ_custody,
-      hop3_relation: :coupled_into_auxiliary_vessel,
-      hop4_relation: :forty_seven_false_alarms_diagnosed,
-      hop5_relation: :enacted_as_hermitage_watch_rule,
-      governance: :cliff_observation_hermitage
-    },
-    Fate_Ascended_SpatialRift: %{
-      c0_status: :c0_intact,
-      pulse: :OverwhelmingNegativeSuppression,
-      regime: :Strained,
-      hop2_relation: :catalogued_in_situ_custody,
-      hop3_relation: :coupled_into_auxiliary_vessel,
-      hop4_relation: :excitation_zenith_rift_diagnosed,
-      hop5_relation: :enacted_as_rift_fire_oath,
-      governance: :rift_guarding_cliff_compact
-    }
-  }
-
   @doc "The relic branches the pathway knows, in declaration order."
   @spec relics() :: [atom()]
-  def relics, do: Enum.map(@relic_specs, & &1.relic)
+  def relics, do: Schema.relics()
 
   @doc "Physical `(c0_status, pulse, regime, governance)` metadata for a fate."
   @spec fate_spec(atom() | String.t()) :: map()
-  def fate_spec(fate), do: Map.fetch!(@fate_specs, fate!(fate))
+  def fate_spec(fate), do: Schema.fate_spec(fate)
 
   @doc "The declared cycle window the safe taps live in."
   @spec window() :: atom()
@@ -140,7 +77,7 @@ defmodule Voy.World.Pathway do
   def edges(relic, fate) do
     spec = spec!(relic)
     fate = fate!(fate)
-    fspec = Map.fetch!(@fate_specs, fate)
+    fspec = Schema.fate_spec(fate)
     batch = {:batch, :main}
     vessel = {:vessel, :main}
 

@@ -10,9 +10,7 @@ defmodule Voy.World.Content do
   alias Voy.World.{Pathway, Schema, Witness}
 
   @pack_dir Path.expand("../../../content", __DIR__)
-  @relics [:ancestral_bronze_zheng, :carved_diversion_stele]
   @roles [:main, :decoy]
-  @c0_states [:c0_collapsed, :c0_intact]
   @decoy_classes [:material_mismatch, :destination_dead_end]
   @front_matter_keys ~w(hop role relic fate c0_status decoy_class title)
   @placeholders ~w(
@@ -40,7 +38,7 @@ defmodule Voy.World.Content do
     end
   end
 
-  def relics, do: @relics
+  def relics, do: Schema.relics()
   def placeholders, do: @placeholders
 
   @doc "Load and validate every Markdown card under `dir/documents`."
@@ -203,9 +201,9 @@ defmodule Voy.World.Content do
 
   defp build_document(id, f, body, source) do
     with {:ok, role} <- enum_field(f, "role", @roles, true, source),
-         {:ok, relic} <- enum_field(f, "relic", @relics, true, source),
+         {:ok, relic} <- enum_field(f, "relic", Schema.relics(), true, source),
          {:ok, fate} <- enum_field(f, "fate", Schema.fates(), false, source),
-         {:ok, c0} <- enum_field(f, "c0_status", @c0_states, false, source),
+         {:ok, c0} <- enum_field(f, "c0_status", Schema.c0_states(), false, source),
          {:ok, decoy} <- enum_field(f, "decoy_class", @decoy_classes, false, source),
          {:ok, hop} <- hop_field(f, role, source),
          :ok <- check_conditions(role, hop, fate, c0, decoy, source),

@@ -3,9 +3,19 @@ defmodule Voy.World.Chronicle do
 
   use Voy.Kanren
 
-  alias Voy.World.{Dynamics, Fields, Projection, Schema}
+  alias Voy.World.{Fields, Schema, Texts}
+
+  @disturbance_pulses [
+    [disturbance: :periodic_shallow_blasting, pulse: :alpha_shock],
+    [disturbance: :overwhelming_reverse_suppression, pulse: :OverwhelmingNegativeSuppression],
+    [disturbance: :low_level_logging_shock, pulse: :heavy_kick]
+  ]
 
   def interventions, do: Schema.interventions()
+
+  def disturbance_pulseo(disturbance, pulse) do
+    tableo(@disturbance_pulses, disturbance: disturbance, pulse: pulse)
+  end
 
   def era1_headmano(topo, era1) do
     fresh [branch_id, up_type, pass_type, down_type, guardian_relic, damping_mode] do
@@ -153,7 +163,7 @@ defmodule Voy.World.Chronicle do
         ]
       end
 
-      Dynamics.disturbance_pulseo(disturbance_mode, pulse)
+      disturbance_pulseo(disturbance_mode, pulse)
 
       eq(era2b,
         org_after_reorg: org_after,
@@ -346,7 +356,7 @@ defmodule Voy.World.Chronicle do
       propso(topo, branch_id: branch_id)
       history_through_era3o(topo, history)
       propso(history, era1: era1, era2a: era2a, era2b: era2b, era3: era3)
-      Projection.compile_structureso(topo, era1, era2b, era3, structures)
+      Texts.compile_structureso(topo, era1, era2b, era3, structures)
 
       eq(slice,
         branch_id: branch_id,
@@ -496,25 +506,14 @@ defmodule Voy.World.Chronicle do
   defp opt_regime(v), do: Schema.normalize_regime(v)
 
   defp opt_c0(v) when v in [:any, "any", nil], do: {:ok, :any}
-  defp opt_c0(v) when v in [:c0_collapsed, :c0_intact], do: {:ok, v}
-  defp opt_c0("c0_collapsed"), do: {:ok, :c0_collapsed}
-  defp opt_c0("c0_intact"), do: {:ok, :c0_intact}
-  defp opt_c0(_v), do: {:error, :invalid_c0_status}
+  defp opt_c0(v), do: Schema.normalize_c0(v)
 
   defp opt_pulse(v) when v in [:any, "any", nil], do: {:ok, :any}
-
-  defp opt_pulse(v)
-       when v in [:alpha_shock, :OverwhelmingNegativeSuppression, :heavy_kick],
-       do: {:ok, v}
-
-  defp opt_pulse("alpha_shock"), do: {:ok, :alpha_shock}
-  defp opt_pulse("OverwhelmingNegativeSuppression"), do: {:ok, :OverwhelmingNegativeSuppression}
-  defp opt_pulse("heavy_kick"), do: {:ok, :heavy_kick}
-  defp opt_pulse(_v), do: {:error, :invalid_pulse}
+  defp opt_pulse(v), do: Schema.normalize_pulse(v)
 
   defp classify_source(fate) when is_atom(fate) or is_binary(fate) do
     with {:ok, normalized} <- Schema.normalize_fate(fate) do
-      spec = Voy.World.Pathway.fate_spec(normalized)
+      spec = Schema.fate_spec(normalized)
       {:ok, {:era2b, [c0_status: spec.c0_status, pulse: spec.pulse]}}
     end
   end

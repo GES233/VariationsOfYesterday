@@ -1,7 +1,7 @@
 defmodule Voy.World.AscribeTest do
   use ExUnit.Case, async: true
 
-  alias Voy.World.{Ascribe, Contract, Facts, Observation, Slice}
+  alias Voy.World.{Ascribe, Contract, Observation, Slice}
 
   setup_all do
     {:ok, contract: Contract.load!()}
@@ -229,33 +229,6 @@ defmodule Voy.World.AscribeTest do
     for forbidden <- [:fate, :document, :author, :claim, :verdict, :expected_cause] do
       refute MapSet.member?(fields, forbidden)
     end
-  end
-
-  # ==== the numeric layer settles the symbolic claim ==== //
-
-  test "a claim from the archives is settled by the numeric oracle", %{contract: contract} do
-    # The archives claim the pulse landed in the vulnerable window and fired
-    # the surge. The oracle measured a delay. The ledger records the claim,
-    # then records its settlement against the measurement.
-    {:ok, predicted, log} =
-      Facts.record(Facts.new(),
-        tick: 100,
-        kind: :predicted,
-        actor: {:player, "u1"},
-        site: "branch_01_baishui/up",
-        props: [claim: "易损窗内点炮将当场激发一次尖峰", due_tick: 160]
-      )
-
-    outcome =
-      case Contract.outcome(contract, :alpha_shock, :relative) do
-        {:ok, %{outcome: :premature}} -> :held
-        {:ok, _} -> :failed
-        :error -> :partial
-      end
-
-    {:ok, settled, log} = Facts.settle(log, predicted.id, outcome, tick: 160)
-    assert settled.props[:outcome] == :failed
-    assert Facts.pending(log) == []
   end
 
   # ==== relational Kanren & minimal sufficient sets ==== //

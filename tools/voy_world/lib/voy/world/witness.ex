@@ -182,7 +182,7 @@ defmodule Voy.World.Witness do
          :ok <- ensure_open(horizon),
          :ok <- ensure_unsettled(Fields.fetch_opt(dossier, :settled, false)),
          {:ok, normalized_intervention} <- Schema.normalize_intervention(intervention),
-         {:ok, relic} <- normalize_relic(Fields.fetch_opt(dossier, :relic, nil)),
+         {:ok, relic} <- Schema.normalize_relic(Fields.fetch_opt(dossier, :relic, nil)),
          {:ok, baseline_fate} <-
            Schema.normalize_fate(
              Fields.fetch_opt(dossier, :baseline_fate, nil) ||
@@ -281,11 +281,6 @@ defmodule Voy.World.Witness do
       transition -> {:ok, transition}
     end
   end
-
-  defp normalize_relic(relic) when relic in [@relic_bronze, @relic_stele], do: {:ok, relic}
-  defp normalize_relic("ancestral_bronze_zheng"), do: {:ok, @relic_bronze}
-  defp normalize_relic("carved_diversion_stele"), do: {:ok, @relic_stele}
-  defp normalize_relic(_other), do: {:error, :unknown_relic}
 
   defp normalize_binding(binding, relic, fate) when is_map(binding) do
     dyn = dynamics()

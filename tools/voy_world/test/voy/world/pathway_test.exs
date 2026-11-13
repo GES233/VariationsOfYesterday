@@ -20,22 +20,6 @@ defmodule Voy.World.PathwayTest do
   @names %{up: "野猪箐", pass: "断碑垭口", down: "白水坝"}
   @branch :branch_01_baishui
 
-  @ascended_spec [
-    node_id: "node_rift_07",
-    branch_id: "branch_rift",
-    rule_set: :default_branch_v1,
-    fate_constraint: {:require, :Fate_Ascended_SpatialRift},
-    names: [node: "黑水支沟", up: "鬼哭漏斗", pass: "断碑垭口", down: "悬棺寨"]
-  ]
-
-  @ascended_features [
-    up_terrain: :karst_sinkhole_headwater,
-    pass_terrain: :canyon_pass,
-    down_terrain: :mid_terrace,
-    up_geology: :deep_stress_cavity,
-    accessibility: :cliff_isolated
-  ]
-
   defp pairs do
     for relic <- Pathway.relics(), fate <- Schema.fates(), do: {relic, fate}
   end
@@ -533,35 +517,38 @@ defmodule Voy.World.PathwayTest do
     assert Canon.check_pathways([]) == :ok
   end
 
-  # ==== seeded node dossier (design note 05 §1) ==== //
+  # ==== open dossier horizon and runtime settlement ==== //
 
-  test "normalize_spec treats the seed as optional and rejects non-integers" do
-    assert {:ok, spec} = Voy.World.Node.normalize_spec(@ascended_spec)
-    assert spec.seed == nil
+  test "open horizon renders Hop 1..4 + 2 decoys and settles into Hop 5 under player intervention" do
+    open_dossier =
+      Witness.render_dossier(
+        101,
+        @branch,
+        :ancestral_bronze_zheng,
+        :Fate_Assimilated_NewZhai,
+        @names,
+        horizon: :open
+      )
 
-    assert {:ok, %{seed: 42}} =
-             Voy.World.Node.normalize_spec(Keyword.put(@ascended_spec, :seed, 42))
+    assert open_dossier.horizon == :open
+    assert open_dossier.settled == false
+    assert open_dossier.baseline_fate == :Fate_Assimilated_NewZhai
+    assert length(open_dossier.documents) == 6
+    assert Enum.map(main_documents(open_dossier), & &1.hop) == [1, 2, 3, 4]
+    assert length(decoy_documents(open_dossier)) == 2
 
-    assert {:error, :invalid_seed} =
-             Voy.World.Node.normalize_spec(Keyword.put(@ascended_spec, :seed, "42"))
-  end
+    assert {:ok, settled} =
+             Voy.World.settle_open_dossier(open_dossier, :reanchor_and_dampen, names: @names)
 
-  test "compile_node requires a seed and mounts the sole five-hop narrative" do
-    assert {:error, :missing_seed} = Voy.World.compile_node(@ascended_spec, @ascended_features)
-
-    assert {:ok, [seeded]} =
-             Voy.World.compile_node(Keyword.put(@ascended_spec, :seed, 303), @ascended_features)
-
-    refute Map.has_key?(seeded, "archives")
-
-    dossier = seeded["dossier"]
-    assert dossier["seed"] == 303
-    assert dossier["relic"] == seeded["era1"]["guardian_relic"]
-    assert dossier["fate"] == seeded["era3"]["fate"]
-    assert length(dossier["documents"]) == 7
-    assert length(Enum.filter(dossier["documents"], &(&1["role"] == "main"))) == 5
-    assert length(Enum.filter(dossier["documents"], &(&1["role"] == "decoy"))) == 2
-    assert dossier["binding"]["safe_tick"] in Witness.safe_ticks()
+    assert settled["settled"] == true
+    assert settled["baseline_fate"] == "Fate_Assimilated_NewZhai"
+    assert settled["fate"] == "Fate_Ancestral_ControlGroup"
+    assert settled["final_regime"] == "Calm"
+    assert settled["applied_intervention"] == "reanchor_and_dampen"
+    assert length(settled["documents"]) == 7
+    assert settled["binding"]["batch_id"] == open_dossier.binding.batch_id
+    assert settled["binding"]["vessel_code"] == open_dossier.binding.vessel_code
+    assert settled["binding"]["safe_tick"] == open_dossier.binding.safe_tick
   end
 
   # ==== content preview micro-chain section ==== //
