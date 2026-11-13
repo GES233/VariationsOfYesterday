@@ -1,72 +1,17 @@
 const state = {
-  overview: null,
-  contract: null,
-  currentDossier: null,
-  currentPathway: null,
-  enabledHops: new Set([1, 2, 3, 4, 5]),
-  enabledDecoys: new Set(["material_mismatch", "destination_dead_end"]),
-  disabledEvidence: new Set(),
-  lastAscribe: null,
+  eras: [],
+  nodes: [],
+  edges: [],
+  audit: null,
+  wires: [], // [{id, from_edge_id, to_edge_id, valid, bridge, warnings, issues}]
+  selectedCardId: null,
+  selectedWireId: null,
+  highlightedCardIds: new Set(),
+  zoom: 1,
+  dirty: false,
+  dragCard: null,
+  dragWire: null,
 };
-
-const LABELS = {
-  // terrain
-  steep_fissure_headwater: "陡峻裂隙源头",
-  karst_sinkhole_headwater: "喀斯特漏斗源头",
-  canyon_pass: "峡谷隘口",
-  karst_gorge: "岩溶暗峡",
-  alluvial_flat: "冲积坝地",
-  mid_terrace: "半山台地",
-  active_fault_vein: "活动断裂脉",
-  deep_stress_cavity: "深部高应力溶腔",
-  minor_fracture: "次级微裂隙",
-  tractor_road_accessible: "拖拉机路可达",
-  cliff_isolated: "绝壁孤寨（不可通车）",
-  // relics & pulses & c0
-  ancestral_bronze_zheng: "镇山古铜钲",
-  carved_diversion_stele: "刻字分水石堰",
-  c0_collapsed: "c0_collapsed（维持源崩塌）",
-  c0_intact: "c0_intact（维持源完好）",
-  alpha_shock: "alpha_shock（周期浅层爆破）",
-  OverwhelmingNegativeSuppression: "OverwhelmingNegativeSuppression（超高压注浆抑制）",
-  heavy_kick: "heavy_kick（低烈度林工微扰）",
-  alpha_metal_resonance: "alpha_metal_resonance（三次金属谐振）",
-  alpha_shock_weak: "alpha_shock_weak（弱对照脉冲）",
-  // fates
-  Fate_Assimilated_NewZhai: "同化新寨（剧烈振荡）",
-  Fate_Annihilated_BurnoutZone: "绝灭封山（白化枯竭）",
-  Fate_Ascended_SpatialRift: "飞升裂隙（高能守山）",
-  Fate_Ancestral_ControlGroup: "祖制对照（平静回归）",
-  Fate_Deferred_ChronicSeep: "迁延渗漏（慢性紧绷）",
-  Fate_Tolerated_FalseAlarm: "耐受虚警（晚期吸收）",
-  // interventions
-  no_intervention: "不作干预（维持基线）",
-  reanchor_vessel: "重锚耦合载体（恢复 c0）",
-  dampen_headwater: "压抑源头脉冲（降为 heavy_kick）",
-  reanchor_and_dampen: "重锚载体 + 压抑源头",
-  // lenses
-  official_hq: "总指挥部（OfficialHQ · 月度行政）",
-  tech_inner: "技术内层（TechInner · 垂架/测钟）",
-  old_zhai: "老寨（OldZhai · 物候口述）",
-  // outcomes
-  premature: "Premature（早发）",
-  delayed: "Delayed（推迟）",
-  absorbed: "Absorbed（吸收）",
-  disrupted: "Disrupted（紊乱）",
-  unresolved: "Unresolved（未决）",
-  // windows
-  absolute: "absolute（φ≈0.15 绝对不应期）",
-  relative: "relative（φ≈0.50 相对不应期）",
-  late: "late（φ≈0.80 晚期恢复）",
-};
-
-function labelOf(k) {
-  return LABELS[k] ? `${LABELS[k]} (${k})` : String(k ?? "");
-}
-
-function shortLabel(k) {
-  return LABELS[k] || String(k ?? "");
-}
 
 function esc(v) {
   return String(v ?? "")
@@ -77,944 +22,929 @@ function esc(v) {
 }
 
 async function api(path, body = null) {
-  const opts = body === null
-    ? { method: "GET" }
-    : {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      };
+  const opts =
+    body === null
+      ? { method: "GET" }
+      : {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        };
   const res = await fetch(path, opts);
   const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || `HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
 
-function regimeBadgeClass(regime) {
-  if (regime === "Calm") return "ok";
-  if (regime === "Burnout") return "err";
-  return "warn";
+function toast(msg, kind = "") {
+  const el = document.getElementById("toast-msg");
+  el.textContent = msg;
+  el.className = `hud-pill ${kind}`;
 }
 
-function formatTermValue(v) {
-  if (Array.isArray(v)) return v.join(" · ");
-  if (v && typeof v === "object") return JSON.stringify(v);
-  return String(v);
+function markDirty(flag = true) {
+  state.dirty = flag;
+  const btn = document.getElementById("btn-save");
+  btn.textContent = flag ? "保存到文件 *" : "保存到文件";
 }
 
-// ==== Tabs ====
-document.querySelectorAll(".tab").forEach((btn) => {
+function eraById(id) {
+  return state.eras.find((e) => e.id === id);
+}
+
+function nodeById(id) {
+  return state.nodes.find((n) => n.id === id);
+}
+
+function edgeById(id) {
+  return state.edges.find((e) => e.id === id);
+}
+
+function nodeLabel(id) {
+  const n = nodeById(id);
+  return n ? `${n.label}` : id;
+}
+
+// ==== Subtabs ====
+document.querySelectorAll(".subtab").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+    switchSubtab(btn.dataset.subtab);
   });
 });
 
-// ==== Bootstrap ====
+function switchSubtab(name) {
+  document.querySelectorAll(".subtab").forEach((b) => b.classList.toggle("active", b.dataset.subtab === name));
+  document.querySelectorAll(".subpanel").forEach((p) => p.classList.toggle("active", p.id === `panel-${name}`));
+}
+
+// ==== Init ====
 async function init() {
-  const overview = await api("/api/overview");
-  state.overview = overview;
-
-  document.getElementById("header-meta").textContent =
-    `contract=${overview.contract_path} · digest=${overview.source_digest.slice(0, 12)}… · content_lint=${overview.content_lint.error_count} err`;
-
-  setupChronicleTab(overview);
-  setupPathwayTab(overview);
-  setupAscribeTab(overview);
-
-  // Run initial panels in parallel
-  await Promise.all([
-    compileChronicle(),
-    loadDossier(),
-    runAscribe(),
-    loadContractAndCanon(),
-  ]);
+  const world = await api("/api/world");
+  loadWorldState(world);
+  autoWireValidOnBoard();
+  bindTopbar();
+  bindBoardInteractions();
 }
 
-// ==== TAB 1: CHRONICLE ====
-function setupChronicleTab(overview) {
-  const { feature_domains, fates } = overview.schemas;
-  fillSelect("ch-up-terrain", feature_domains.up_terrain);
-  fillSelect("ch-pass-terrain", feature_domains.pass_terrain);
-  fillSelect("ch-down-terrain", feature_domains.down_terrain);
-  fillSelect("ch-up-geology", feature_domains.up_geology);
-  fillSelect("ch-accessibility", feature_domains.accessibility);
-  fillSelect("reverse-fate-select", fates);
-
-  const presetStrip = document.getElementById("chronicle-presets");
-  presetStrip.innerHTML = overview.presets
-    .map((p) => `<button type="button" class="chip-btn" data-preset="${esc(p.id)}">${esc(p.topo.down_name)} (${esc(p.id)})</button>`)
-    .join("");
-
-  presetStrip.querySelectorAll("button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const preset = overview.presets.find((p) => p.id === btn.dataset.preset);
-      if (!preset) return;
-      presetStrip.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      const t = preset.topo;
-      document.getElementById("ch-up-name").value = t.up_name;
-      document.getElementById("ch-pass-name").value = t.pass_name;
-      document.getElementById("ch-down-name").value = t.down_name;
-      document.getElementById("ch-up-terrain").value = t.up_terrain;
-      document.getElementById("ch-pass-terrain").value = t.pass_terrain;
-      document.getElementById("ch-down-terrain").value = t.down_terrain;
-      document.getElementById("ch-up-geology").value = t.up_geology;
-      document.getElementById("ch-accessibility").value = t.accessibility;
-      compileChronicle();
-    });
-  });
-
-  document.getElementById("chronicle-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    compileChronicle();
-  });
-
-  document.getElementById("reverse-fate-btn").addEventListener("click", runReverseWorldgen);
+function loadWorldState(world) {
+  state.eras = world.eras;
+  state.nodes = world.nodes;
+  state.edges = world.edges;
+  state.audit = world.audit;
+  markDirty(false);
+  renderAll();
 }
 
-async function compileChronicle() {
-  const out = document.getElementById("chronicle-output");
-  const payload = {
-    branch_id: "branch_webui",
-    up_name: document.getElementById("ch-up-name").value,
-    pass_name: document.getElementById("ch-pass-name").value,
-    down_name: document.getElementById("ch-down-name").value,
-    up_terrain: document.getElementById("ch-up-terrain").value,
-    pass_terrain: document.getElementById("ch-pass-terrain").value,
-    down_terrain: document.getElementById("ch-down-terrain").value,
-    up_geology: document.getElementById("ch-up-geology").value,
-    accessibility: document.getElementById("ch-accessibility").value,
-  };
-
-  try {
-    const res = await api("/api/chronicle/compile", payload);
-    const slice = res.slices[0];
-    const era1 = slice.era1;
-    const era2a = slice.era2a;
-    const era2b = slice.era2b;
-    const era3 = slice.era3;
-    const st = slice.structures;
-
-    out.innerHTML = `
-      <div class="card">
-        <div class="card-head">
-          <h2>四纪演化切片：${esc(payload.up_name)} → ${esc(payload.pass_name)} → ${esc(payload.down_name)}</h2>
-          <span class="badge ${regimeBadgeClass(era3.final_regime)}">${esc(era3.fate)} · ${esc(era3.final_regime)}</span>
-        </div>
-        <div class="era-grid">
-          <div class="era-box">
-            <h4>第一纪 · 山官古制 (Era 1)</h4>
-            <dl class="kv-list">
-              <dt>polity</dt><dd>${esc(era1.polity)}</dd>
-              <dt>relic</dt><dd>${esc(labelOf(era1.guardian_relic))}</dd>
-              <dt>damping</dt><dd>${esc(era1.damping_mode)}</dd>
-              <dt>c0</dt><dd>${esc(era1.initial_c0)} (${esc(era1.initial_regime)})</dd>
-            </dl>
-          </div>
-          <div class="era-box">
-            <h4>第二纪甲 · 流官试探 (Era 2a)</h4>
-            <dl class="kv-list">
-              <dt>attempt</dt><dd>${esc(era2a.attempt)}</dd>
-              <dt>backlash</dt><dd>${esc(era2a.historical_backlash)}</dd>
-              <dt>polity</dt><dd>${esc(era2a.resulting_polity)}</dd>
-              <dt>precedent</dt><dd>${esc(era2a.gazetteer_precedent)}</dd>
-            </dl>
-          </div>
-          <div class="era-box">
-            <h4>第二纪乙 · 垦殖入山 (Era 2b)</h4>
-            <dl class="kv-list">
-              <dt>org</dt><dd>${esc(era2b.org_after_reorg)}</dd>
-              <dt>team</dt><dd>${esc(era2b.stationed_team)}</dd>
-              <dt>c0_status</dt><dd>${esc(era2b.c0_status)}</dd>
-              <dt>pulse</dt><dd>${esc(era2b.pulse)}</dd>
-            </dl>
-          </div>
-          <div class="era-box era3">
-            <h4>第三纪 · 撤出与现状 (Era 3)</h4>
-            <dl class="kv-list">
-              <dt>fate</dt><dd><strong>${esc(shortLabel(era3.fate))}</strong></dd>
-              <dt>regime</dt><dd>${esc(era3.final_regime)}</dd>
-              <dt>phase_rule</dt><dd>${esc(era3.phase_rule)}</dd>
-              <dt>polity</dt><dd>${esc(era3.post_withdrawal_polity)}</dd>
-            </dl>
-          </div>
-        </div>
-        <div style="margin-top:0.85rem;">
-          <h4 style="margin:0 0 0.45rem;font-size:0.9rem;">三处遗址结构投影（Texts.compile_structureso）</h4>
-          <table class="data-table">
-            <thead><tr><th>点位</th><th>地名</th><th>结构表象</th></tr></thead>
-            <tbody>
-              <tr><td>上游源头</td><td>${esc(st.upstream_site[0])}</td><td>${esc(st.upstream_site[1])}</td></tr>
-              <tr><td>隘口枢纽</td><td>${esc(st.pass_site[0])}</td><td>${esc(st.pass_site[1])}</td></tr>
-              <tr><td>下游坝寨</td><td>${esc(st.downstream_site[0])}</td><td>${esc(st.downstream_site[1])}</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <h2>玩家干预可达未来求解 · Chronicle.solve_interventions/2</h2>
-          <span class="badge">${res.interventions.length} 条可达迁移</span>
-        </div>
-        <table class="data-table">
-          <thead>
-            <tr><th>干预动作</th><th>有效维持源 (c0)</th><th>有效脉冲</th><th>目标结局</th><th>慢变量分区</th><th>相位规则</th></tr>
-          </thead>
-          <tbody>
-            ${res.interventions
-              .map(
-                (tr) => `
-              <tr>
-                <td><strong>${esc(shortLabel(tr.intervention))}</strong><br><span class="mono muted">${esc(tr.intervention)}</span></td>
-                <td class="mono">${esc(tr.effective_c0)}</td>
-                <td class="mono">${esc(tr.effective_pulse)}</td>
-                <td>${esc(shortLabel(tr.target_fate))}</td>
-                <td><span class="badge ${regimeBadgeClass(tr.target_regime)}">${esc(tr.target_regime)}</span></td>
-                <td class="mono">${esc(tr.phase_rule)}</td>
-              </tr>`
-              )
-              .join("")}
-          </tbody>
-        </table>
-      </div>
-    `;
-  } catch (err) {
-    out.innerHTML = `
-      <div class="card">
-        <div class="card-head">
-          <h2>地形组合不受支持</h2>
-          <span class="badge warn">${esc(err.message)}</span>
-        </div>
-        <p class="muted">microKanren 仅允许配对的地质与源头地形（例如 <code>steep_fissure_headwater</code> 配 <code>active_fault_vein</code> 或 <code>minor_fracture</code>；<code>karst_sinkhole_headwater</code> 配 <code>deep_stress_cavity</code>）。</p>
-      </div>
-    `;
-  }
+function renderAll() {
+  renderAuditSummary();
+  renderEraFilters();
+  renderLeftDrawers();
+  renderBoardCards();
+  renderWires();
+  renderInspector();
+  renderEraEditor();
+  renderPathfinderSelects();
 }
 
-async function runReverseWorldgen() {
-  const fate = document.getElementById("reverse-fate-select").value;
-  const box = document.getElementById("reverse-results");
-  box.innerHTML = `<span class="muted">正在执行 Voy.World.reverse_worldgen(${esc(fate)})…</span>`;
-  try {
-    const res = await api("/api/chronicle/reverse", { fate });
-    if (res.slices.length === 0) {
-      box.innerHTML = `<span class="badge err">无匹配地形</span>`;
-      return;
-    }
-    box.innerHTML = `
-      <div class="badge ok" style="align-self:flex-start;">共找到 ${res.count} 组可演化为「${esc(shortLabel(fate))}」的地形</div>
-      <table class="data-table">
-        <thead><tr><th>#</th><th>up_terrain</th><th>pass_terrain</th><th>down_terrain</th><th>up_geology</th><th>accessibility</th></tr></thead>
-        <tbody>
-          ${res.slices
-            .map((s, i) => {
-              const t = s.topography;
-              return `<tr>
-                <td>${i + 1}</td>
-                <td>${esc(shortLabel(t.up_terrain))}</td>
-                <td>${esc(shortLabel(t.pass_terrain))}</td>
-                <td>${esc(shortLabel(t.down_terrain))}</td>
-                <td>${esc(shortLabel(t.up_geology))}</td>
-                <td>${esc(shortLabel(t.accessibility))}</td>
-              </tr>`;
-            })
-            .join("")}
-        </tbody>
-      </table>
-    `;
-  } catch (err) {
-    box.innerHTML = `<span class="badge err">${esc(err.message)}</span>`;
-  }
+function renderAuditSummary() {
+  const s = state.audit?.summary;
+  if (!s) return;
+  document.getElementById("audit-summary").textContent =
+    `节点 ${s.nodes} · 卡片 ${s.edges} · 合规 ${s.ok_edges} · 词表外 ${s.warn_edges} · 冲突 ${s.error_edges} · 合法桥接 ${s.valid_bridges}`;
 }
 
-// ==== TAB 2: PATHWAY & DOSSIER ====
-function setupPathwayTab(overview) {
-  fillSelect("pw-relic", overview.schemas.relics);
-  fillSelect("pw-fate", overview.schemas.fates);
-
-  const presetStrip = document.getElementById("dossier-presets");
-  presetStrip.innerHTML = overview.presets
-    .map((p) => `<button type="button" class="chip-btn" data-preset="${esc(p.id)}">${esc(p.topo.down_name)}</button>`)
-    .join("");
-
-  presetStrip.querySelectorAll("button").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const preset = overview.presets.find((p) => p.id === btn.dataset.preset);
-      if (!preset) return;
-      presetStrip.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      const compiled = await api("/api/chronicle/compile", preset.topo);
-      const slice = compiled.slices[0];
-      document.getElementById("pw-relic").value = slice.era1.guardian_relic;
-      document.getElementById("pw-fate").value = slice.era3.fate;
-      await loadDossier(preset.topo);
-    });
-  });
-
-  document.getElementById("pw-load-btn").addEventListener("click", () => loadDossier());
+function renderEraFilters() {
+  const filter = document.getElementById("filter-era");
+  const cur = filter.value || "all";
+  filter.innerHTML =
+    `<option value="all">全部时代</option>` +
+    state.eras.map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("");
+  filter.value = cur;
 }
 
-async function loadDossier(topoOverride = null) {
-  const relic = document.getElementById("pw-relic").value;
-  const fate = document.getElementById("pw-fate").value;
-  const seed = Number(document.getElementById("pw-seed").value || 101);
-  const horizon = document.getElementById("pw-horizon").value;
+function renderLeftDrawers() {
+  const filterEra = document.getElementById("filter-era").value || "all";
+  const reports = state.audit?.edge_reports || {};
 
-  const body = {
-    relic,
-    fate,
-    seed,
-    horizon,
-    branch_id: topoOverride ? topoOverride.branch_id : "branch_webui",
-    up_name: topoOverride ? topoOverride.up_name : document.getElementById("ch-up-name").value,
-    pass_name: topoOverride ? topoOverride.pass_name : document.getElementById("ch-pass-name").value,
-    down_name: topoOverride ? topoOverride.down_name : document.getElementById("ch-down-name").value,
-  };
-
-  const res = await api("/api/dossier", body);
-  state.currentDossier = res.dossier;
-  state.currentPathway = res.pathway;
-  state.enabledHops = new Set([1, 2, 3, 4, 5]);
-  state.enabledDecoys = new Set(["material_mismatch", "destination_dead_end"]);
-
-  renderDossierView();
-  await runPathwayAblation();
-}
-
-function renderDossierView() {
-  const dossier = state.currentDossier;
-  const pathway = state.currentPathway;
-  renderPathwaySvg(pathway);
-  renderPathwayToggles(pathway);
-  renderOpenSettlement(dossier);
-
-  const b = dossier.binding;
-  const headerBanner = `
-    <div class="doc-card" style="grid-column:1/-1;border-left-color:var(--slate);background:#fff;">
-      <div class="doc-card-head">
-        <strong>种子物证绑定摘要 (seed=${esc(dossier.seed)} · horizon=${esc(dossier.horizon)} · settled=${esc(dossier.settled)})</strong>
-        <span class="badge ${dossier.settled ? "ok" : "warn"}">${esc(shortLabel(dossier.fate))}</span>
-      </div>
-      <div class="muted mono" style="font-size:0.82rem;">
-        批号 batch_id: <strong>${esc(b.batch_id)}</strong> |
-        工业载体: <strong>${esc(b.vessel_name)} (${esc(b.vessel_code)})</strong> |
-        实测勘定格: <strong>第 ${esc(b.safe_tick)} 格</strong> (φ≈${Number(b.safe_phase).toFixed(2)}, Δ=${esc(b.safe_delay)} 刻)
-      </div>
-    </div>
-  `;
-
-  const cardsHtml = dossier.documents
-    .map((doc) => {
-      const isDecoy = doc.role === "decoy";
-      const tag = isDecoy ? `干扰 · ${doc.decoy_class}` : `真链 Hop ${doc.hop}`;
+  const filteredEdges = state.edges.filter((e) => filterEra === "all" || e.era === filterEra);
+  document.getElementById("card-library").innerHTML = filteredEdges
+    .map((edge) => {
+      const rep = reports[edge.id] || { status: "ok" };
+      const era = eraById(edge.era);
+      const statusBadge =
+        rep.status === "error"
+          ? `<span class="badge err">冲突</span>`
+          : rep.status === "warn"
+          ? `<span class="badge warn">词表外</span>`
+          : `<span class="badge ok">合规</span>`;
+      const boardBtn = edge.on_board
+        ? `<button class="btn small toggle-board" data-id="${esc(edge.id)}">收起</button>`
+        : `<button class="btn small primary toggle-board" data-id="${esc(edge.id)}">+ 上桌</button>`;
       return `
-        <article class="doc-card ${isDecoy ? "decoy" : ""}">
-          <div class="doc-card-head">
-            <span class="badge ${isDecoy ? "warn" : "ok"}">${esc(tag)}</span>
-            <span class="badge">${esc(doc.lens)} · ${esc(doc.doc_kind)}</span>
+        <div class="lib-item ${esc(rep.status)}" data-select-card="${esc(edge.id)}">
+          <div class="lib-item-top">
+            <strong style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(edge.title)}</strong>
+            ${statusBadge}
           </div>
-          <h4>${esc(doc.title)}</h4>
-          <p>${esc(doc.body)}</p>
-        </article>
-      `;
-    })
-    .join("");
-
-  document.getElementById("dossier-cards-grid").innerHTML = headerBanner + cardsHtml;
-}
-
-function renderOpenSettlement(dossier) {
-  const box = document.getElementById("open-settlement-box");
-  if (dossier.horizon !== "open") {
-    box.innerHTML = "";
-    return;
-  }
-
-  if (dossier.settled) {
-    box.innerHTML = `
-      <div class="card">
-        <div class="card-head">
-          <h2>开放视界已结算 · Hop 5 议事会公契已解锁</h2>
-          <span class="badge ok">intervention=${esc(dossier.applied_intervention)} → ${esc(shortLabel(dossier.fate))}</span>
-        </div>
-        <p class="muted">种子绑定的批号 <code>${esc(dossier.binding.batch_id)}</code>、载体编号 <code>${esc(dossier.binding.vessel_code)}</code> 与勘定格 <code>#${esc(dossier.binding.safe_tick)}</code> 在干预结算后保持不变。</p>
-      </div>
-    `;
-    return;
-  }
-
-  const transitions = dossier.reachable_transitions || [];
-  box.innerHTML = `
-    <div class="card">
-      <div class="card-head">
-        <h2>开放视界待结算（Hop 1..4 已就绪，选择干预解锁 Hop 5）</h2>
-        <span class="badge warn">horizon=open · settled=false</span>
-      </div>
-      <div class="preset-strip" style="margin-bottom:0;">
-        ${transitions
-          .map(
-            (t) => `<button type="button" class="btn settle-btn" data-intervention="${esc(t.intervention)}">
-              ${esc(shortLabel(t.intervention))} → ${esc(shortLabel(t.target_fate))} [${esc(t.target_regime)}]
-            </button>`
-          )
-          .join("")}
-      </div>
-    </div>
-  `;
-
-  box.querySelectorAll(".settle-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const res = await api("/api/dossier/settle", {
-        dossier: state.currentDossier,
-        intervention: btn.dataset.intervention,
-        names: {
-          up: document.getElementById("ch-up-name").value,
-          pass: document.getElementById("ch-pass-name").value,
-          down: document.getElementById("ch-down-name").value,
-        },
-      });
-      state.currentDossier = res.dossier;
-      renderDossierView();
-    });
-  });
-}
-
-function renderPathwaySvg(pathway) {
-  const w = 980;
-  const h = 230;
-  const xs = [60, 235, 410, 585, 760];
-
-  const mainNodes = pathway.chain.map((edge, idx) => {
-    const x = xs[idx];
-    const enabled = state.enabledHops.has(edge.hop);
-    const stroke = enabled ? "#1d6f66" : "#b9ae98";
-    const fill = enabled ? "#e2f1ee" : "#f0eadc";
-    const opacity = enabled ? 1 : 0.45;
-    const arrow = idx < 4
-      ? `<line x1="${x + 145}" y1="68" x2="${xs[idx + 1] - 4}" y2="68" stroke="${enabled && state.enabledHops.has(edge.hop + 1) ? "#1d6f66" : "#c7beb0"}" stroke-width="2.5" marker-end="url(#arrow)" stroke-dasharray="${enabled && state.enabledHops.has(edge.hop + 1) ? "" : "4 4"}"/>`
-      : "";
-
-    return `
-      ${arrow}
-      <g class="svg-hop" data-hop="${edge.hop}" style="cursor:pointer;opacity:${opacity}">
-        <rect x="${x}" y="34" width="145" height="68" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="2" />
-        <text x="${x + 10}" y="54" font-size="12" font-weight="700" fill="#1b2326">Hop ${edge.hop} · ${esc(edge.lens)}</text>
-        <text x="${x + 10}" y="72" font-size="11" fill="#394b54">${esc(edge.doc_kind)}</text>
-        <text x="${x + 10}" y="90" font-size="10" font-family="monospace" fill="#5b666a">${esc(String(edge.relation).slice(0, 20))}</text>
-      </g>
-    `;
-  }).join("");
-
-  const decoys = pathway.decoys.map((decoy, idx) => {
-    const cls = decoy.attrs.decoy_class;
-    const x = idx === 0 ? 235 : 410;
-    const enabled = state.enabledDecoys.has(cls);
-    return `
-      <g class="svg-decoy" data-decoy="${esc(cls)}" style="cursor:pointer;opacity:${enabled ? 1 : 0.4}">
-        <rect x="${x}" y="142" width="210" height="58" rx="6" fill="${enabled ? "#fbf0da" : "#f0eadc"}" stroke="${enabled ? "#a86b12" : "#b9ae98"}" stroke-width="1.8" stroke-dasharray="5 3" />
-        <text x="${x + 10}" y="164" font-size="11.5" font-weight="700" fill="#82510a">干扰卡: ${esc(cls)}</text>
-        <text x="${x + 10}" y="183" font-size="10.5" fill="#5b666a">breaks_at ${esc(decoy.attrs.breaks_at)} · ${esc(decoy.lens)}</text>
-      </g>
-    `;
-  }).join("");
-
-  const wrap = document.getElementById("pathway-graph-wrap");
-  wrap.innerHTML = `
-    <svg viewBox="0 0 ${w} ${h}" width="100%" style="max-height:240px;">
-      <defs>
-        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 1 L 10 5 L 0 9 z" fill="#1d6f66" />
-        </marker>
-      </defs>
-      ${mainNodes}
-      ${decoys}
-    </svg>
-  `;
-
-  wrap.querySelectorAll(".svg-hop").forEach((el) => {
-    el.addEventListener("click", () => toggleHop(Number(el.dataset.hop)));
-  });
-  wrap.querySelectorAll(".svg-decoy").forEach((el) => {
-    el.addEventListener("click", () => toggleDecoy(el.dataset.decoy));
-  });
-}
-
-function renderPathwayToggles(pathway) {
-  const container = document.getElementById("pathway-toggles");
-  const hopPills = pathway.chain
-    .map((e) => {
-      const on = state.enabledHops.has(e.hop);
-      return `<button type="button" class="toggle-pill ${on ? "active-main" : ""}" data-hop="${e.hop}">
-        ${on ? "✓" : "✕"} Hop ${e.hop} (${esc(e.doc_kind)})
-      </button>`;
-    })
-    .join("");
-
-  const decoyPills = pathway.decoys
-    .map((d) => {
-      const cls = d.attrs.decoy_class;
-      const on = state.enabledDecoys.has(cls);
-      return `<button type="button" class="toggle-pill ${on ? "active-decoy" : ""}" data-decoy="${esc(cls)}">
-        ${on ? "+" : "○"} 混入干扰 ${esc(cls)}
-      </button>`;
-    })
-    .join("");
-
-  container.innerHTML = hopPills + decoyPills;
-  container.querySelectorAll("[data-hop]").forEach((b) =>
-    b.addEventListener("click", () => toggleHop(Number(b.dataset.hop)))
-  );
-  container.querySelectorAll("[data-decoy]").forEach((b) =>
-    b.addEventListener("click", () => toggleDecoy(b.dataset.decoy))
-  );
-}
-
-function toggleHop(hop) {
-  if (state.enabledHops.has(hop)) state.enabledHops.delete(hop);
-  else state.enabledHops.add(hop);
-  renderPathwaySvg(state.currentPathway);
-  renderPathwayToggles(state.currentPathway);
-  runPathwayAblation();
-}
-
-function toggleDecoy(cls) {
-  if (state.enabledDecoys.has(cls)) state.enabledDecoys.delete(cls);
-  else state.enabledDecoys.add(cls);
-  renderPathwaySvg(state.currentPathway);
-  renderPathwayToggles(state.currentPathway);
-  runPathwayAblation();
-}
-
-async function runPathwayAblation() {
-  const relic = document.getElementById("pw-relic").value;
-  const fate = document.getElementById("pw-fate").value;
-  const res = await api("/api/pathway/ablate", {
-    relic,
-    fate,
-    enabled_hops: Array.from(state.enabledHops).sort(),
-    include_decoys: Array.from(state.enabledDecoys),
-  });
-  const badge = document.getElementById("ablate-status-badge");
-  if (res.connected_count === 1) {
-    badge.className = "badge ok";
-    badge.textContent = `连通成功：1 条唯一主链 [${res.connections[0].hops.join("→")}] (pool=${res.pool_size})`;
-  } else {
-    badge.className = "badge err";
-    badge.textContent = `断链：0 条可合一路线 (pool=${res.pool_size})`;
-  }
-}
-
-// ==== TAB 3: OBSERVATION & ASCRIBE ====
-function setupAscribeTab(overview) {
-  fillSelect("as-c0", overview.schemas.c0_states);
-  fillSelect("as-pulse", overview.schemas.world_pulses);
-  fillSelect("as-window", overview.schemas.windows);
-  document.getElementById("as-window").value = "relative";
-
-  document.getElementById("as-run-btn").addEventListener("click", () => runAscribe());
-  document.getElementById("as-reset-ev-btn").addEventListener("click", () => {
-    state.disabledEvidence.clear();
-    runAscribe();
-  });
-}
-
-function evKey(lens, field) {
-  return `${lens}:${field}`;
-}
-
-async function runAscribe() {
-  const payload = {
-    c0_state: document.getElementById("as-c0").value,
-    pulse_kind: document.getElementById("as-pulse").value,
-    safe_phase_window: document.getElementById("as-window").value,
-    resolution: Number(document.getElementById("as-resolution").value),
-    disabled_keys: Array.from(state.disabledEvidence).map((k) => {
-      const [lens, field] = k.split(":");
-      return { lens, field };
-    }),
-  };
-
-  const res = await api("/api/ascribe/analyze", payload);
-  state.lastAscribe = res;
-  renderAscribeVerdict(res);
-  renderLensesGrid(res);
-  renderMinimalAndAblation(res);
-  renderRefuteAndIdentifiability(res);
-}
-
-function renderAscribeVerdict(res) {
-  const ex = res.explain;
-  let badgeCls = "ok";
-  let title = "";
-  let detail = "";
-
-  if (ex.status === "unique") {
-    badgeCls = "ok";
-    const h = ex.hypothesis;
-    title = `唯一锁定隐藏真相 (:unique) · 启用证据 ${res.active_count}/${res.total_count}`;
-    detail = `c0_state = <code>${esc(h.c0_state)}</code> · pulse_kind = <code>${esc(h.pulse_kind)}</code> · safe_phase_window = <code>${esc(h.safe_phase_window)}</code>`;
-  } else if (ex.status === "incomplete") {
-    badgeCls = "warn";
-    title = `缺证待补 (:incomplete) · 剩余 ${ex.candidates.length} 个候选`;
-    detail = `缺少关键鉴别字段：${ex.missing.map((m) => `<code>${esc(m)}</code>`).join("、")}`;
-  } else if (ex.status === "multiple") {
-    badgeCls = "warn";
-    title = `仪器分辨率极限多解 (:multiple) · 剩余 ${ex.candidates.length} 个不可分候选`;
-    detail = `现有测钟分辨率 <code>${esc(res.resolution)}</code> 下仍余候选：${ex.candidates
-      .map((c) => `<code>(${esc(c.c0_state)}, ${esc(c.pulse_kind)}, ${esc(c.safe_phase_window)})</code>`)
-      .join(" / ")}`;
-  } else {
-    badgeCls = "err";
-    title = `无可满足假说 (:none)`;
-    detail = `与所有 24 个候选假说均存在矛盾。`;
-  }
-
-  document.getElementById("ascribe-verdict-box").innerHTML = `
-    <div class="card">
-      <div class="card-head">
-        <h2>${title}</h2>
-        <span class="badge ${badgeCls}">${esc(ex.status.toUpperCase())}</span>
-      </div>
-      <p style="margin:0 0 0.4rem;">${detail}</p>
-      <p class="muted mono" style="margin:0;font-size:0.8rem;">
-        底层数值轨迹：T_ref=${Number(res.trace.period).toFixed(2)}, surge_lag=${Number(res.trace.surge_lag).toFixed(2)}, shift=${Number(res.trace.shift).toFixed(2)} (${esc(res.trace.outcome)}), impacts=${esc(res.trace.impacts)}, stress=${Number(res.trace.stress).toFixed(3)}, blows=${esc(res.trace.frame_slams)}
-      </p>
-    </div>
-  `;
-}
-
-function renderLensesGrid(res) {
-  const ablateMap = new Map(
-    (res.ablation.items || []).map((it) => [evKey(it.lens, it.field), it])
-  );
-  const grid = document.getElementById("lenses-grid");
-
-  grid.innerHTML = ["official_hq", "tech_inner", "old_zhai"]
-    .map((lensKey) => {
-      const report = res.lenses[lensKey];
-      const rows = report.records
-        .map((rec) => {
-          const key = evKey(rec.lens, rec.field);
-          const enabled = !state.disabledEvidence.has(key);
-          const ab = ablateMap.get(key);
-          const necTag = ab && ab.necessary
-            ? `<span class="badge err" title="删去即失去唯一性">必要</span>`
-            : "";
-
-          return `
-            <label class="record-row ${enabled ? "" : "disabled"}">
-              <input type="checkbox" class="ev-toggle" data-key="${esc(key)}" ${enabled ? "checked" : ""} />
-              <span>
-                <strong>${esc(rec.field)}</strong> = <code>${esc(formatTermValue(rec.value))}</code>
-                ${necTag}
-              </span>
-              <span class="badge">${esc(rec.provenance)}</span>
-            </label>
-          `;
-        })
-        .join("");
-
-      return `
-        <div class="card lens-card">
-          <div class="card-head">
-            <h3>${esc(shortLabel(lensKey))}</h3>
-            <span class="badge">${report.records.length} 条记录</span>
+          <div class="muted" style="font-size:0.72rem;">${esc(era ? era.name : edge.era)} · ${esc(edge.observer)}</div>
+          <div class="inline-row" style="justify-content:space-between;">
+            <span class="mono" style="font-size:0.68rem;color:var(--muted);">${esc(edge.id)}</span>
+            ${boardBtn}
           </div>
-          ${rows}
-          <details style="font-size:0.8rem;color:var(--muted);">
-            <summary style="cursor:pointer;">保留 / 丢失通道说明</summary>
-            <p style="margin:0.35rem 0 0;"><strong>保留：</strong>${report.retains.map(esc).join("；")}</p>
-            <p style="margin:0.25rem 0 0;"><strong>丢失：</strong>${report.loses.map(esc).join("；")}</p>
-          </details>
         </div>
       `;
     })
     .join("");
 
-  grid.querySelectorAll(".ev-toggle").forEach((cb) => {
-    cb.addEventListener("change", () => {
-      const key = cb.dataset.key;
-      if (cb.checked) state.disabledEvidence.delete(key);
-      else state.disabledEvidence.add(key);
-      runAscribe();
+  document.querySelectorAll(".toggle-board").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const edge = edgeById(btn.dataset.id);
+      if (!edge) return;
+      edge.on_board = !edge.on_board;
+      markDirty();
+      renderLeftDrawers();
+      renderBoardCards();
+      renderWires();
     });
   });
-}
 
-function renderMinimalAndAblation(res) {
-  const box = document.getElementById("ascribe-minimal-box");
-  const sets = res.minimal_sufficient_sets || [];
-  const setsHtml = sets.length === 0
-    ? `<p class="muted">当前启用证据尚未唯一锁定单一假说，故不存在最小充分子集。</p>`
-    : `<div class="preset-strip">
-        ${sets
-          .map(
-            (set, idx) => `<button type="button" class="chip-btn apply-minset" data-idx="${idx}">
-              集合 ${idx + 1} (${set.length} 项): ${set.map((k) => `${k.lens}.${k.field}`).join(" + ")}
-            </button>`
-          )
-          .join("")}
-      </div>`;
-
-  const ablateRows = (res.ablation.items || [])
-    .map((it) => {
-      const tag = it.necessary
-        ? `<span class="badge err">必要 (删去→${esc(it.without.status)})</span>`
-        : it.irrelevant
-        ? `<span class="badge">可由他证替代</span>`
-        : `<span class="badge warn">${esc(it.without.status)}</span>`;
-      return `<tr><td class="mono">${esc(it.lens)}.${esc(it.field)}</td><td>${tag}</td></tr>`;
-    })
-    .join("");
-
-  box.innerHTML = `
-    <p class="hint">点击任意「最小充分证据集」芯片，可只勾选该最小集合验证 <code>abduceo/4</code> 仍保持唯一锁定：</p>
-    ${setsHtml}
-    <table class="data-table">
-      <thead><tr><th>证据项</th><th>留一消融 (Leave-One-Out)</th></tr></thead>
-      <tbody>${ablateRows}</tbody>
-    </table>
-  `;
-
-  box.querySelectorAll(".apply-minset").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const chosen = sets[Number(btn.dataset.idx)];
-      const keepSet = new Set(chosen.map((k) => evKey(k.lens, k.field)));
-      state.disabledEvidence.clear();
-      for (const lensKey of ["official_hq", "tech_inner", "old_zhai"]) {
-        for (const rec of res.lenses[lensKey].records) {
-          const key = evKey(rec.lens, rec.field);
-          if (!keepSet.has(key)) state.disabledEvidence.add(key);
-        }
-      }
-      runAscribe();
+  document.querySelectorAll("[data-select-card]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const edge = edgeById(el.dataset.selectCard);
+      if (!edge) return;
+      if (!edge.on_board) edge.on_board = true;
+      state.selectedCardId = edge.id;
+      state.selectedWireId = null;
+      switchSubtab("inspector");
+      renderLeftDrawers();
+      renderBoardCards();
+      renderWires();
+      renderInspector();
     });
   });
-}
 
-function renderRefuteAndIdentifiability(res) {
-  const box = document.getElementById("ascribe-refute-box");
-  const ref = res.refutations;
-  const official = res.official_only;
-
-  const renderRef = (name, r) => {
-    if (r.status === "excluded") {
-      return `<div><span class="badge ok">已排除 ${esc(name)}</span> — 矛盾字段：${r.reasons
-        .map((x) => `<code>${esc(x.lens)}.${esc(x.field)}</code> (预期 ${esc(x.expected)} vs 实测 ${esc(x.recorded)})`)
-        .join("；")}</div>`;
-    }
-    return `<div><span class="badge warn">未能排除 ${esc(name)}</span>（当前证据不足以反驳）</div>`;
-  };
-
-  const ladderRows = res.identifiability
+  document.getElementById("node-count").textContent = String(state.nodes.length);
+  document.getElementById("node-library").innerHTML = state.nodes
     .map(
-      (step) => `
-      <tr>
-        <td class="mono">Δt = ${esc(step.resolution)}</td>
-        <td><span class="badge ${step.result.status === "unique" ? "ok" : "warn"}">${esc(step.result.status)}</span></td>
-        <td class="mono">${step.result.status === "unique" ? esc(step.result.hypothesis.pulse_kind + " / " + step.result.hypothesis.safe_phase_window) : `${(step.result.candidates || []).length} candidates`}</td>
-      </tr>`
-    )
-    .join("");
-
-  box.innerHTML = `
-    <div class="stack-gap" style="gap:0.55rem;margin-bottom:0.85rem;">
-      ${renderRef("秋雨自然侵蚀 (autumn_rain)", ref.autumn_rain)}
-      ${renderRef("纯自然蚀空 (natural_collapse)", ref.natural_collapse)}
-      <div>
-        <span class="badge warn">对照组 official_only</span> — 仅凭行政 <code>cause_tag</code> 总是给出：<code>${esc(JSON.stringify(official.hypothesis || official.missing))}</code>
-      </div>
-    </div>
-    <h4 style="margin:0 0 0.4rem;font-size:0.88rem;">测钟分辨率阶梯 · Ascribe.identifiability/2</h4>
-    <table class="data-table">
-      <thead><tr><th>分辨率</th><th>反演状态</th><th>结论 / 候选数</th></tr></thead>
-      <tbody>${ladderRows}</tbody>
-    </table>
-  `;
-}
-
-// ==== TAB 4: CONTRACT & CANON ====
-async function loadContractAndCanon() {
-  const [contract, canon] = await Promise.all([api("/api/contract"), api("/api/canon/lint")]);
-  state.contract = contract;
-  renderCanonGrid(canon);
-  renderDutyCycleSvg(contract);
-  renderSafeTicksSvg(contract);
-  renderOutcomesTable(contract);
-  renderBenchmarksAndClaims(contract);
-
-  document.getElementById("canon-run-btn").addEventListener("click", async () => {
-    const fresh = await api("/api/canon/lint");
-    renderCanonGrid(fresh);
-  });
-}
-
-function renderCanonGrid(canon) {
-  const items = [
-    { label: "内容包检查 (Content.lint)", ok: canon.content.ok, detail: `${canon.content.errors.length} 错 / ${canon.content.warnings.length} 警` },
-    { label: "年代锚点 (Timeline)", ok: canon.timeline.ok, detail: canon.timeline.ok ? "1894 / 1902 / 1979 一致" : canon.timeline.issues.join(", ") },
-    { label: "结构模板 (Texts)", ok: canon.texts.ok, detail: canon.texts.ok ? "6 结局描述无悬空占位符" : canon.texts.issues.join(", ") },
-    { label: "结局可达性 (reverse_worldgen)", ok: canon.fates.ok, detail: canon.fates.ok ? "6/6 结局均由合法地形可达" : canon.fates.issues.join(", ") },
-    { label: "五跳微链与消融 (Pathways)", ok: canon.pathways.ok, detail: canon.pathways.ok ? "12 条五跳链 + 局部性全通过" : canon.pathways.issues.join(", ") },
-    { label: "全地形语料库 (48 组合)", ok: canon.corpus.issue_count === 0, detail: `${canon.corpus.ok} 合法 / ${canon.corpus.unsupported} 地质不配对` },
-  ];
-
-  document.getElementById("canon-audit-grid").innerHTML = items
-    .map(
-      (it) => `
-      <div class="kpi">
-        <div class="label">${esc(it.label)}</div>
-        <div class="val"><span class="badge ${it.ok ? "ok" : "err"}">${it.ok ? "PASS" : "FAIL"}</span></div>
-        <div class="muted" style="font-size:0.78rem;margin-top:0.25rem;">${esc(it.detail)}</div>
+      (n) => `
+      <div class="lib-item">
+        <div class="lib-item-top">
+          <strong>${esc(n.label)}</strong>
+          <span class="badge">${esc(n.kind)}</span>
+        </div>
+        <div class="mono" style="font-size:0.69rem;color:var(--muted);">${esc(n.id)} · ${esc(n.era)}</div>
       </div>`
     )
     .join("");
 }
 
-function renderDutyCycleSvg(c) {
-  const onset = c.onset_comparison;
-  const settled = c.oscillator;
-  const settledPeriod = c.period;
+function renderBoardCards() {
+  const layer = document.getElementById("cards-layer");
+  const reports = state.audit?.edge_reports || {};
+  const boardEdges = state.edges.filter((e) => e.on_board);
 
-  const bar = (y, label, period, frac, outcome, delta, color) => {
-    const totalW = 420;
-    const platW = Math.round(totalW * frac);
-    const pct = (frac * 100).toFixed(1);
-    return `
-      <text x="16" y="${y}" font-size="12" font-weight="700" fill="#1b2326">${esc(label)}</text>
-      <text x="16" y="${y + 16}" font-size="11" font-family="monospace" fill="#5b666a">T=${Number(period).toFixed(2)} · 激发高台=${pct}% · φ=0.5 敲击→${esc(outcome)} (Δ=${delta > 0 ? "+" : ""}${Number(delta).toFixed(2)})</text>
-      <rect x="16" y="${y + 24}" width="${totalW}" height="24" rx="4" fill="#e9e2d2" stroke="#b9ae98" />
-      <rect x="16" y="${y + 24}" width="${platW}" height="24" rx="4" fill="${color}" />
-      <line x1="${16 + totalW / 2}" y1="${y + 20}" x2="${16 + totalW / 2}" y2="${y + 52}" stroke="#1b2326" stroke-width="2" stroke-dasharray="3 2" />
-      <text x="${16 + totalW / 2 + 5}" y="${y + 40}" font-size="10.5" font-weight="700" fill="#1b2326">φ=0.50</text>
-    `;
-  };
+  layer.innerHTML = boardEdges
+    .map((edge) => {
+      const era = eraById(edge.era);
+      const color = era?.color || "#394b54";
+      const rep = reports[edge.id] || { status: "ok", errors: [], warnings: [] };
+      const selected = state.selectedCardId === edge.id ? "selected" : "";
+      const highlighted = state.highlightedCardIds.has(edge.id) ? "highlighted" : "";
+      const statusCls = `status-${rep.status}`;
+      const forbiddenSet = new Set(era?.forbidden_concepts || []);
 
-  const settledMid = c.outcome_table.find((r) => r.pulse === "alpha_shock" && r.window === "relative");
-  document.getElementById("duty-cycle-svg").innerHTML = `
-    <svg viewBox="0 0 470 180" width="100%">
-      ${bar(22, "近 Hopf 起始段 (a=0.40, s=0.30)", onset.period, onset.plateau_fraction, onset.mid_cycle_outcome, onset.mid_cycle_delta, "#b43c2c")}
-      ${bar(106, "稳态深渊极限环 (a=-0.30, s=1.00)", settledPeriod, settled.plateau_fraction, settledMid.outcome, settledMid.delta, "#1d6f66")}
-    </svg>
-  `;
+      const statusBadge =
+        rep.status === "error"
+          ? `<span class="badge err">✕ 冲突</span>`
+          : rep.status === "warn"
+          ? `<span class="badge warn">! 词表外</span>`
+          : `<span class="badge ok">✓ 合规</span>`;
+
+      const errBox =
+        rep.errors && rep.errors.length > 0
+          ? `<div class="card-errors">${rep.errors.map((x) => esc(x.message)).join("<br>")}</div>`
+          : "";
+
+      return `
+        <article class="board-card ${selected} ${highlighted} ${statusCls}" data-card-id="${esc(edge.id)}" style="left:${edge.x}px;top:${edge.y}px;">
+          <div class="card-stripe" style="background:${esc(color)};"></div>
+          <div class="card-head" data-drag-handle="${esc(edge.id)}">
+            <span class="badge">${esc(era ? era.name.split("·")[0].trim() : edge.era)} · ${esc(edge.observer)}</span>
+            <div class="inline-row" style="gap:0.25rem;">
+              ${statusBadge}
+              <button class="btn small hide-card-btn" data-hide-card="${esc(edge.id)}" title="收起回抽屉">×</button>
+            </div>
+          </div>
+          <div class="card-title">${esc(edge.title || edge.id)}</div>
+          <div class="card-body">${esc(edge.body)}</div>
+          <div class="card-ports">
+            <div class="port-wrap in" title="输入节点: ${esc(edge.from)}">
+              <div class="port-dot in" data-port-in="${esc(edge.id)}"></div>
+              <span class="port-label">${esc(nodeLabel(edge.from))}</span>
+            </div>
+            <span class="mono" style="font-size:0.65rem;color:var(--teal);">${esc(edge.rel)}</span>
+            <div class="port-wrap out" title="输出节点: ${esc(edge.to)}">
+              <div class="port-dot out" data-port-out="${esc(edge.id)}"></div>
+              <span class="port-label">${esc(nodeLabel(edge.to))}</span>
+            </div>
+          </div>
+          <div class="card-concepts">
+            ${(edge.concepts || [])
+              .map((c) => `<span class="tag ${forbiddenSet.has(c) ? "err" : ""}">${esc(c)}</span>`)
+              .join("")}
+            ${edge.retrospective ? `<span class="badge accent">追认</span>` : ""}
+          </div>
+          ${errBox}
+        </article>
+      `;
+    })
+    .join("");
+
+  // Bind card selection, dragging, hide, and port wiring
+  layer.querySelectorAll(".board-card").forEach((cardEl) => {
+    cardEl.addEventListener("mousedown", (ev) => {
+      if (ev.target.closest(".port-dot") || ev.target.closest(".hide-card-btn")) return;
+      state.selectedCardId = cardEl.dataset.cardId;
+      state.selectedWireId = null;
+      switchSubtab("inspector");
+      renderInspector();
+      layer.querySelectorAll(".board-card").forEach((el) => el.classList.toggle("selected", el.dataset.cardId === state.selectedCardId));
+      renderWires();
+    });
+  });
+
+  layer.querySelectorAll("[data-drag-handle]").forEach((handle) => {
+    handle.addEventListener("mousedown", (ev) => {
+      if (ev.target.closest(".hide-card-btn")) return;
+      ev.preventDefault();
+      const id = handle.dataset.dragHandle;
+      const edge = edgeById(id);
+      if (!edge) return;
+      const pt = clientToBoard(ev.clientX, ev.clientY);
+      state.dragCard = { id, offsetX: pt.x - edge.x, offsetY: pt.y - edge.y };
+    });
+  });
+
+  layer.querySelectorAll("[data-hide-card]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const id = btn.dataset.hideCard;
+      const edge = edgeById(id);
+      if (!edge) return;
+      edge.on_board = false;
+      state.wires = state.wires.filter((w) => w.from_edge_id !== id && w.to_edge_id !== id);
+      if (state.selectedCardId === id) state.selectedCardId = null;
+      markDirty();
+      renderLeftDrawers();
+      renderBoardCards();
+      renderWires();
+      renderInspector();
+    });
+  });
+
+  layer.querySelectorAll("[data-port-out]").forEach((dot) => {
+    dot.addEventListener("mousedown", (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      const fromId = dot.dataset.portOut;
+      const pos = getPortPos(fromId, "out");
+      state.dragWire = { fromId, x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y };
+      updateDragWireSvg();
+    });
+  });
 }
 
-function renderSafeTicksSvg(c) {
-  const pulse = c.pulses.find((p) => p.pulse === "alpha_metal_resonance");
-  const ticks = pulse ? pulse.safe_ticks : [];
-  const x0 = 28;
-  const span = 415;
+function getPortPos(edgeId, side) {
+  const card = document.querySelector(`.board-card[data-card-id="${CSS.escape(edgeId)}"]`);
+  const edge = edgeById(edgeId);
+  if (!card || !edge) return { x: (edge?.x || 0) + (side === "out" ? 248 : 0), y: (edge?.y || 0) + 100 };
 
-  const marks = ticks
-    .map((t) => {
-      const x = x0 + t.phase * span;
+  const dot = card.querySelector(side === "out" ? "[data-port-out]" : "[data-port-in]");
+  if (!dot) return { x: edge.x + (side === "out" ? 248 : 0), y: edge.y + 100 };
+
+  const stageRect = document.getElementById("board-stage").getBoundingClientRect();
+  const dotRect = dot.getBoundingClientRect();
+  return {
+    x: (dotRect.left + dotRect.width / 2 - stageRect.left) / state.zoom,
+    y: (dotRect.top + dotRect.height / 2 - stageRect.top) / state.zoom,
+  };
+}
+
+function cubicPath(x1, y1, x2, y2) {
+  const dx = Math.max(Math.abs(x2 - x1) * 0.45, 55);
+  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+}
+
+function renderWires() {
+  const layer = document.getElementById("wires-layer");
+  const visibleWires = state.wires.filter((w) => edgeById(w.from_edge_id)?.on_board && edgeById(w.to_edge_id)?.on_board);
+
+  layer.innerHTML = visibleWires
+    .map((w) => {
+      const p1 = getPortPos(w.from_edge_id, "out");
+      const p2 = getPortPos(w.to_edge_id, "in");
+      const d = cubicPath(p1.x, p1.y, p2.x, p2.y);
+      const cls = w.valid ? "ok" : "err";
+      const sel = state.selectedWireId === w.id ? "selected" : "";
+      const mx = (p1.x + p2.x) / 2;
+      const my = (p1.y + p2.y) / 2 - 8;
+      const label = w.valid ? nodeLabel(w.bridge) : (w.issues[0]?.code || "冲突");
       return `
-        <g>
-          <line x1="${x.toFixed(1)}" y1="42" x2="${x.toFixed(1)}" y2="86" stroke="#1d6f66" stroke-width="2.5" />
-          <circle cx="${x.toFixed(1)}" cy="42" r="4.5" fill="#1d6f66">
-            <title>tick ${t.tick} | φ=${t.phase.toFixed(3)} | Δ=${t.delta.toFixed(2)} (${t.window})</title>
-          </circle>
-          <text x="${x.toFixed(1)}" y="102" font-size="10" font-family="monospace" text-anchor="middle" fill="#1b2326">${t.tick}</text>
+        <g data-wire-id="${esc(w.id)}">
+          <path class="wire-hit" d="${d}" />
+          <path class="wire-path ${cls} ${sel}" d="${d}" marker-end="url(#arrow-${cls})" />
+          <text class="wire-label" x="${mx}" y="${my}" text-anchor="middle">${esc(label)}</text>
         </g>
       `;
     })
     .join("");
 
-  document.getElementById("safe-ticks-svg").innerHTML = `
-    <svg viewBox="0 0 470 135" width="100%">
-      <text x="${x0}" y="20" font-size="12" font-weight="700" fill="#1b2326">共 ${ticks.length} 个实测安全刻度 (Delayed · 悬停圆点查看相移 Δ)</text>
-      <line x1="${x0}" y1="64" x2="${x0 + span}" y2="64" stroke="#8b8270" stroke-width="2" />
-      <text x="${x0}" y="122" font-size="10" font-family="monospace" fill="#5b666a">φ=0.00</text>
-      <text x="${x0 + span / 2}" y="122" font-size="10" font-family="monospace" text-anchor="middle" fill="#5b666a">φ=0.50</text>
-      <text x="${x0 + span}" y="122" font-size="10" font-family="monospace" text-anchor="end" fill="#5b666a">φ=1.00</text>
-      ${marks}
-    </svg>
-  `;
+  layer.querySelectorAll("[data-wire-id]").forEach((g) => {
+    g.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      state.selectedWireId = g.dataset.wireId;
+      state.selectedCardId = null;
+      switchSubtab("inspector");
+      renderBoardCards();
+      renderWires();
+      renderInspector();
+    });
+  });
 }
 
-function renderOutcomesTable(c) {
-  const byPulse = new Map();
-  for (const row of c.outcome_table) {
-    if (!byPulse.has(row.pulse)) byPulse.set(row.pulse, {});
-    byPulse.get(row.pulse)[row.window] = row;
+function updateDragWireSvg() {
+  const path = document.getElementById("drag-wire");
+  if (!state.dragWire) {
+    path.style.display = "none";
+    return;
+  }
+  path.style.display = "block";
+  path.setAttribute("d", cubicPath(state.dragWire.x1, state.dragWire.y1, state.dragWire.x2, state.dragWire.y2));
+}
+
+function clientToBoard(cx, cy) {
+  const rect = document.getElementById("board-stage").getBoundingClientRect();
+  return {
+    x: (cx - rect.left) / state.zoom,
+    y: (cy - rect.top) / state.zoom,
+  };
+}
+
+function bindBoardInteractions() {
+  window.addEventListener("mousemove", (ev) => {
+    if (state.dragCard) {
+      const edge = edgeById(state.dragCard.id);
+      if (!edge) return;
+      const pt = clientToBoard(ev.clientX, ev.clientY);
+      edge.x = Math.max(10, Math.round(pt.x - state.dragCard.offsetX));
+      edge.y = Math.max(10, Math.round(pt.y - state.dragCard.offsetY));
+      const el = document.querySelector(`.board-card[data-card-id="${CSS.escape(edge.id)}"]`);
+      if (el) {
+        el.style.left = `${edge.x}px`;
+        el.style.top = `${edge.y}px`;
+      }
+      renderWires();
+      markDirty();
+    } else if (state.dragWire) {
+      const pt = clientToBoard(ev.clientX, ev.clientY);
+      state.dragWire.x2 = pt.x;
+      state.dragWire.y2 = pt.y;
+      updateDragWireSvg();
+    }
+  });
+
+  window.addEventListener("mouseup", async (ev) => {
+    if (state.dragCard) {
+      state.dragCard = null;
+    }
+    if (state.dragWire) {
+      const fromId = state.dragWire.fromId;
+      state.dragWire = null;
+      updateDragWireSvg();
+      const targetDot = ev.target?.closest?.("[data-port-in]");
+      const targetCard = targetDot ? null : ev.target?.closest?.(".board-card");
+      const toId = targetDot ? targetDot.dataset.portIn : targetCard?.dataset?.cardId;
+      if (toId && toId !== fromId) {
+        await addAndValidateWire(fromId, toId);
+      }
+    }
+  });
+
+  document.getElementById("filter-era").addEventListener("change", renderLeftDrawers);
+
+  document.getElementById("btn-zoom-in").addEventListener("click", () => setZoom(state.zoom + 0.1));
+  document.getElementById("btn-zoom-out").addEventListener("click", () => setZoom(state.zoom - 0.1));
+}
+
+function setZoom(z) {
+  state.zoom = Math.min(1.4, Math.max(0.6, Number(z.toFixed(2))));
+  document.getElementById("board-stage").style.transform = `scale(${state.zoom})`;
+  document.getElementById("zoom-label").textContent = `${Math.round(state.zoom * 100)}%`;
+  renderWires();
+}
+
+async function addAndValidateWire(fromId, toId) {
+  const res = await api("/api/world/wire", {
+    eras: state.eras,
+    nodes: state.nodes,
+    edges: state.edges,
+    from_edge_id: fromId,
+    to_edge_id: toId,
+  });
+
+  const wireId = `${fromId}->${toId}`;
+  state.wires = state.wires.filter((w) => w.id !== wireId);
+  const wire = {
+    id: wireId,
+    from_edge_id: fromId,
+    to_edge_id: toId,
+    valid: res.valid,
+    bridge: res.bridge,
+    warnings: res.warnings || [],
+    issues: res.issues || [],
+  };
+  state.wires.push(wire);
+  state.selectedWireId = wireId;
+  state.selectedCardId = null;
+
+  if (wire.valid) {
+    toast(`接线成立：通过「${nodeLabel(wire.bridge)}」桥接。`, "ok");
+  } else {
+    toast(`接线冲突：${wire.issues.map((i) => i.message).join("；")}`, "err");
   }
 
-  const cell = (row) => {
-    if (!row) return "<td>—</td>";
-    const cls = row.outcome === "delayed" ? "ok" : row.outcome === "premature" ? "err" : "warn";
-    return `<td><span class="badge ${cls}">${esc(row.outcome)}</span> <span class="mono">Δ=${row.delta > 0 ? "+" : ""}${Number(row.delta).toFixed(2)}</span></td>`;
-  };
-
-  const rows = Array.from(byPulse.entries())
-    .map(([pulse, map]) => `
-      <tr>
-        <td><strong>${esc(shortLabel(pulse))}</strong><br><span class="mono muted">${esc(pulse)}</span></td>
-        ${cell(map.absolute)}
-        ${cell(map.relative)}
-        ${cell(map.late)}
-      </tr>`)
-    .join("");
-
-  document.getElementById("contract-outcomes-wrap").innerHTML = `
-    <table class="data-table">
-      <thead><tr><th>脉冲类型</th><th>absolute (φ≈0.15)</th><th>relative (φ≈0.50)</th><th>late (φ≈0.80)</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
+  switchSubtab("inspector");
+  renderWires();
+  renderInspector();
 }
 
-function renderBenchmarksAndClaims(c) {
-  document.getElementById("contract-benchmarks-wrap").innerHTML = `
-    <dl class="kv-list" style="margin-bottom:0.8rem;">
-      <dt>Hopf 点</dt><dd class="mono">v_c=${c.hopf.v_c}, a_c=${c.hopf.a_c}, s_c=${c.hopf.s_c}</dd>
-      <dt>Relaxation 极限</dt><dd class="mono">T_rel=${c.relaxation.period} (a=${c.relaxation.a}) vs 实测 T=${c.period}</dd>
-      <dt>步长离散度</dt><dd class="mono">${(c.period_spread * 100).toFixed(4)}% (${c.period_rows.map((r) => `dt=${r.dt}→${r.measured}`).join(", ")})</dd>
-      <dt>点火阈值</dt><dd class="mono">area=${c.fire_threshold.area} (alpha_shock=${c.fire_threshold.declared_alpha_shock_area})</dd>
-    </dl>
-    <table class="data-table">
-      <thead><tr><th>采样 stress</th><th>activity (q)</th><th>Regime</th></tr></thead>
-      <tbody>
-        ${c.regime_samples
-          .map(
-            (s) => `<tr><td class="mono">${s.stress}</td><td class="mono">${s.activity}</td><td><span class="badge ${regimeBadgeClass(s.regime)}">${esc(s.regime)}</span></td></tr>`
-          )
-          .join("")}
-      </tbody>
-    </table>
-  `;
-
-  document.getElementById("contract-claims-wrap").innerHTML = `
-    <table class="data-table">
-      <thead><tr><th>命题 ID</th><th>裁决</th><th>说明</th></tr></thead>
-      <tbody>
-        ${c.claims
-          .map(
-            (cl) => `<tr>
-              <td class="mono">${esc(cl.id)}</td>
-              <td><span class="badge ${cl.verdict === "confirmed" ? "ok" : "warn"}">${esc(cl.verdict)}</span></td>
-              <td>${esc(cl.summary || cl.note || "")}</td>
-            </tr>`
-          )
-          .join("")}
-      </tbody>
-    </table>
-  `;
+async function autoWireValidOnBoard() {
+  const boardEdges = state.edges.filter((e) => e.on_board);
+  const validBridges = (state.audit?.bridges || []).filter((b) => b.ok);
+  const newWires = [];
+  for (const b of validBridges) {
+    const fromOn = boardEdges.some((e) => e.id === b.from_edge);
+    const toOn = boardEdges.some((e) => e.id === b.to_edge);
+    if (fromOn && toOn) {
+      newWires.push({
+        id: `${b.from_edge}->${b.to_edge}`,
+        from_edge_id: b.from_edge,
+        to_edge_id: b.to_edge,
+        valid: true,
+        bridge: b.bridge,
+        warnings: b.issues || [],
+        issues: [],
+      });
+    }
+  }
+  state.wires = newWires;
+  renderWires();
 }
 
-function fillSelect(id, options) {
-  const el = document.getElementById(id);
-  el.innerHTML = options
-    .map((opt) => `<option value="${esc(opt)}">${esc(labelOf(opt))}</option>`)
+async function reauditWorld() {
+  const res = await api("/api/world/audit", {
+    eras: state.eras,
+    nodes: state.nodes,
+    edges: state.edges,
+  });
+  state.audit = res.audit;
+
+  // Re-validate all active manual/auto wires
+  const updatedWires = [];
+  for (const w of state.wires) {
+    if (!edgeById(w.from_edge_id) || !edgeById(w.to_edge_id)) continue;
+    const wr = await api("/api/world/wire", {
+      eras: state.eras,
+      nodes: state.nodes,
+      edges: state.edges,
+      from_edge_id: w.from_edge_id,
+      to_edge_id: w.to_edge_id,
+    });
+    updatedWires.push({
+      id: w.id,
+      from_edge_id: w.from_edge_id,
+      to_edge_id: w.to_edge_id,
+      valid: wr.valid,
+      bridge: wr.bridge,
+      warnings: wr.warnings || [],
+      issues: wr.issues || [],
+    });
+  }
+  state.wires = updatedWires;
+  renderAll();
+}
+
+// ==== Inspector ====
+function renderInspector() {
+  const box = document.getElementById("inspector-body");
+  if (state.selectedWireId) {
+    const w = state.wires.find((x) => x.id === state.selectedWireId);
+    if (!w) {
+      box.innerHTML = `<p class="muted">连线已移除。</p>`;
+      return;
+    }
+    const issuesHtml = w.valid
+      ? `<div class="box ok"><strong>接线合法</strong><br>桥接节点：<code>${esc(w.bridge)}</code>（${esc(nodeLabel(w.bridge))}）</div>`
+      : `<div class="box err"><strong>接线被拒绝</strong><ul style="margin:0.35rem 0 0;padding-left:1.1rem;">${w.issues
+          .map((i) => `<li>${esc(i.message)}</li>`)
+          .join("")}</ul></div>`;
+
+    box.innerHTML = `
+      <div class="stack-gap">
+        <div class="mono" style="font-size:0.78rem;">${esc(w.from_edge_id)} → ${esc(w.to_edge_id)}</div>
+        ${issuesHtml}
+        <button id="btn-remove-wire" class="btn danger">断开此连线</button>
+      </div>
+    `;
+    document.getElementById("btn-remove-wire").addEventListener("click", () => {
+      state.wires = state.wires.filter((x) => x.id !== w.id);
+      state.selectedWireId = null;
+      renderWires();
+      renderInspector();
+    });
+    return;
+  }
+
+  if (state.selectedCardId) {
+    const edge = edgeById(state.selectedCardId);
+    if (!edge) {
+      box.innerHTML = `<p class="muted">找不到选中卡片。</p>`;
+      return;
+    }
+    const rep = state.audit?.edge_reports?.[edge.id] || { errors: [], warnings: [] };
+    const nodeOpts = state.nodes
+      .map((n) => `<option value="${esc(n.id)}">${esc(n.label)} (${esc(n.id)})</option>`)
+      .join("");
+    const eraOpts = state.eras
+      .map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`)
+      .join("");
+
+    box.innerHTML = `
+      <form id="card-edit-form" class="form-stack">
+        <div class="inline-row" style="justify-content:space-between;">
+          <span class="mono" style="font-size:0.76rem;">ID: ${esc(edge.id)}</span>
+          <button type="button" id="btn-delete-card" class="btn small danger">删除卡片</button>
+        </div>
+        <label>卡片标题 <input type="text" id="ed-title" value="${esc(edge.title)}" /></label>
+        <label>所属时代 <select id="ed-era">${eraOpts}</select></label>
+        <label>观察者 / 视角 (observer) <input type="text" id="ed-observer" value="${esc(edge.observer)}" /></label>
+        <label>输入节点 (from) <select id="ed-from">${nodeOpts}</select></label>
+        <label>关系动词 (rel) <input type="text" id="ed-rel" value="${esc(edge.rel)}" /></label>
+        <label>输出节点 (to) <select id="ed-to">${nodeOpts}</select></label>
+        <label style="flex-direction:row;align-items:center;gap:0.45rem;">
+          <input type="checkbox" id="ed-retro" ${edge.retrospective ? "checked" : ""} />
+          <span>允许跨时代历史追认 (retrospective)</span>
+        </label>
+        <label>涉及概念词（逗号分隔）
+          <input type="text" id="ed-concepts" value="${esc((edge.concepts || []).join(", "))}" />
+        </label>
+        <label>档案正文
+          <textarea id="ed-body">${esc(edge.body)}</textarea>
+        </label>
+        <button type="submit" class="btn primary">应用修改并重检图谱</button>
+      </form>
+      <div class="stack-gap" style="margin-top:0.65rem;">
+        ${(rep.errors || []).map((e) => `<div class="box err">${esc(e.message)}</div>`).join("")}
+        ${(rep.warnings || []).map((w) => `<div class="box">${esc(w.message)}</div>`).join("")}
+      </div>
+    `;
+
+    document.getElementById("ed-era").value = edge.era;
+    document.getElementById("ed-from").value = edge.from;
+    document.getElementById("ed-to").value = edge.to;
+
+    document.getElementById("card-edit-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      edge.title = document.getElementById("ed-title").value.trim();
+      edge.era = document.getElementById("ed-era").value;
+      edge.observer = document.getElementById("ed-observer").value.trim() || "unspecified";
+      edge.from = document.getElementById("ed-from").value;
+      edge.rel = document.getElementById("ed-rel").value.trim() || "relates_to";
+      edge.to = document.getElementById("ed-to").value;
+      edge.retrospective = document.getElementById("ed-retro").checked;
+      edge.concepts = document
+        .getElementById("ed-concepts")
+        .value.split(/[,，]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      edge.body = document.getElementById("ed-body").value;
+
+      markDirty();
+      await reauditWorld();
+      toast(`已更新卡片「${edge.title}」并完成关系重检。`, "ok");
+    });
+
+    document.getElementById("btn-delete-card").addEventListener("click", async () => {
+      state.edges = state.edges.filter((e) => e.id !== edge.id);
+      state.wires = state.wires.filter((w) => w.from_edge_id !== edge.id && w.to_edge_id !== edge.id);
+      state.selectedCardId = null;
+      markDirty();
+      await reauditWorld();
+    });
+    return;
+  }
+
+  box.innerHTML = `<p class="muted">点击画布上的卡片或连线进行编辑与检查；也可切换到「时代认知模型」直接修改各时代允许/禁止的概念和防火墙规则。</p>`;
+}
+
+// ==== Era Epistemic Editor ====
+function renderEraEditor() {
+  const select = document.getElementById("era-editor-select");
+  const prev = select.value;
+  select.innerHTML = state.eras.map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("");
+  if (prev && eraById(prev)) select.value = prev;
+
+  const era = eraById(select.value) || state.eras[0];
+  const body = document.getElementById("era-editor-body");
+  if (!era) {
+    body.innerHTML = "";
+    return;
+  }
+
+  const taboosHtml = (era.taboos || [])
+    .map(
+      (t, idx) => `
+      <div class="box" style="display:flex;flex-direction:column;gap:0.25rem;">
+        <div class="inline-row" style="justify-content:space-between;">
+          <span class="mono" style="font-size:0.72rem;">neq(${esc(t.observer)}, ${esc(t.rel)}, ${esc(t.target_kind)})</span>
+          <button type="button" class="btn small danger del-taboo" data-idx="${idx}">删</button>
+        </div>
+        <div class="muted" style="font-size:0.74rem;">${esc(t.reason)}</div>
+      </div>`
+    )
     .join("");
+
+  body.innerHTML = `
+    <form id="era-edit-form" class="form-stack" style="margin-top:0.55rem;">
+      <label>时代名称 <input type="text" id="er-name" value="${esc(era.name)}" /></label>
+      <label>年代顺位 (order) <input type="number" id="er-order" value="${esc(era.order)}" min="1" /></label>
+      <label>建模粒度说明 (granularity)
+        <textarea id="er-granularity">${esc(era.granularity || "")}</textarea>
+      </label>
+      <label>允许概念词表（逗号分隔）
+        <textarea id="er-allowed">${esc((era.allowed_concepts || []).join(", "))}</textarea>
+      </label>
+      <label>时代禁止词汇 / 防越界（逗号分隔）
+        <textarea id="er-forbidden">${esc((era.forbidden_concepts || []).join(", "))}</textarea>
+      </label>
+      <button type="submit" class="btn primary">更新此时代模型并重检全图</button>
+    </form>
+
+    <div style="margin-top:0.75rem;">
+      <div class="drawer-header">
+        <strong style="font-size:0.82rem;">机构认知防火墙 (neq/2)</strong>
+        <button type="button" id="btn-add-taboo" class="btn small">+ 加规则</button>
+      </div>
+      <div class="stack-gap">${taboosHtml || `<span class="muted">此时代暂无 neq 防火墙规则。</span>`}</div>
+    </div>
+  `;
+
+  select.onchange = renderEraEditor;
+
+  document.getElementById("era-edit-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    era.name = document.getElementById("er-name").value.trim() || era.id;
+    era.order = Number(document.getElementById("er-order").value || 1);
+    era.granularity = document.getElementById("er-granularity").value;
+    era.allowed_concepts = splitTerms(document.getElementById("er-allowed").value);
+    era.forbidden_concepts = splitTerms(document.getElementById("er-forbidden").value);
+
+    markDirty();
+    await reauditWorld();
+    toast(`已更新时代「${era.name}」认知模型，全图已完成重新校验。`, "ok");
+  });
+
+  body.querySelectorAll(".del-taboo").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      era.taboos.splice(Number(btn.dataset.idx), 1);
+      markDirty();
+      await reauditWorld();
+    });
+  });
+
+  document.getElementById("btn-add-taboo").addEventListener("click", async () => {
+    const observer = prompt("观察者 (observer)，如 official_hq：", "official_hq");
+    if (!observer) return;
+    const rel = prompt("禁止的关系动词 (rel)，如 caused_by：", "caused_by");
+    if (!rel) return;
+    const targetKind = prompt("禁止的目标节点类型 (target_kind)，如 engineering_disturbance：", "engineering_disturbance");
+    if (!targetKind) return;
+    const reason = prompt("原因说明：", "认知防火墙阻断此归因") || "认知防火墙阻断此归因";
+
+    era.taboos = era.taboos || [];
+    era.taboos.push({ observer, rel, target_kind: targetKind, reason });
+    markDirty();
+    await reauditWorld();
+  });
+}
+
+function splitTerms(str) {
+  return str
+    .split(/[,，\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// ==== Pathfinder ====
+function renderPathfinderSelects() {
+  const s = document.getElementById("pf-start");
+  const t = document.getElementById("pf-target");
+  const prevS = s.value || "node_ritual_origin";
+  const prevT = t.value || "node_defibrillation";
+  const opts = state.nodes.map((n) => `<option value="${esc(n.id)}">${esc(n.label)} (${esc(n.id)})</option>`).join("");
+  s.innerHTML = opts;
+  t.innerHTML = opts;
+  if (nodeById(prevS)) s.value = prevS;
+  if (nodeById(prevT)) t.value = prevT;
+}
+
+async function runPathfinder() {
+  const startNode = document.getElementById("pf-start").value;
+  const targetNode = document.getElementById("pf-target").value;
+  const res = await api("/api/world/paths", {
+    eras: state.eras,
+    nodes: state.nodes,
+    edges: state.edges,
+    start_node: startNode,
+    target_node: targetNode,
+  });
+
+  const box = document.getElementById("pf-results");
+  const validHtml =
+    res.valid_paths.length === 0
+      ? `<div class="box err">未找到满足全部时代认知约束的通路。</div>`
+      : res.valid_paths
+          .map(
+            (p, idx) => `
+          <div class="box ok">
+            <strong>合法通路 #${idx + 1} (${p.length} 跳)</strong>
+            <div class="mono" style="font-size:0.74rem;margin:0.25rem 0;">${p.map(esc).join(" → ")}</div>
+            <button type="button" class="btn small primary highlight-path" data-path="${esc(p.join(","))}">在画布高亮并连线</button>
+          </div>`
+          )
+          .join("");
+
+  const rejHtml = res.rejected_paths
+    .map(
+      (r) => `
+      <div class="box err">
+        <strong>被时代/防火墙拦截的通路</strong>
+        <div class="mono" style="font-size:0.72rem;margin:0.2rem 0;">${r.path.map(esc).join(" → ")}</div>
+        <div style="font-size:0.74rem;">${r.reasons.map((x) => esc(x.message)).join("<br>")}</div>
+      </div>`
+    )
+    .join("");
+
+  box.innerHTML = validHtml + rejHtml;
+
+  box.querySelectorAll(".highlight-path").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const ids = btn.dataset.path.split(",");
+      state.highlightedCardIds = new Set(ids);
+      ids.forEach((id) => {
+        const edge = edgeById(id);
+        if (edge) edge.on_board = true;
+      });
+      state.wires = [];
+      for (let i = 0; i < ids.length - 1; i++) {
+        await addAndValidateWire(ids[i], ids[i + 1]);
+      }
+      renderLeftDrawers();
+      renderBoardCards();
+      renderWires();
+      toast(`已高亮并连线合法通路：${ids.join(" → ")}`, "ok");
+    });
+  });
+}
+
+// ==== Topbar & Creation Actions ====
+function bindTopbar() {
+  document.getElementById("btn-auto-wire").addEventListener("click", async () => {
+    await autoWireValidOnBoard();
+    toast("已自动连接当前桌面上所有合规且端口匹配的卡片。", "ok");
+  });
+
+  document.getElementById("btn-clear-wires").addEventListener("click", () => {
+    state.wires = [];
+    state.highlightedCardIds.clear();
+    state.selectedWireId = null;
+    renderBoardCards();
+    renderWires();
+    renderInspector();
+  });
+
+  document.getElementById("btn-board-all").addEventListener("click", async () => {
+    state.edges.forEach((e) => (e.on_board = true));
+    markDirty();
+    renderLeftDrawers();
+    renderBoardCards();
+    renderWires();
+    toast("已将全部卡片（含干扰卡、穿帮与防火墙测试卡）摆上桌面。", "");
+  });
+
+  document.getElementById("btn-board-main").addEventListener("click", () => {
+    state.edges.forEach((e) => {
+      e.on_board = e.id.startsWith("card_0");
+    });
+    markDirty();
+    renderLeftDrawers();
+    renderBoardCards();
+    autoWireValidOnBoard();
+  });
+
+  document.getElementById("btn-save").addEventListener("click", async () => {
+    const res = await api("/api/world/save", {
+      eras: state.eras,
+      nodes: state.nodes,
+      edges: state.edges,
+    });
+    state.audit = res.audit;
+    markDirty(false);
+    renderAuditSummary();
+    toast("已保存到 world/eras.json 与 world/graph.json。", "ok");
+  });
+
+  document.getElementById("btn-reset").addEventListener("click", async () => {
+    const res = await api("/api/world/reset", {});
+    state.highlightedCardIds.clear();
+    loadWorldState(res);
+    autoWireValidOnBoard();
+    toast("已从磁盘重新加载世界档案。", "");
+  });
+
+  document.getElementById("btn-new-card").addEventListener("click", async () => {
+    const id = `card_${Date.now().toString().slice(-4)}`;
+    const firstNode = state.nodes[0]?.id || "node_zheng";
+    const secondNode = state.nodes[1]?.id || firstNode;
+    const firstEra = state.eras[0]?.id || "era1_ancestral";
+    const newCard = {
+      id,
+      from: firstNode,
+      rel: "relates_to",
+      to: secondNode,
+      era: firstEra,
+      observer: "archivist",
+      retrospective: false,
+      title: "新档案卡",
+      body: "在此编写事件与认知记录……",
+      concepts: [],
+      on_board: true,
+      x: 160 + (state.edges.length % 4) * 50,
+      y: 160 + (state.edges.length % 4) * 40,
+    };
+    state.edges.push(newCard);
+    state.selectedCardId = id;
+    state.selectedWireId = null;
+    markDirty();
+    await reauditWorld();
+    switchSubtab("inspector");
+  });
+
+  document.getElementById("btn-new-node").addEventListener("click", async () => {
+    const id = prompt("新节点 ID（英文标识，如 node_mycelium_core）：");
+    if (!id) return;
+    if (nodeById(id)) {
+      toast(`节点 ${id} 已存在。`, "err");
+      return;
+    }
+    const label = prompt("节点显示名称：", id) || id;
+    const kind = prompt("节点类型 (kind)，如 relic / omen / protocol / engineering_disturbance：", "entity") || "entity";
+    const era = state.eras[0]?.id || "era1_ancestral";
+    state.nodes.push({ id, kind, era, label, note: "" });
+    markDirty();
+    await reauditWorld();
+    toast(`已新增节点「${label}」(${id})。`, "ok");
+  });
+
+  document.getElementById("btn-new-era").addEventListener("click", async () => {
+    const id = prompt("新时代 ID（如 era4_recovery）：");
+    if (!id) return;
+    if (eraById(id)) {
+      toast(`时代 ${id} 已存在。`, "err");
+      return;
+    }
+    const name = prompt("时代显示名：", id) || id;
+    state.eras.push({
+      id,
+      name,
+      order: state.eras.length + 1,
+      color: "#394b54",
+      granularity: "在此描述该时代对山体建模的粒度。",
+      allowed_concepts: [],
+      forbidden_concepts: [],
+      taboos: [],
+    });
+    markDirty();
+    await reauditWorld();
+    document.getElementById("era-editor-select").value = id;
+    renderEraEditor();
+  });
+
+  document.getElementById("btn-find-paths").addEventListener("click", runPathfinder);
 }
 
 init().catch((err) => {
-  document.getElementById("header-meta").textContent = `初始化失败: ${err.message}`;
+  toast(`加载失败：${err.message}`, "err");
   console.error(err);
 });

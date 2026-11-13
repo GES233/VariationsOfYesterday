@@ -7,18 +7,18 @@
 - 模组 ID：`variations-of-yesterday`
 - 包名：`moe.chestnut.awa.voy`
 - 版本与坐标：`gradle.properties`（`mod_version=0.1.0`，`maven_group=moe.chestnut.awa.voy`）
-- 许可证：代码 MPL-2.0（`LICENSE`）；叙事与美术资源 CC BY-NC-SA 4.0（`LICENSE-CONTENT`，范围含 `docs/`、`tools/voy_world/docs/`、`tools/voy_world/content/`、lang 文案、贴图与图标）。Mojang EULA 规定模组不得售卖，故本协议只约束社区二创，不涉及商业分发。
+- 许可证：代码 MPL-2.0（`LICENSE`）；叙事与美术资源 CC BY-NC-SA 4.0（`LICENSE-CONTENT`，范围含 `docs/`、`tools/voy_world/docs/`、`tools/voy_world/world/`、lang 文案、贴图与图标）。Mojang EULA 规定模组不得售卖，故本协议只约束社区二创，不涉及商业分发。
 
 ## 技术栈
 
 - **语言与平台**：Scala 3（3.6.3，显著缩进风格）+ Java 21，Minecraft 1.21.2 + Yarn + Fabric Loader 0.16.10 + Fabric API 0.106.1+1.21.2，通过 `kotori_scala` 加载。
 - **并发与调度**：自建单线程 actor 内核（`inner/actor/`），便于直接发版。`MandateRuntime` 随服务器生命周期启停；`END_SERVER_TICK` 投递固定步长 `TickArrived(dt = 配置 tickDt，默认 0.05, tickRate)`，与通道事件在 `MandateAgent` 信箱内全序处理。游戏线程只投递事件、读取 `@volatile` 快照并在下一 tick 消费动作队列。
-- **关系推理与内容沙盘**：`tools/voy_world/`（独立 Elixir Mix 包，不进模组 jar），内置零依赖 microKanren 引擎（`Voy.Kanren`）。
+- **关系图谱与时代认知沙盘**：`tools/voy_world/`（独立 Elixir Mix 包，不进模组 jar），内置 microKanren 引擎（`Voy.Kanren`）与 `Plug + Bandit` 本地桌面卡片接线沙盘。
 
 ## 构建与测试
 
 - 构建与测试（JVM）：`./gradlew build`、`./gradlew test`、`./gradlew runClient`
-- 关系沙盘与内容检查（Elixir）：在 `tools/voy_world/` 下运行 `mix test`、`mix voy.content lint`、`mix run examples/sandbox.exs`
+- 关系沙盘与 WebUI（Elixir）：在 `tools/voy_world/` 下运行 `mix test`、`mix voy.web [--port 4040 --open]`
 - 本机环境注意：JDK 21 路径等本机配置见 `ref/本地环境.md`（`ref/` 被 git 忽略）。
 
 ## 代码与目录组织
@@ -46,11 +46,11 @@
 - `src/main/java/moe/chestnut/awa/voy/mixin/` — mixin 层（`VillagerEntityMixin` 交易/繁殖/铁傀儡、`CropBlockMixin` 作物生长，均委托 `MandateEconomy`；Java 源与 Scala 联合编译，见 `build.gradle` 的 sourceSets 配置）
 - `src/test/scala/moe/chestnut/awa/voy/` — 19 个 JUnit 5 测试规范（`GridBenchmarkSpec` 默认跳过）；`inner/veins/` 下 15 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
-- `tools/voy_world/` — 独立 Elixir 关系世界模型与叙事无冲突沙盘（含 `docs/` 内的关系模型札记 02 / 05 与图集）：
+- `tools/voy_world/` — 独立 Elixir 关系图谱、时代认知模型与卡片接线沙盘（含 `docs/` 内的历史设计札记 02 / 05 与图集）：
   - `lib/voy/kanren/` — microKanren 内核与 DSL
-  - `lib/voy/world/` — `Chronicle`（地形与四纪六结局、玩家干预求解）、`Pathway + Witness + Content + Canon + Timeline`（五跳局部证据链、种子物化、散文卡片加载与无冲突静态检查）、`Observation + Ascribe + Slice + Contract`（三方有损观测与 24 候选假说溯因反演沙盘）、`Schema + Texts + Fields`（地形与六结局单一真相表、上中下游建筑描述投影、统一字段访问）；门面 `Voy.World`、Mix 任务 `Mix.Tasks.Voy.Content`
-  - `content/documents/` — 唯一叙事散文来源（32 张主链卡 + 4 张干扰卡）
-  - `docs/` — Elixir 式盘引擎与五跳卷宗设计文档（札记 02 / 05）及生成图集（`diagrams/`）
+  - `lib/voy/world/` — `Graph`（mediKanren 风格开放属性图 `nodeo` / `edgeo` / `patho` / `bridgeo`）、`Epistemic`（时代粒度、概念越界、机构 `neq/2` 防火墙与接线校验）、`Store`（读写 `world/*.json`）、`Web`（`Plug + Bandit` 卡片接线画布服务）；门面 `Voy.World`、Mix 任务 `Mix.Tasks.Voy.Web`
+  - `world/` — 人类可直接编辑的 `eras.json`（时代认知模型）与 `graph.json`（节点与档案卡片边）
+  - `docs/` — 此前阶段的设计札记（02 / 05）及生成图集（`diagrams/`）
 - `docs/` — 模组本体中文设计文档（索引与边界重划见 `docs/README.md`）：草案 01、札记 06/07/08/10；`incubator/` 存放挂起构想（札记 09）；`archive/` 存放历史快照（验证报告 01）。原札记 03/04 已分别并入 05/02。
 
 ## 开发约定

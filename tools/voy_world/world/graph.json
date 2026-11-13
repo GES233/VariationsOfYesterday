@@ -1,0 +1,241 @@
+{
+  "nodes": [
+    {
+      "id": "node_ritual_origin",
+      "kind": "ritual_mechanism",
+      "era": "era1_ancestral",
+      "label": "山官岁祭与三息阻尼",
+      "note": "古寨按潮候叩击镇器，借三息余音稳住山体起搏"
+    },
+    {
+      "id": "node_zheng",
+      "kind": "relic",
+      "era": "era1_ancestral",
+      "label": "寨门镇山铜钲",
+      "note": "高锡青铜古器，具三息余音"
+    },
+    {
+      "id": "node_omen",
+      "kind": "omen",
+      "era": "era2a_magistrate",
+      "label": "鱼鳞水纹与局署塌方",
+      "note": "光绪二十年强收铜钲后出现的异常滑坡"
+    },
+    {
+      "id": "node_scrap_bronze",
+      "kind": "scrap_batch",
+      "era": "era2b_reclamation",
+      "label": "高锡废铜批号 79-04",
+      "note": "1979年拆解过磅收缴的高锡青铜批次"
+    },
+    {
+      "id": "node_cylinder_vessel",
+      "kind": "industrial_vessel",
+      "era": "era2b_reclamation",
+      "label": "东方红-54 铜铸气缸体",
+      "note": "机修车间翻砂改铸，意外保留三息金属谐振"
+    },
+    {
+      "id": "node_duty_inversion",
+      "kind": "engineering_disturbance",
+      "era": "era2b_reclamation",
+      "label": "占空比反转与自持振荡",
+      "note": "302队手簿测得的饱和区膨胀与垂架撞框周期"
+    },
+    {
+      "id": "node_defibrillation",
+      "kind": "protocol",
+      "era": "era3_mycelial",
+      "label": "相对不应期体外除颤",
+      "note": "在易损推迟窗激发三次金属谐振，打断折返振荡"
+    },
+    {
+      "id": "node_iron_decoy",
+      "kind": "scrap_batch",
+      "era": "era2b_reclamation",
+      "label": "普通生铁废农具（干扰）",
+      "note": "声短而闷，无三息余音"
+    },
+    {
+      "id": "node_smelter_deadend",
+      "kind": "destination",
+      "era": "era2b_reclamation",
+      "label": "省冶炼厂外运批次（干扰）",
+      "note": "外运离山，与本地机修车间毫无交集"
+    },
+    {
+      "id": "node_rain_scapegoat",
+      "kind": "natural_cause",
+      "era": "era2b_reclamation",
+      "label": "十月秋雨泥石流（行政替罪）",
+      "note": "总指挥部按固定规程勾选的事故归因"
+    }
+  ],
+  "edges": [
+    {
+      "id": "card_01",
+      "from": "node_ritual_origin",
+      "rel": "anchored_in",
+      "to": "node_zheng",
+      "era": "era1_ancestral",
+      "observer": "headman",
+      "retrospective": false,
+      "title": "山官口传《听山口诀》",
+      "body": "山如睡兽，三息一喘。每逢谷口起风，山官击寨门镇山铜钲，三息余音未绝而山患平息。",
+      "concepts": ["山官岁祭", "镇山铜钲", "三息余音", "山患平息"],
+      "on_board": true,
+      "x": 40,
+      "y": 70
+    },
+    {
+      "id": "card_02",
+      "from": "node_zheng",
+      "rel": "removal_provokes",
+      "to": "node_omen",
+      "era": "era2a_magistrate",
+      "observer": "chronicler",
+      "retrospective": false,
+      "title": "《旧州府清丈残卷》断碑案",
+      "body": "清丈局强收镇山铜钲入库铸钱，是秋涧水起鱼鳞水纹，夜间山石崩落掩没局署；流官惊惧，遂发还旧器。",
+      "concepts": ["清丈局", "鱼鳞水纹", "局署塌方", "发还旧器"],
+      "on_board": true,
+      "x": 340,
+      "y": 70
+    },
+    {
+      "id": "card_03",
+      "from": "node_omen",
+      "rel": "requisitioned_as",
+      "to": "node_scrap_bronze",
+      "era": "era2b_reclamation",
+      "observer": "logistics",
+      "retrospective": false,
+      "title": "物资回收过磅单 79-04",
+      "body": "旧铜器一件按废铜全数拆解过磅收缴，成色高锡青铜，重三百四十斤，编入批号 79-04 送机修车间翻砂。",
+      "concepts": ["废铜过磅", "高锡青铜"],
+      "on_board": true,
+      "x": 640,
+      "y": 70
+    },
+    {
+      "id": "card_04",
+      "from": "node_scrap_bronze",
+      "rel": "cast_into",
+      "to": "node_cylinder_vessel",
+      "era": "era2b_reclamation",
+      "observer": "workshop",
+      "retrospective": false,
+      "title": "机修车间翻砂工艺卡",
+      "body": "收批号 79-04 高锡青铜旧料一宗，翻砂改铸东方红-54 铜铸气缸体；探伤叩击，余音仍存三息。",
+      "concepts": ["高锡青铜", "翻砂气缸体"],
+      "on_board": true,
+      "x": 40,
+      "y": 330
+    },
+    {
+      "id": "card_05",
+      "from": "node_cylinder_vessel",
+      "rel": "probes_against",
+      "to": "node_duty_inversion",
+      "era": "era2b_reclamation",
+      "observer": "tech_inner",
+      "retrospective": false,
+      "title": "302水文队野外观测手簿",
+      "body": "拆器浅层爆破后饱和区膨胀至 60.6%，占空比反转、垂架撞框；借机修房那件备件在推迟格叩击可延缓下一轮山啸。",
+      "concepts": ["浅层爆破", "占空比反转", "垂架撞框", "推迟格"],
+      "on_board": true,
+      "x": 340,
+      "y": 330
+    },
+    {
+      "id": "card_06",
+      "from": "node_duty_inversion",
+      "rel": "reinterpreted_as",
+      "to": "node_defibrillation",
+      "era": "era3_mycelial",
+      "observer": "mycelial_survey",
+      "retrospective": true,
+      "title": "菌脉起搏与体外除颤备忘",
+      "body": "历史追认：老寨荧光菌脉构成传导束，占空比反转即自持折返振荡；在相对不应期激发三息谐振即为给大山做体外除颤。",
+      "concepts": ["荧光菌脉", "起搏传导束", "自持振荡", "相对不应期", "体外除颤", "三息谐振", "历史追认"],
+      "on_board": true,
+      "x": 640,
+      "y": 330
+    },
+    {
+      "id": "decoy_iron",
+      "from": "node_iron_decoy",
+      "rel": "cast_into",
+      "to": "node_cylinder_vessel",
+      "era": "era2b_reclamation",
+      "observer": "workshop",
+      "retrospective": false,
+      "title": "[干扰] 生铁废农具翻砂卡",
+      "body": "收普通生铁犁铧锄板一批翻砂改铸，探伤声短而闷，无余音，端口无法接续高锡青铜批次。",
+      "concepts": ["翻砂气缸体"],
+      "on_board": false,
+      "x": 40,
+      "y": 560
+    },
+    {
+      "id": "decoy_smelter",
+      "from": "node_omen",
+      "rel": "shipped_out_to",
+      "to": "node_smelter_deadend",
+      "era": "era2b_reclamation",
+      "observer": "logistics",
+      "retrospective": false,
+      "title": "[干扰] 省冶炼厂外运调拨单",
+      "body": "杂铜一批装车外运省冶炼厂，至此离开本山谷，成为断头去向。",
+      "concepts": ["废铜过磅"],
+      "on_board": false,
+      "x": 340,
+      "y": 560
+    },
+    {
+      "id": "card_hq_coverup",
+      "from": "node_duty_inversion",
+      "rel": "caused_by",
+      "to": "node_rain_scapegoat",
+      "era": "era2b_reclamation",
+      "observer": "official_hq",
+      "retrospective": false,
+      "title": "总指挥部十日简报（合规替罪）",
+      "body": "本旬连降秋雨，山体自然渗水引发秋雨泥石流；爆破物资领用合规，与本案无涉。",
+      "concepts": ["秋雨泥石流"],
+      "on_board": false,
+      "x": 640,
+      "y": 560
+    },
+    {
+      "id": "card_anachronism_demo",
+      "from": "node_zheng",
+      "rel": "anachronistic_link",
+      "to": "node_defibrillation",
+      "era": "era1_ancestral",
+      "observer": "headman",
+      "retrospective": false,
+      "title": "[穿帮演示] 越界写进第一纪的除颤卡",
+      "body": "山官手持铜钲对荧光菌脉在相对不应期实施体外除颤——此卡故意在 Era 1 使用后世词汇。",
+      "concepts": ["镇山铜钲", "除颤", "相位"],
+      "on_board": false,
+      "x": 930,
+      "y": 70
+    },
+    {
+      "id": "card_hq_taboo_demo",
+      "from": "node_cylinder_vessel",
+      "rel": "caused_by",
+      "to": "node_duty_inversion",
+      "era": "era2b_reclamation",
+      "observer": "official_hq",
+      "retrospective": false,
+      "title": "[防火墙演示] 官府承认爆破致灾",
+      "body": "总指挥部内部档案坦承浅层爆破导致垂架撞框与占空比反转——故意撞上 official_hq 的 neq 禁忌。",
+      "concepts": ["浅层爆破", "占空比反转"],
+      "on_board": false,
+      "x": 930,
+      "y": 330
+    }
+  ]
+}

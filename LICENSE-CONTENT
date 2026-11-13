@@ -15,7 +15,7 @@ Scope
 
   * docs/                      design drafts and notes (including incubator/ and archive/)
   * tools/voy_world/docs/      relational engine design notes and generated diagrams
-  * tools/voy_world/content/   narrative documents (the 32 + 4 dossier cards)
+  * tools/voy_world/world/     human-editable eras and narrative graph cards (eras.json, graph.json)
   * src/**/lang/*.json         player-facing prose (names, tooltips, wording)
   * src/**/textures/**         pixel art
   * src/main/resources/assets/**/icon.png

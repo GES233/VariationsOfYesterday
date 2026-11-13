@@ -1,0 +1,107 @@
+{
+  "eras": [
+    {
+      "id": "era1_ancestral",
+      "name": "第一纪 · 山官岁祭",
+      "order": 1,
+      "color": "#1d6f66",
+      "granularity": "整体观：将山体视为有脾气、会呼吸的活物；仅以镇物、水文异象与岁祭三息余音定性建模。",
+      "allowed_concepts": [
+        "山官岁祭",
+        "镇山铜钲",
+        "三息余音",
+        "鱼鳞水纹",
+        "山患平息"
+      ],
+      "forbidden_concepts": [
+        "爆破单",
+        "过磅",
+        "占空比",
+        "相位",
+        "生物电",
+        "除颤",
+        "起搏"
+      ],
+      "taboos": []
+    },
+    {
+      "id": "era2a_magistrate",
+      "name": "第二纪甲 · 清丈奏报",
+      "order": 2,
+      "color": "#5d6870",
+      "granularity": "赋税与灾异观：只认铜税、田亩与公署损毁奏报；刻意抹除山官祭祀的物理作用。",
+      "allowed_concepts": [
+        "清丈局",
+        "征调入库",
+        "鱼鳞水纹",
+        "局署塌方",
+        "发还旧器",
+        "抚夷旧例"
+      ],
+      "forbidden_concepts": [
+        "爆破单",
+        "占空比",
+        "相位",
+        "生物电",
+        "除颤",
+        "起搏"
+      ],
+      "taboos": [
+        {
+          "observer": "magistrate",
+          "rel": "calmed_by",
+          "target_kind": "ritual_mechanism",
+          "reason": "州府公文不允许承认土官岁祭具有平灾效力，只能改记为抚夷安民旧例。"
+        }
+      ]
+    },
+    {
+      "id": "era2b_reclamation",
+      "name": "第二纪乙 · 八十年代垦殖与水文队",
+      "order": 3,
+      "color": "#a86b12",
+      "granularity": "双轨失真观：总指挥部只看雨量与炸药台账；302队测出了周期、垂架撞框与占空比反转，但不知底层是菌脉生物电。",
+      "allowed_concepts": [
+        "废铜过磅",
+        "高锡青铜",
+        "翻砂气缸体",
+        "浅层爆破",
+        "占空比反转",
+        "垂架撞框",
+        "推迟格",
+        "秋雨泥石流"
+      ],
+      "forbidden_concepts": [
+        "生物电",
+        "除颤",
+        "菌脉起搏"
+      ],
+      "taboos": [
+        {
+          "observer": "official_hq",
+          "rel": "caused_by",
+          "target_kind": "engineering_disturbance",
+          "reason": "总指挥部行文防火墙：严禁将山啸归因于工程爆破扰动，必须归档为秋雨泥石流。"
+        }
+      ]
+    },
+    {
+      "id": "era3_mycelial",
+      "name": "第三纪 · 菌脉起搏与除颤",
+      "order": 4,
+      "color": "#b43c2c",
+      "granularity": "可激发介质观：识别出荧光菌脉传导束与自持折返振荡，将历代档案追认为「维持源损毁→占空比反转→易损窗体外除颤」。",
+      "allowed_concepts": [
+        "荧光菌脉",
+        "起搏传导束",
+        "自持振荡",
+        "相对不应期",
+        "体外除颤",
+        "三息谐振",
+        "历史追认"
+      ],
+      "forbidden_concepts": [],
+      "taboos": []
+    }
+  ]
+}
