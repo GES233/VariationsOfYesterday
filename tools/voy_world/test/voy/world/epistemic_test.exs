@@ -17,11 +17,15 @@ defmodule Voy.World.EpistemicTest do
              "card_06"
            ])
 
-    res = Epistemic.query_paths(world.eras, world.graph, "node_ritual_origin", "node_defibrillation")
+    res =
+      Epistemic.query_paths(world.eras, world.graph, "node_ritual_origin", "node_defibrillation")
+
     assert ["card_01", "card_02", "card_03", "card_04", "card_05", "card_06"] in res.valid_paths
   end
 
-  test "cross-era translation bridges card_01 -> card_02 and fails if translation is removed", %{world: world} do
+  test "cross-era translation bridges card_01 -> card_02 and fails if translation is removed", %{
+    world: world
+  } do
     assert {:ok, %{bridge: %{kind: "translation", translation_id: "tr_zheng_to_tax_bronze"}}} =
              Epistemic.check_wire(world.eras, world.graph, "card_01", "card_02")
 
@@ -47,10 +51,14 @@ defmodule Voy.World.EpistemicTest do
   end
 
   test "decoy cards fail port unification and rejected paths explain why", %{world: world} do
-    assert {:error, issues} = Epistemic.check_wire(world.eras, world.graph, "card_03", "decoy_iron")
+    assert {:error, issues} =
+             Epistemic.check_wire(world.eras, world.graph, "card_03", "decoy_iron")
+
     assert Enum.any?(issues, &(&1.code == "port_mismatch"))
 
-    res = Epistemic.query_paths(world.eras, world.graph, "node_ritual_origin", "node_defibrillation")
+    res =
+      Epistemic.query_paths(world.eras, world.graph, "node_ritual_origin", "node_defibrillation")
+
     assert Enum.any?(res.rejected_paths, fn r -> "card_anachronism_demo" in r.path end)
   end
 
@@ -64,6 +72,7 @@ defmodule Voy.World.EpistemicTest do
         end
       end)
 
-    assert {:ok, _} = Epistemic.check_wire(relaxed_eras, world.graph, "card_01", "card_anachronism_demo")
+    assert {:ok, _} =
+             Epistemic.check_wire(relaxed_eras, world.graph, "card_01", "card_anachronism_demo")
   end
 end

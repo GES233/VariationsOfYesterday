@@ -16,7 +16,14 @@ defmodule Voy.World.GraphTest do
         ],
         [
           %{id: "e1", from: "a", rel: "becomes", to: "b", era: "e1", observer: "headman"},
-          %{id: "e2", from: "b_alias", rel: "cast_into", to: "c", era: "e2", observer: "workshop"},
+          %{
+            id: "e2",
+            from: "b_alias",
+            rel: "cast_into",
+            to: "c",
+            era: "e2",
+            observer: "workshop"
+          },
           %{id: "e_dead", from: "b", rel: "shipped_to", to: "x", era: "e2", observer: "logistics"}
         ],
         [
@@ -38,7 +45,9 @@ defmodule Voy.World.GraphTest do
              run_all(fn q -> Graph.nodeo(graph, q, "relic", "e1") end) |> terms()
 
     assert ["e2"] ==
-             run_all(fn q -> Graph.edgeo(graph, q, "b_alias", "cast_into", "c", observer: "workshop") end)
+             run_all(fn q ->
+               Graph.edgeo(graph, q, "b_alias", "cast_into", "c", observer: "workshop")
+             end)
              |> terms()
   end
 

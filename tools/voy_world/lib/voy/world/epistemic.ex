@@ -240,8 +240,11 @@ defmodule Voy.World.Epistemic do
 
   defp path_issues(eras, graph, [single]) do
     case Graph.find_edge(graph, single) do
-      nil -> [%{code: "missing_edge", severity: "error", edge_id: single, message: "缺失边 #{single}"}]
-      edge -> elem(split_edge_result(check_edge(eras, graph, edge)), 0)
+      nil ->
+        [%{code: "missing_edge", severity: "error", edge_id: single, message: "缺失边 #{single}"}]
+
+      edge ->
+        elem(split_edge_result(check_edge(eras, graph, edge)), 0)
     end
   end
 
@@ -350,7 +353,9 @@ defmodule Voy.World.Epistemic do
 
     tr_retro =
       case bridge[:translation_id] do
-        nil -> false
+        nil ->
+          false
+
         id ->
           tr = Graph.find_translation(graph, id)
           tr != nil and tr[:retrospective] == true
@@ -381,7 +386,11 @@ defmodule Voy.World.Epistemic do
 
   defp split_edge_result(:ok), do: {[], []}
   defp split_edge_result({:ok_with_warnings, warnings}), do: {[], warnings}
-  defp split_edge_result({:error, issues}), do: {Enum.filter(issues, &(&1.severity == "error")), Enum.filter(issues, &(&1.severity == "warn"))}
+
+  defp split_edge_result({:error, issues}),
+    do:
+      {Enum.filter(issues, &(&1.severity == "error")),
+       Enum.filter(issues, &(&1.severity == "warn"))}
 
   defp find_era(eras, id), do: Enum.find(eras, &(era_id(&1) == id))
   defp era_id(era), do: Map.get(era, :id) || Map.get(era, "id")

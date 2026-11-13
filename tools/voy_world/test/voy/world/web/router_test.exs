@@ -55,24 +55,44 @@ defmodule Voy.World.Web.RouterTest do
       translations: world.raw_translations
     }
 
-    tr_wire = post_json("/api/world/wire", Map.merge(base, %{from_edge_id: "card_01", to_edge_id: "card_02"}))
+    tr_wire =
+      post_json(
+        "/api/world/wire",
+        Map.merge(base, %{from_edge_id: "card_01", to_edge_id: "card_02"})
+      )
+
     tr_data = JSON.decode!(tr_wire.resp_body)
     assert tr_data["valid"] == true
     assert tr_data["bridge"]["kind"] == "translation"
     assert tr_data["bridge"]["translation_id"] == "tr_zheng_to_tax_bronze"
 
-    exact_wire = post_json("/api/world/wire", Map.merge(base, %{from_edge_id: "card_02", to_edge_id: "card_03"}))
+    exact_wire =
+      post_json(
+        "/api/world/wire",
+        Map.merge(base, %{from_edge_id: "card_02", to_edge_id: "card_03"})
+      )
+
     exact_data = JSON.decode!(exact_wire.resp_body)
     assert exact_data["valid"] == true
     assert exact_data["bridge"]["kind"] == "exact"
     assert exact_data["bridge"]["from_node"] == "node_omen"
 
-    bad_port = post_json("/api/world/wire", Map.merge(base, %{from_edge_id: "card_03", to_edge_id: "decoy_iron"}))
+    bad_port =
+      post_json(
+        "/api/world/wire",
+        Map.merge(base, %{from_edge_id: "card_03", to_edge_id: "decoy_iron"})
+      )
+
     bad_data = JSON.decode!(bad_port.resp_body)
     assert bad_data["valid"] == false
     assert Enum.any?(bad_data["issues"], &(&1["code"] == "port_mismatch"))
 
-    taboo_wire = post_json("/api/world/wire", Map.merge(base, %{from_edge_id: "card_04", to_edge_id: "card_hq_taboo_demo"}))
+    taboo_wire =
+      post_json(
+        "/api/world/wire",
+        Map.merge(base, %{from_edge_id: "card_04", to_edge_id: "card_hq_taboo_demo"})
+      )
+
     taboo_data = JSON.decode!(taboo_wire.resp_body)
     assert taboo_data["valid"] == false
     assert Enum.any?(taboo_data["issues"], &(&1["code"] == "taboo_violation"))
@@ -93,7 +113,11 @@ defmodule Voy.World.Web.RouterTest do
 
     assert res.status == 200
     data = JSON.decode!(res.resp_body)
-    assert ["card_01", "card_02", "card_03", "card_04", "card_05", "card_06"] in data["valid_paths"]
+
+    assert ["card_01", "card_02", "card_03", "card_04", "card_05", "card_06"] in data[
+             "valid_paths"
+           ]
+
     assert data["rejected_paths"] != []
   end
 end

@@ -60,7 +60,13 @@ defmodule Voy.World.Graph do
         ]),
         all([
           membero(tr, translations),
-          propso(tr, id: tr_id, from_node: node_b, to_node: node_a, reversible: true, gloss: gloss),
+          propso(tr,
+            id: tr_id,
+            from_node: node_b,
+            to_node: node_a,
+            reversible: true,
+            gloss: gloss
+          ),
           eq(meta, kind: :translation, id: tr_id, gloss: gloss)
         ])
       ])
@@ -162,8 +168,7 @@ defmodule Voy.World.Graph do
                code: "port_mismatch",
                expected: edge_b[:from],
                actual: edge_a[:to],
-               message:
-                 "端口不匹配：左卡输出「#{edge_a[:to]}」，右卡需要输入「#{edge_b[:from]}」（无同名直连，也未声明跨时代认知转译）"
+               message: "端口不匹配：左卡输出「#{edge_a[:to]}」，右卡需要输入「#{edge_b[:from]}」（无同名直连，也未声明跨时代认知转译）"
              }}
         end
     end

@@ -9,18 +9,20 @@ defmodule Voy.World.Web.Router do
 
   @static_dir Path.expand("../../../../priv/static", __DIR__)
 
-  plug Plug.Static,
+  plug(Plug.Static,
     at: "/static",
     from: @static_dir
+  )
 
-  plug :match
+  plug(:match)
 
-  plug Plug.Parsers,
+  plug(Plug.Parsers,
     parsers: [:json],
     pass: ["application/json"],
     json_decoder: JSON
+  )
 
-  plug :dispatch
+  plug(:dispatch)
 
   get "/" do
     index_path = Path.join(@static_dir, "index.html")
