@@ -15,11 +15,18 @@
       "note": "高锡青铜古器，具三息余音"
     },
     {
+      "id": "node_era2a_old_bronze",
+      "kind": "tax_inventory",
+      "era": "era2a_magistrate",
+      "label": "土官旧铜器（清丈入库项）",
+      "note": "流官清丈局视角的资产称谓，不知其声学阻尼功能"
+    },
+    {
       "id": "node_omen",
       "kind": "omen",
       "era": "era2a_magistrate",
       "label": "鱼鳞水纹与局署塌方",
-      "note": "光绪二十年强收铜钲后出现的异常滑坡"
+      "note": "光绪二十年强收旧铜后出现的异常滑坡"
     },
     {
       "id": "node_scrap_bronze",
@@ -41,6 +48,13 @@
       "era": "era2b_reclamation",
       "label": "占空比反转与自持振荡",
       "note": "302队手簿测得的饱和区膨胀与垂架撞框周期"
+    },
+    {
+      "id": "node_era3_reentry",
+      "kind": "bioelectric_state",
+      "era": "era3_mycelial",
+      "label": "菌脉自持折返振荡",
+      "note": "现世勘探视角下的可激发介质折返环路"
     },
     {
       "id": "node_defibrillation",
@@ -71,6 +85,24 @@
       "note": "总指挥部按固定规程勾选的事故归因"
     }
   ],
+  "translations": [
+    {
+      "id": "tr_zheng_to_tax_bronze",
+      "from_node": "node_zheng",
+      "to_node": "node_era2a_old_bronze",
+      "gloss": "山官所称「镇山铜钲」，在清丈局账册上记作「土官旧铜器」",
+      "reversible": false,
+      "retrospective": false
+    },
+    {
+      "id": "tr_duty_to_reentry",
+      "from_node": "node_duty_inversion",
+      "to_node": "node_era3_reentry",
+      "gloss": "302队实测的「占空比反转」，在菌脉模型下即「自持折返振荡」",
+      "reversible": false,
+      "retrospective": true
+    }
+  ],
   "edges": [
     {
       "id": "card_01",
@@ -85,22 +117,22 @@
       "concepts": ["山官岁祭", "镇山铜钲", "三息余音", "山患平息"],
       "on_board": true,
       "x": 40,
-      "y": 70
+      "y": 48
     },
     {
       "id": "card_02",
-      "from": "node_zheng",
+      "from": "node_era2a_old_bronze",
       "rel": "removal_provokes",
       "to": "node_omen",
       "era": "era2a_magistrate",
       "observer": "chronicler",
       "retrospective": false,
       "title": "《旧州府清丈残卷》断碑案",
-      "body": "清丈局强收镇山铜钲入库铸钱，是秋涧水起鱼鳞水纹，夜间山石崩落掩没局署；流官惊惧，遂发还旧器。",
-      "concepts": ["清丈局", "鱼鳞水纹", "局署塌方", "发还旧器"],
+      "body": "清丈局强收土官旧铜器入库铸钱，是秋涧水起鱼鳞水纹，夜间山石崩落掩没局署；流官惊惧，遂发还旧器。",
+      "concepts": ["清丈局", "征调入库", "鱼鳞水纹", "局署塌方", "发还旧器"],
       "on_board": true,
-      "x": 340,
-      "y": 70
+      "x": 440,
+      "y": 48
     },
     {
       "id": "card_03",
@@ -114,8 +146,8 @@
       "body": "旧铜器一件按废铜全数拆解过磅收缴，成色高锡青铜，重三百四十斤，编入批号 79-04 送机修车间翻砂。",
       "concepts": ["废铜过磅", "高锡青铜"],
       "on_board": true,
-      "x": 640,
-      "y": 70
+      "x": 840,
+      "y": 48
     },
     {
       "id": "card_04",
@@ -130,7 +162,7 @@
       "concepts": ["高锡青铜", "翻砂气缸体"],
       "on_board": true,
       "x": 40,
-      "y": 330
+      "y": 410
     },
     {
       "id": "card_05",
@@ -144,13 +176,13 @@
       "body": "拆器浅层爆破后饱和区膨胀至 60.6%，占空比反转、垂架撞框；借机修房那件备件在推迟格叩击可延缓下一轮山啸。",
       "concepts": ["浅层爆破", "占空比反转", "垂架撞框", "推迟格"],
       "on_board": true,
-      "x": 340,
-      "y": 330
+      "x": 440,
+      "y": 410
     },
     {
       "id": "card_06",
-      "from": "node_duty_inversion",
-      "rel": "reinterpreted_as",
+      "from": "node_era3_reentry",
+      "rel": "treated_by",
       "to": "node_defibrillation",
       "era": "era3_mycelial",
       "observer": "mycelial_survey",
@@ -159,8 +191,8 @@
       "body": "历史追认：老寨荧光菌脉构成传导束，占空比反转即自持折返振荡；在相对不应期激发三息谐振即为给大山做体外除颤。",
       "concepts": ["荧光菌脉", "起搏传导束", "自持振荡", "相对不应期", "体外除颤", "三息谐振", "历史追认"],
       "on_board": true,
-      "x": 640,
-      "y": 330
+      "x": 840,
+      "y": 410
     },
     {
       "id": "decoy_iron",
@@ -175,7 +207,7 @@
       "concepts": ["翻砂气缸体"],
       "on_board": false,
       "x": 40,
-      "y": 560
+      "y": 750
     },
     {
       "id": "decoy_smelter",
@@ -189,8 +221,8 @@
       "body": "杂铜一批装车外运省冶炼厂，至此离开本山谷，成为断头去向。",
       "concepts": ["废铜过磅"],
       "on_board": false,
-      "x": 340,
-      "y": 560
+      "x": 440,
+      "y": 750
     },
     {
       "id": "card_hq_coverup",
@@ -204,8 +236,8 @@
       "body": "本旬连降秋雨，山体自然渗水引发秋雨泥石流；爆破物资领用合规，与本案无涉。",
       "concepts": ["秋雨泥石流"],
       "on_board": false,
-      "x": 640,
-      "y": 560
+      "x": 840,
+      "y": 750
     },
     {
       "id": "card_anachronism_demo",
@@ -219,8 +251,8 @@
       "body": "山官手持铜钲对荧光菌脉在相对不应期实施体外除颤——此卡故意在 Era 1 使用后世词汇。",
       "concepts": ["镇山铜钲", "除颤", "相位"],
       "on_board": false,
-      "x": 930,
-      "y": 70
+      "x": 1240,
+      "y": 48
     },
     {
       "id": "card_hq_taboo_demo",
@@ -234,8 +266,8 @@
       "body": "总指挥部内部档案坦承浅层爆破导致垂架撞框与占空比反转——故意撞上 official_hq 的 neq 禁忌。",
       "concepts": ["浅层爆破", "占空比反转"],
       "on_board": false,
-      "x": 930,
-      "y": 330
+      "x": 1240,
+      "y": 410
     }
   ]
 }

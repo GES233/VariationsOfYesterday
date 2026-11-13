@@ -2,6 +2,7 @@ const state = {
   eras: [],
   nodes: [],
   edges: [],
+  translations: [],
   audit: null,
   wires: [], // [{id, from_edge_id, to_edge_id, valid, bridge, warnings, issues}]
   selectedCardId: null,
@@ -90,6 +91,7 @@ function loadWorldState(world) {
   state.eras = world.eras;
   state.nodes = world.nodes;
   state.edges = world.edges;
+  state.translations = world.translations || [];
   state.audit = world.audit;
   markDirty(false);
   renderAll();
@@ -103,6 +105,7 @@ function renderAll() {
   renderWires();
   renderInspector();
   renderEraEditor();
+  renderAliasesPanel();
   renderPathfinderSelects();
 }
 
@@ -110,7 +113,7 @@ function renderAuditSummary() {
   const s = state.audit?.summary;
   if (!s) return;
   document.getElementById("audit-summary").textContent =
-    `节点 ${s.nodes} · 卡片 ${s.edges} · 合规 ${s.ok_edges} · 词表外 ${s.warn_edges} · 冲突 ${s.error_edges} · 合法桥接 ${s.valid_bridges}`;
+    `节点 ${s.nodes} · 卡片 ${s.edges} · 转译桥 ${s.translations ?? state.translations.length} · 合规 ${s.ok_edges} · 冲突 ${s.error_edges} · 合法桥接 ${s.valid_bridges}`;
 }
 
 function renderEraFilters() {
@@ -239,14 +242,18 @@ function renderBoardCards() {
           <div class="card-title">${esc(edge.title || edge.id)}</div>
           <div class="card-body">${esc(edge.body)}</div>
           <div class="card-ports">
-            <div class="port-wrap in" title="输入节点: ${esc(edge.from)}">
-              <div class="port-dot in" data-port-in="${esc(edge.id)}"></div>
-              <span class="port-label">${esc(nodeLabel(edge.from))}</span>
+            <div class="port-row">
+              <div class="port-wrap in" title="输入节点: ${esc(edge.from)}">
+                <div class="port-dot in" data-port-in="${esc(edge.id)}"></div>
+                <span class="port-label">${esc(nodeLabel(edge.from))}</span>
+              </div>
+              <span class="port-rel">${esc(edge.rel)}</span>
             </div>
-            <span class="mono" style="font-size:0.65rem;color:var(--teal);">${esc(edge.rel)}</span>
-            <div class="port-wrap out" title="输出节点: ${esc(edge.to)}">
-              <div class="port-dot out" data-port-out="${esc(edge.id)}"></div>
-              <span class="port-label">${esc(nodeLabel(edge.to))}</span>
+            <div class="port-row out-row">
+              <div class="port-wrap out" title="输出节点: ${esc(edge.to)}">
+                <div class="port-dot out" data-port-out="${esc(edge.id)}"></div>
+                <span class="port-label">${esc(nodeLabel(edge.to))}</span>
+              </div>
             </div>
           </div>
           <div class="card-concepts">
@@ -318,10 +325,10 @@ function renderBoardCards() {
 function getPortPos(edgeId, side) {
   const card = document.querySelector(`.board-card[data-card-id="${CSS.escape(edgeId)}"]`);
   const edge = edgeById(edgeId);
-  if (!card || !edge) return { x: (edge?.x || 0) + (side === "out" ? 248 : 0), y: (edge?.y || 0) + 100 };
+  if (!card || !edge) return { x: (edge?.x || 0) + (side === "out" ? 304 : 0), y: (edge?.y || 0) + 120 };
 
   const dot = card.querySelector(side === "out" ? "[data-port-out]" : "[data-port-in]");
-  if (!dot) return { x: edge.x + (side === "out" ? 248 : 0), y: edge.y + 100 };
+  if (!dot) return { x: edge.x + (side === "out" ? 304 : 0), y: edge.y + 120 };
 
   const stageRect = document.getElementById("board-stage").getBoundingClientRect();
   const dotRect = dot.getBoundingClientRect();
@@ -331,9 +338,17 @@ function getPortPos(edgeId, side) {
   };
 }
 
-function cubicPath(x1, y1, x2, y2) {
-  const dx = Math.max(Math.abs(x2 - x1) * 0.45, 55);
-  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+function wireGeometry(x1, y1, x2, y2) {
+  // Forward flow: left-to-right gentle cubic Bezier
+  if (x2 >= x1 + 30) {
+    const dx = Math.max((x2 - x1) * 0.45, 55);
+    const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+    return { d, lx: (x1 + x2) / 2, ly: (y1 + y2) / 2 - 4 };
+  }
+  // Row-wrap / backward flow: route smoothly through the vertical gap between rows
+  const midY = Math.abs(y2 - y1) > 120 ? (y1 + y2) / 2 : y1 + 135;
+  const d = `M ${x1} ${y1} C ${x1 + 95} ${y1 + 50}, ${x1 + 75} ${midY}, ${(x1 + x2) / 2} ${midY} S ${x2 - 95} ${y2 - 50}, ${x2} ${y2}`;
+  return { d, lx: (x1 + x2) / 2, ly: midY };
 }
 
 function renderWires() {
@@ -344,17 +359,22 @@ function renderWires() {
     .map((w) => {
       const p1 = getPortPos(w.from_edge_id, "out");
       const p2 = getPortPos(w.to_edge_id, "in");
-      const d = cubicPath(p1.x, p1.y, p2.x, p2.y);
-      const cls = w.valid ? "ok" : "err";
+      const geom = wireGeometry(p1.x, p1.y, p2.x, p2.y);
+      const isTr = w.valid && w.bridge?.kind === "translation";
+      const cls = !w.valid ? "err" : isTr ? "tr" : "ok";
       const sel = state.selectedWireId === w.id ? "selected" : "";
-      const mx = (p1.x + p2.x) / 2;
-      const my = (p1.y + p2.y) / 2 - 8;
-      const label = w.valid ? nodeLabel(w.bridge) : (w.issues[0]?.code || "冲突");
+      const label = !w.valid
+        ? w.issues[0]?.code || "冲突"
+        : isTr
+        ? `⇄ ${nodeLabel(w.bridge.from_node)}`
+        : nodeLabel(w.bridge?.from_node || w.bridge);
+      const pillW = Math.min(210, Math.max(70, label.length * 9.5 + 16));
       return `
         <g data-wire-id="${esc(w.id)}">
-          <path class="wire-hit" d="${d}" />
-          <path class="wire-path ${cls} ${sel}" d="${d}" marker-end="url(#arrow-${cls})" />
-          <text class="wire-label" x="${mx}" y="${my}" text-anchor="middle">${esc(label)}</text>
+          <path class="wire-hit" d="${geom.d}" />
+          <path class="wire-path ${cls} ${sel}" d="${geom.d}" marker-end="url(#arrow-${cls})" />
+          <rect class="wire-label-bg ${cls}" x="${geom.lx - pillW / 2}" y="${geom.ly - 11}" width="${pillW}" height="20" rx="10" />
+          <text class="wire-label" x="${geom.lx}" y="${geom.ly + 3}" text-anchor="middle">${esc(label)}</text>
         </g>
       `;
     })
@@ -380,7 +400,8 @@ function updateDragWireSvg() {
     return;
   }
   path.style.display = "block";
-  path.setAttribute("d", cubicPath(state.dragWire.x1, state.dragWire.y1, state.dragWire.x2, state.dragWire.y2));
+  const geom = wireGeometry(state.dragWire.x1, state.dragWire.y1, state.dragWire.x2, state.dragWire.y2);
+  path.setAttribute("d", geom.d);
 }
 
 function clientToBoard(cx, cy) {
@@ -449,6 +470,7 @@ async function addAndValidateWire(fromId, toId) {
     eras: state.eras,
     nodes: state.nodes,
     edges: state.edges,
+    translations: state.translations,
     from_edge_id: fromId,
     to_edge_id: toId,
   });
@@ -469,7 +491,11 @@ async function addAndValidateWire(fromId, toId) {
   state.selectedCardId = null;
 
   if (wire.valid) {
-    toast(`接线成立：通过「${nodeLabel(wire.bridge)}」桥接。`, "ok");
+    if (wire.bridge?.kind === "translation") {
+      toast(`跨时代转译接线成立：${wire.bridge.gloss}`, "ok");
+    } else {
+      toast(`接线成立：通过「${nodeLabel(wire.bridge?.from_node)}」直连。`, "ok");
+    }
   } else {
     toast(`接线冲突：${wire.issues.map((i) => i.message).join("；")}`, "err");
   }
@@ -507,6 +533,7 @@ async function reauditWorld() {
     eras: state.eras,
     nodes: state.nodes,
     edges: state.edges,
+    translations: state.translations,
   });
   state.audit = res.audit;
 
@@ -518,6 +545,7 @@ async function reauditWorld() {
       eras: state.eras,
       nodes: state.nodes,
       edges: state.edges,
+      translations: state.translations,
       from_edge_id: w.from_edge_id,
       to_edge_id: w.to_edge_id,
     });
@@ -545,7 +573,9 @@ function renderInspector() {
       return;
     }
     const issuesHtml = w.valid
-      ? `<div class="box ok"><strong>接线合法</strong><br>桥接节点：<code>${esc(w.bridge)}</code>（${esc(nodeLabel(w.bridge))}）</div>`
+      ? w.bridge?.kind === "translation"
+        ? `<div class="box ok"><strong>跨时代认知转译成立 (aliaso)</strong><br><code>${esc(w.bridge.from_node)}</code> ⇄ <code>${esc(w.bridge.to_node)}</code><br><div style="margin-top:0.35rem;">${esc(w.bridge.gloss)}</div></div>`
+        : `<div class="box ok"><strong>同节点直连成立</strong><br>桥接节点：<code>${esc(w.bridge?.from_node)}</code>（${esc(nodeLabel(w.bridge?.from_node))}）</div>`
       : `<div class="box err"><strong>接线被拒绝</strong><ul style="margin:0.35rem 0 0;padding-left:1.1rem;">${w.issues
           .map((i) => `<li>${esc(i.message)}</li>`)
           .join("")}</ul></div>`;
@@ -746,6 +776,47 @@ function splitTerms(str) {
     .filter(Boolean);
 }
 
+// ==== Aliases / Translations Panel ====
+function renderAliasesPanel() {
+  const box = document.getElementById("aliases-list");
+  if (!box) return;
+
+  if (state.translations.length === 0) {
+    box.innerHTML = `<div class="muted">尚未声明跨时代同物转译，点击「+ 新转译」添加。</div>`;
+    return;
+  }
+
+  box.innerHTML = state.translations
+    .map(
+      (tr, idx) => `
+      <div class="box ok" style="border-left-color:#2b5b84;">
+        <div class="inline-row" style="justify-content:space-between;margin-bottom:0.25rem;">
+          <span class="mono" style="font-size:0.74rem;color:#2b5b84;">${esc(tr.id)}</span>
+          <div class="inline-row" style="gap:0.25rem;">
+            ${tr.reversible ? `<span class="badge">双向</span>` : `<span class="badge">单向</span>`}
+            ${tr.retrospective ? `<span class="badge">追认</span>` : ""}
+            <button type="button" class="btn small danger del-alias" data-idx="${idx}">删</button>
+          </div>
+        </div>
+        <div class="mono" style="font-size:0.75rem;margin-bottom:0.25rem;">
+          ${esc(nodeLabel(tr.from_node))} (${esc(tr.from_node)})<br>
+          ⇄ ${esc(nodeLabel(tr.to_node))} (${esc(tr.to_node)})
+        </div>
+        <div style="font-size:0.78rem;color:var(--ink);">${esc(tr.gloss)}</div>
+      </div>`
+    )
+    .join("");
+
+  box.querySelectorAll(".del-alias").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      state.translations.splice(Number(btn.dataset.idx), 1);
+      markDirty();
+      await reauditWorld();
+      toast("已删除跨时代转译规则，所有受影响连线已重检。", "");
+    });
+  });
+}
+
 // ==== Pathfinder ====
 function renderPathfinderSelects() {
   const s = document.getElementById("pf-start");
@@ -766,6 +837,7 @@ async function runPathfinder() {
     eras: state.eras,
     nodes: state.nodes,
     edges: state.edges,
+    translations: state.translations,
     start_node: startNode,
     target_node: targetNode,
   });
@@ -858,11 +930,40 @@ function bindTopbar() {
       eras: state.eras,
       nodes: state.nodes,
       edges: state.edges,
+      translations: state.translations,
     });
     state.audit = res.audit;
     markDirty(false);
     renderAuditSummary();
     toast("已保存到 world/eras.json 与 world/graph.json。", "ok");
+  });
+
+  document.getElementById("btn-new-alias").addEventListener("click", async () => {
+    const fromNode = prompt("源节点 ID（如 node_zheng）：", state.nodes[0]?.id || "");
+    if (!fromNode || !nodeById(fromNode)) {
+      if (fromNode) toast(`找不到节点 ${fromNode}`, "err");
+      return;
+    }
+    const toNode = prompt("目标节点 ID（如 node_era2a_old_bronze）：", state.nodes[1]?.id || "");
+    if (!toNode || !nodeById(toNode)) {
+      if (toNode) toast(`找不到节点 ${toNode}`, "err");
+      return;
+    }
+    const gloss = prompt("转译说明：", `${nodeLabel(fromNode)} 即后世所称 ${nodeLabel(toNode)}`) || "";
+    const reversible = confirm("是否设为双向等价？（确定=双向，取消=单向正序转译）");
+    const retrospective = confirm("是否属于历史追认转译？（确定=允许跨时代追认）");
+
+    state.translations.push({
+      id: `tr_${Date.now().toString().slice(-4)}`,
+      from_node: fromNode,
+      to_node: toNode,
+      gloss,
+      reversible,
+      retrospective,
+    });
+    markDirty();
+    await reauditWorld();
+    toast("已新增跨时代同物转译桥。", "ok");
   });
 
   document.getElementById("btn-reset").addEventListener("click", async () => {

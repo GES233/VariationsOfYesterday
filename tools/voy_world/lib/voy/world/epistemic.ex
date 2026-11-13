@@ -89,12 +89,12 @@ defmodule Voy.World.Epistemic do
 
   @doc """
   Validate wiring Card A (`edge_a_id`) -> Card B (`edge_b_id`):
-    1. Port unification (`edge_a.to == edge_b.from`) via `Voy.World.Graph`
-    2. Chronological consistency (`era_a.order <= era_b.order`, unless `edge_b` is retrospective)
+    1. Port unification (`exact` or via declared cross-era `translation`) via `Voy.World.Graph`
+    2. Chronological consistency (`era_a.order <= era_b.order`, unless retrospective)
     3. Both cards pass their own era epistemic checks
   """
   @spec check_wire([map()], Graph.t(), String.t(), String.t()) ::
-          {:ok, %{bridge: String.t(), warnings: [issue()]}} | {:error, [issue()]}
+          {:ok, %{bridge: map(), warnings: [issue()]}} | {:error, [issue()]}
   def check_wire(eras, graph, edge_a_id, edge_b_id) do
     case Graph.check_bridge(graph, edge_a_id, edge_b_id) do
       {:error, err} ->
@@ -104,7 +104,7 @@ defmodule Voy.World.Epistemic do
         edge_a = Graph.find_edge(graph, edge_a_id)
         edge_b = Graph.find_edge(graph, edge_b_id)
 
-        chrono_issues = check_chronology(eras, edge_a, edge_b)
+        chrono_issues = check_chronology(eras, graph, edge_a, edge_b, bridge)
         {err_a, warn_a} = split_edge_result(check_edge(eras, graph, edge_a))
         {err_b, warn_b} = split_edge_result(check_edge(eras, graph, edge_b))
 
@@ -183,15 +183,35 @@ defmodule Voy.World.Epistemic do
       for a <- graph.edges,
           b <- graph.edges,
           a[:id] != b[:id],
-          a[:to] == b[:from],
+          match?({:ok, _}, Graph.check_bridge(graph, a[:id], b[:id])),
           reduce: [] do
         acc ->
           case check_wire(eras, graph, a[:id], b[:id]) do
             {:ok, info} ->
-              [%{from_edge: a[:id], to_edge: b[:id], bridge: info.bridge, ok: true, issues: info.warnings} | acc]
+              [
+                %{
+                  from_edge: a[:id],
+                  to_edge: b[:id],
+                  bridge: info.bridge,
+                  ok: true,
+                  issues: info.warnings
+                }
+                | acc
+              ]
 
             {:error, issues} ->
-              [%{from_edge: a[:id], to_edge: b[:id], bridge: a[:to], ok: false, issues: issues} | acc]
+              {:ok, raw_bridge} = Graph.check_bridge(graph, a[:id], b[:id])
+
+              [
+                %{
+                  from_edge: a[:id],
+                  to_edge: b[:id],
+                  bridge: raw_bridge,
+                  ok: false,
+                  issues: issues
+                }
+                | acc
+              ]
           end
       end
       |> Enum.reverse()
@@ -203,6 +223,7 @@ defmodule Voy.World.Epistemic do
       summary: %{
         nodes: length(graph.nodes),
         edges: length(graph.edges),
+        translations: length(graph.translations),
         eras: length(eras),
         ok_edges: length(graph.edges) - error_edges - warn_edges,
         warn_edges: warn_edges,
@@ -323,15 +344,23 @@ defmodule Voy.World.Epistemic do
     end
   end
 
-  defp check_chronology(eras, edge_a, edge_b) do
+  defp check_chronology(eras, graph, edge_a, edge_b, bridge) do
     era_a = find_era(eras, edge_a[:era])
     era_b = find_era(eras, edge_b[:era])
+
+    tr_retro =
+      case bridge[:translation_id] do
+        nil -> false
+        id ->
+          tr = Graph.find_translation(graph, id)
+          tr != nil and tr[:retrospective] == true
+      end
 
     cond do
       era_a == nil or era_b == nil ->
         []
 
-      edge_b[:retrospective] ->
+      edge_b[:retrospective] or tr_retro ->
         []
 
       era_order(era_a) > era_order(era_b) ->

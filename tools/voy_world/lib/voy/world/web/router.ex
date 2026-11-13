@@ -39,21 +39,22 @@ defmodule Voy.World.Web.Router do
       eras: world.eras,
       nodes: world.raw_nodes,
       edges: world.raw_edges,
+      translations: world.raw_translations,
       audit: audit
     })
   end
 
   post "/api/world/audit" do
-    {eras, raw_nodes, raw_edges} = extract_world(conn.body_params)
-    graph = Graph.new(raw_nodes, raw_edges)
+    {eras, raw_nodes, raw_edges, raw_translations} = extract_world(conn.body_params)
+    graph = Graph.new(raw_nodes, raw_edges, raw_translations)
     audit = Epistemic.audit_world(eras, graph)
     send_json(conn, 200, %{ok: true, audit: audit})
   end
 
   post "/api/world/wire" do
     params = conn.body_params
-    {eras, raw_nodes, raw_edges} = extract_world(params)
-    graph = Graph.new(raw_nodes, raw_edges)
+    {eras, raw_nodes, raw_edges, raw_translations} = extract_world(params)
+    graph = Graph.new(raw_nodes, raw_edges, raw_translations)
     from_id = Map.get(params, "from_edge_id", "")
     to_id = Map.get(params, "to_edge_id", "")
 
@@ -80,8 +81,8 @@ defmodule Voy.World.Web.Router do
 
   post "/api/world/paths" do
     params = conn.body_params
-    {eras, raw_nodes, raw_edges} = extract_world(params)
-    graph = Graph.new(raw_nodes, raw_edges)
+    {eras, raw_nodes, raw_edges, raw_translations} = extract_world(params)
+    graph = Graph.new(raw_nodes, raw_edges, raw_translations)
     start_node = Map.get(params, "start_node", "")
     target_node = Map.get(params, "target_node", "")
 
@@ -97,12 +98,18 @@ defmodule Voy.World.Web.Router do
   end
 
   post "/api/world/save" do
-    {eras, raw_nodes, raw_edges} = extract_world(conn.body_params)
-    payload = %{"eras" => eras, "nodes" => raw_nodes, "edges" => raw_edges}
+    {eras, raw_nodes, raw_edges, raw_translations} = extract_world(conn.body_params)
+
+    payload = %{
+      "eras" => eras,
+      "nodes" => raw_nodes,
+      "edges" => raw_edges,
+      "translations" => raw_translations
+    }
 
     case Store.save(payload) do
       :ok ->
-        graph = Graph.new(raw_nodes, raw_edges)
+        graph = Graph.new(raw_nodes, raw_edges, raw_translations)
         audit = Epistemic.audit_world(eras, graph)
         send_json(conn, 200, %{ok: true, audit: audit})
 
@@ -120,6 +127,7 @@ defmodule Voy.World.Web.Router do
       eras: world.eras,
       nodes: world.raw_nodes,
       edges: world.raw_edges,
+      translations: world.raw_translations,
       audit: audit
     })
   end
@@ -132,7 +140,8 @@ defmodule Voy.World.Web.Router do
     eras = Map.get(params, "eras") || []
     nodes = Map.get(params, "nodes") || []
     edges = Map.get(params, "edges") || []
-    {eras, nodes, edges}
+    translations = Map.get(params, "translations") || []
+    {eras, nodes, edges, translations}
   end
 
   defp send_json(conn, status, data) do

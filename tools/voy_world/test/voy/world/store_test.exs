@@ -16,7 +16,8 @@ defmodule Voy.World.StoreTest do
                %{
                  "eras" => world.eras,
                  "nodes" => world.raw_nodes,
-                 "edges" => world.raw_edges
+                 "edges" => world.raw_edges,
+                 "translations" => world.raw_translations
                },
                tmp
              )
@@ -25,5 +26,6 @@ defmodule Voy.World.StoreTest do
     assert length(reloaded.eras) == length(world.eras)
     assert length(reloaded.raw_nodes) == length(world.raw_nodes)
     assert length(reloaded.raw_edges) == length(world.raw_edges)
+    assert length(reloaded.raw_translations) == length(world.raw_translations)
   end
 end

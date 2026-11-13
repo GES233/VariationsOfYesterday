@@ -64,6 +64,9 @@
               <marker id="arrow-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
                 <path d="M 0 1 L 10 5 L 0 9 z" fill="#1d6f66" />
               </marker>
+              <marker id="arrow-tr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#2b5b84" />
+              </marker>
               <marker id="arrow-err" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
                 <path d="M 0 1 L 10 5 L 0 9 z" fill="#b43c2c" />
               </marker>
@@ -79,9 +82,10 @@
     <!-- RIGHT DRAWER: INSPECTOR / ERAS / PATHFINDER -->
     <aside class="drawer right-drawer">
       <div class="subtabs">
-        <button class="subtab active" data-subtab="inspector">卡片/连线编辑</button>
-        <button class="subtab" data-subtab="eras">时代认知模型</button>
-        <button class="subtab" data-subtab="pathfinder">Kanren 寻路</button>
+        <button class="subtab active" data-subtab="inspector">卡片/连线</button>
+        <button class="subtab" data-subtab="eras">时代模型</button>
+        <button class="subtab" data-subtab="aliases">同物转译</button>
+        <button class="subtab" data-subtab="pathfinder">Kanren寻路</button>
       </div>
 
       <div id="panel-inspector" class="subpanel active">
@@ -94,6 +98,15 @@
           <button id="btn-new-era" class="btn small">+ 新时代</button>
         </div>
         <div id="era-editor-body"></div>
+      </div>
+
+      <div id="panel-aliases" class="subpanel">
+        <div class="drawer-header">
+          <strong style="font-size:0.84rem;">跨时代同物异名转译 (aliaso/4)</strong>
+          <button id="btn-new-alias" class="btn small primary">+ 新转译</button>
+        </div>
+        <p class="muted" style="margin:0;">声明两个不同时代口径下的节点等价（如「镇山铜钲」⇄「土官旧铜器」），让卡片跨时代接通。</p>
+        <div id="aliases-list" class="stack-gap"></div>
       </div>
 
       <div id="panel-pathfinder" class="subpanel">

@@ -21,6 +21,16 @@ defmodule Voy.World.EpistemicTest do
     assert ["card_01", "card_02", "card_03", "card_04", "card_05", "card_06"] in res.valid_paths
   end
 
+  test "cross-era translation bridges card_01 -> card_02 and fails if translation is removed", %{world: world} do
+    assert {:ok, %{bridge: %{kind: "translation", translation_id: "tr_zheng_to_tax_bronze"}}} =
+             Epistemic.check_wire(world.eras, world.graph, "card_01", "card_02")
+
+    no_tr_graph = %{world.graph | translations: []}
+
+    assert {:error, [%{code: "port_mismatch"}]} =
+             Epistemic.check_wire(world.eras, no_tr_graph, "card_01", "card_02")
+  end
+
   test "anachronistic concept and text are caught against the era model", %{world: world} do
     bad_card = Enum.find(world.graph.edges, &(&1[:id] == "card_anachronism_demo"))
     assert {:error, issues} = Epistemic.check_edge(world.eras, world.graph, bad_card)
