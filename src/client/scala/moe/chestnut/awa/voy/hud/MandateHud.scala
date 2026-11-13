@@ -5,8 +5,13 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.render.RenderTickCounter
-import moe.chestnut.awa.voy.mandate.{MandatePhenomena, MandateRuntime, MandateWording}
-import moe.chestnut.awa.voy.inner.veins.{CellReadout, PhaseLabel, PhaseReading, Regime}
+import moe.chestnut.awa.voy.mandate.{
+  ClientCellView,
+  ClientMandateCache,
+  MandateWording,
+  SyncedCellEntry
+}
+import moe.chestnut.awa.voy.inner.veins.{PhaseLabel, PhaseReading, Regime}
 
 /** Development HUD overlay that visualises the mandate readout
   * (`Regime`, `PhaseReading`, `MycelialHealth`, `c0` status, and continuous
@@ -72,8 +77,7 @@ object MandateHud:
 
     val centerX = player.getChunkPos.x
     val centerZ = player.getChunkPos.z
-    val readout = MandateRuntime.readoutAt(centerX, centerZ)
-    val center = readout.current
+    val centerEntry = ClientMandateCache.get(centerX, centerZ)
     val textRenderer = client.textRenderer
 
     val x0 = 8
@@ -90,28 +94,61 @@ object MandateHud:
     drawBoxBorder(context, x0 - 4, y0 - 4, panelWidth + 4, panelHeight + 4, ColPanelBorder)
 
     // Header & telemetry lines
-    val shelterTag = if readout.isSheltered then "庇护" else "沉滞(STAGNANT)"
-    context.drawTextWithShadow(
-      textRenderer,
-      f"VOY Mandate [$centerX%d, $centerZ%d]  [$shelterTag]  菌:${readout.mycelium.word}",
-      x0,
-      y0,
-      tileColor(centerX, centerZ, readout)
-    )
-    context.drawTextWithShadow(
-      textRenderer,
-      f"v=${center.dissonance}%+.2f  s=${center.stress}%.3f  q=${center.activity}%.3f  M=${readout.sustenance}%.2f  c0=${readout.baselineCalming}%.2f  p=${readout.pulseDrive}%.2f  win=${readout.pulseStamp.remainingShelterAt(readout.simTime)}%.1f  cd=${readout.pulseStamp.remainingCooldownAt(readout.simTime)}%.1f",
-      x0,
-      y0 + lineHeight,
-      0xFFE2E6EC
-    )
-    context.drawTextWithShadow(
-      textRenderer,
-      s"regime=${readout.regime}  phase=${MandateWording.formatPhaseShort(readout.phase)}",
-      x0,
-      y0 + 2 * lineHeight,
-      tileColor(centerX, centerZ, readout)
-    )
+    val centerColor = tileColor(centerEntry.map(_.view))
+    centerEntry match
+      case Some(SyncedCellEntry(view, debugOpt)) =>
+        val shelterTag = if view.isSheltered then "庇护" else "沉滞(STAGNANT)"
+        context.drawTextWithShadow(
+          textRenderer,
+          f"VOY Mandate [$centerX%d, $centerZ%d]  [$shelterTag]  菌:${view.mycelium.word}",
+          x0,
+          y0,
+          centerColor
+        )
+        val telemetryLine = debugOpt match
+          case Some(d) =>
+            f"v=${d.dissonance}%+.2f  s=${d.stress}%.3f  q=${d.activity}%.3f  M=${d.sustenance}%.2f  c0=${d.baselineCalming}%.2f  p=${d.pulseDrive}%.2f  win=${d.remainingShelter}%.1f  cd=${d.remainingCooldown}%.1f"
+          case None =>
+            "debug telemetry withheld (requires dev or OP)"
+        context.drawTextWithShadow(
+          textRenderer,
+          telemetryLine,
+          x0,
+          y0 + lineHeight,
+          0xFFE2E6EC
+        )
+        val phaseText = debugOpt
+          .map(d => MandateWording.formatPhaseShort(d.phaseReading(view.phaseLabel)))
+          .getOrElse(view.dialTick.map(t => s"刻度 $t/20").getOrElse("无周期"))
+        context.drawTextWithShadow(
+          textRenderer,
+          s"regime=${view.regime}  phase=$phaseText",
+          x0,
+          y0 + 2 * lineHeight,
+          centerColor
+        )
+      case None =>
+        context.drawTextWithShadow(
+          textRenderer,
+          f"VOY Mandate [$centerX%d, $centerZ%d]  [域外/未同步]",
+          x0,
+          y0,
+          ColOutside
+        )
+        context.drawTextWithShadow(
+          textRenderer,
+          "outside active mandate lattice",
+          x0,
+          y0 + lineHeight,
+          0xFF9AA3B2
+        )
+        context.drawTextWithShadow(
+          textRenderer,
+          "regime=-  phase=-",
+          x0,
+          y0 + 2 * lineHeight,
+          0xFF9AA3B2
+        )
 
     // 7x7 uniform square color-block grid
     val gridX = x0
@@ -123,14 +160,14 @@ object MandateHud:
     do
       val cx = centerX + dx
       val cz = centerZ + dz
-      val cellReadout = MandateRuntime.readoutAt(cx, cz)
+      val cellView = ClientMandateCache.getView(cx, cz)
       val tx = gridX + (dx + radius) * tileStep
       val ty = gridY + (dz + radius) * tileStep
-      val color = tileColor(cx, cz, cellReadout)
+      val color = tileColor(cellView)
 
       context.fill(tx, ty, tx + tileSize, ty + tileSize, color)
 
-      if cellReadout.baselineCalming >= MandatePhenomena.C0ShelterLevel then
+      if cellView.exists(_.c0Sheltered) then
         val dotX = tx + tileSize / 2 - 1
         val dotY = ty + tileSize / 2 - 1
         context.fill(dotX, dotY, dotX + 2, dotY + 2, ColC0Dot)
@@ -156,7 +193,7 @@ object MandateHud:
 
     // 20-division phase dial bar below the grid
     val barY = gridY + gridPixelSize + 6
-    val activeTick = readout.dialTick
+    val activeTick = centerEntry.flatMap(_.view.dialTick)
     val segW = 6
     val segH = 6
     val segGap = 2
@@ -181,18 +218,20 @@ object MandateHud:
       0xFFB8C0CC
     )
 
-  private def tileColor(chunkX: Int, chunkZ: Int, r: CellReadout): Int =
-    if !MandateRuntime.isLiveChunk(chunkX, chunkZ) then ColOutside
-    else if r.isSpiking then ColSpike
-    else
-      r.regime match
-        case Regime.Burnout => ColBurnout
-        case Regime.Oscillating => ColOscillating
-        case Regime.Strained => ColStrained
-        case Regime.Calm =>
-          r.phase match
-            case PhaseReading.Cycle(PhaseLabel.Excitation, _) => ColSpike
-            case _ => if r.isSheltered then ColCalmMaintained else ColCalmStagnant
+  private def tileColor(viewOpt: Option[ClientCellView]): Int =
+    viewOpt match
+      case None => ColOutside
+      case Some(v) =>
+        if v.isSpiking then ColSpike
+        else
+          v.regime match
+            case Regime.Burnout => ColBurnout
+            case Regime.Oscillating => ColOscillating
+            case Regime.Strained => ColStrained
+            case Regime.Calm =>
+              v.phaseLabel match
+                case Some(PhaseLabel.Excitation) => ColSpike
+                case _ => if v.isSheltered then ColCalmMaintained else ColCalmStagnant
 
   private def drawBoxBorder(
       context: DrawContext,

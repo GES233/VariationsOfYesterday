@@ -199,6 +199,7 @@ object MandateRuntime:
     snapshot = Map.empty
     readoutSnapshot = Map.empty
     pendingActions.clear()
+    MandateNetworking.clearAll()
   }
 
   def onTick(server: MinecraftServer): Unit =
@@ -210,6 +211,7 @@ object MandateRuntime:
     if !server.getPlayerManager.getPlayerList.isEmpty then
       system.foreach(_ ! EventMsg.TickArrived(TickDt, tickRate))
       MandateOverworld.onServerTick(server)
+      MandateNetworking.onServerTick(server)
 
   def flush(): Unit =
     system match

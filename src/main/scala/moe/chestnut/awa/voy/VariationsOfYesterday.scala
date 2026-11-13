@@ -3,7 +3,7 @@ package moe.chestnut.awa.voy
 import net.fabricmc.api.ModInitializer
 
 import moe.chestnut.awa.voy.blocks.VoyBlocks
-import moe.chestnut.awa.voy.mandate.{MandateEffects, MandateOverworld, MandateRuntime}
+import moe.chestnut.awa.voy.mandate.{MandateEffects, MandateNetworking, MandateOverworld, MandateRuntime}
 import net.fabricmc.fabric.api.event.lifecycle.v1.{ServerLifecycleEvents, ServerTickEvents}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -35,6 +35,7 @@ object VariationsOfYesterday extends ModInitializer:
     ServerLifecycleEvents.BEFORE_SAVE.register((_, _, _) => MandateRuntime.flush())
     ServerLifecycleEvents.SERVER_STOPPED.register(_ => MandateRuntime.stop())
     ServerTickEvents.END_SERVER_TICK.register(MandateRuntime.onTick(_))
+    MandateNetworking.register()
     MandateOverworld.register()
 
 
