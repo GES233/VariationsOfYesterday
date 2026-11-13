@@ -443,6 +443,7 @@ defmodule Voy.World.Content do
   }
 
   def preview_presets, do: Enum.map(@preview_presets, &elem(&1, 0))
+  def presets, do: @preview_presets
 
   def preview(target \\ "all", opts \\ []) do
     target = to_string(target)

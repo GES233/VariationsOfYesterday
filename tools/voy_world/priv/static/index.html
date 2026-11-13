@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voy.World · 旧日变奏曲 关系式盘与观测台</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-seal">旧日·式盘</div>
+      <div>
+        <h1>Voy.World 关系推演与观测工作台</h1>
+        <p class="subtitle" id="header-meta">正在加载数值契约与词表…</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="chronicle">四纪式盘与反演</button>
+      <button class="tab" data-tab="pathway">五跳微链与卷宗</button>
+      <button class="tab" data-tab="ascribe">三方观测与溯因</button>
+      <button class="tab" data-tab="contract">数值契约与审计</button>
+    </nav>
+  </header>
+
+  <main class="workspace">
+    <!-- TAB 1: CHRONICLE -->
+    <section id="tab-chronicle" class="panel active">
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-head">
+            <h2>支沟地形输入 · 正向编译</h2>
+            <span class="badge">Chronicle / Kanren</span>
+          </div>
+          <div class="preset-strip" id="chronicle-presets"></div>
+          <form id="chronicle-form" class="form-grid">
+            <label>上游源头地名 <input type="text" id="ch-up-name" value="野猪箐裂隙" /></label>
+            <label>隘口地名 <input type="text" id="ch-pass-name" value="断碑垭口" /></label>
+            <label>下游聚落地名 <input type="text" id="ch-down-name" value="白水坝" /></label>
+            <label>上游地形 (up_terrain) <select id="ch-up-terrain"></select></label>
+            <label>隘口地形 (pass_terrain) <select id="ch-pass-terrain"></select></label>
+            <label>下游地形 (down_terrain) <select id="ch-down-terrain"></select></label>
+            <label>上游地质 (up_geology) <select id="ch-up-geology"></select></label>
+            <label>通达度 (accessibility) <select id="ch-accessibility"></select></label>
+            <div class="form-actions">
+              <button type="submit" class="btn primary">编译四纪历史与结构</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>由结局反推地形 · Reverse Worldgen</h2>
+            <span class="badge accent">Voy.World.reverse_worldgen/1</span>
+          </div>
+          <div class="inline-controls">
+            <select id="reverse-fate-select"></select>
+            <button id="reverse-fate-btn" class="btn">反推匹配地形组合</button>
+          </div>
+          <div id="reverse-results" class="scroll-box muted">选择一种结局并点击反推，查看全部满足 microKanren 约束的地形特征组合。</div>
+        </div>
+      </div>
+
+      <div id="chronicle-output" class="stack-gap"></div>
+    </section>
+
+    <!-- TAB 2: PATHWAY & DOSSIER -->
+    <section id="tab-pathway" class="panel">
+      <div class="card">
+        <div class="card-head">
+          <h2>五跳局部微链与种子卷宗</h2>
+          <span class="badge">Pathway + Witness + Content</span>
+        </div>
+        <div class="preset-strip" id="dossier-presets"></div>
+        <div class="toolbar-row">
+          <label>镇山古器
+            <select id="pw-relic"></select>
+          </label>
+          <label>目标结局
+            <select id="pw-fate"></select>
+          </label>
+          <label>世界种子
+            <input type="number" id="pw-seed" value="101" min="1" step="1" />
+          </label>
+          <label>视界模式
+            <select id="pw-horizon">
+              <option value="locked">locked（锁定全五跳）</option>
+              <option value="open">open（仅前四跳，待玩家干预结算）</option>
+            </select>
+          </label>
+          <button id="pw-load-btn" class="btn primary">生成卷宗与微链</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>交互式断链与干扰排斥试验 · connect_edges/1</h2>
+          <div id="ablate-status-badge" class="badge">等待加载</div>
+        </div>
+        <p class="hint">点击下方任一跳节点或干扰单据开关，实时调用 <code>Pathway.connect_edges/1</code> 验证「删去任一跳即断链」与「干扰边不可拼成完整因果链」。</p>
+        <div id="pathway-graph-wrap" class="svg-stage"></div>
+        <div class="ablate-controls" id="pathway-toggles"></div>
+      </div>
+
+      <div id="open-settlement-box"></div>
+      <div id="dossier-cards-grid" class="cards-grid"></div>
+    </section>
+
+    <!-- TAB 3: OBSERVATION & ASCRIBE -->
+    <section id="tab-ascribe" class="panel">
+      <div class="card">
+        <div class="card-head">
+          <h2>三方制度观测变换与 24 假说溯因工作台</h2>
+          <span class="badge">Observation + Ascribe.abduceo/4</span>
+        </div>
+        <div class="toolbar-row">
+          <label>隐含维持源 (c0_state)
+            <select id="as-c0"></select>
+          </label>
+          <label>隐含脉冲类型 (pulse_kind)
+            <select id="as-pulse"></select>
+          </label>
+          <label>落点窗口 (safe_phase_window)
+            <select id="as-window"></select>
+          </label>
+          <label>测钟分辨率 (resolution)
+            <select id="as-resolution">
+              <option value="0.05">0.05（高精度）</option>
+              <option value="0.1">0.10</option>
+              <option value="0.25" selected>0.25（标准）</option>
+              <option value="0.5">0.50</option>
+              <option value="1.0">1.00（粗糙）</option>
+              <option value="2.0">2.00（失真）</option>
+            </select>
+          </label>
+          <button id="as-run-btn" class="btn primary">执行三方观测与反演</button>
+          <button id="as-reset-ev-btn" class="btn">恢复全部证据项</button>
+        </div>
+      </div>
+
+      <div id="ascribe-verdict-box"></div>
+
+      <div class="grid-3col" id="lenses-grid"></div>
+
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-head">
+            <h2>最小充分证据集与逐项消融</h2>
+            <span class="badge">minimal_sufficient_sets / ablate</span>
+          </div>
+          <div id="ascribe-minimal-box"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>竞争归因排斥与分辨率阶梯</h2>
+            <span class="badge">refute / identifiability</span>
+          </div>
+          <div id="ascribe-refute-box"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: CONTRACT & CANON -->
+    <section id="tab-contract" class="panel">
+      <div class="card">
+        <div class="card-head">
+          <h2>静态规范与内容包审计 · Canon & Content Lint</h2>
+          <button id="canon-run-btn" class="btn primary">刷新全面审计</button>
+        </div>
+        <div id="canon-audit-grid" class="kpi-grid"></div>
+      </div>
+
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-head">
+            <h2>占空比反转对照 · Onset vs Settled</h2>
+            <span class="badge">mandate-slice-v1.json</span>
+          </div>
+          <div id="duty-cycle-svg" class="svg-stage"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>金属共振安全敲击刻度尺 · alpha_metal_resonance</h2>
+            <span class="badge">safe_ticks</span>
+          </div>
+          <div id="safe-ticks-svg" class="svg-stage"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>脉冲 × 相位窗口实测结果矩阵</h2>
+          <span class="badge">Contract.outcome_table/1</span>
+        </div>
+        <div id="contract-outcomes-wrap"></div>
+      </div>
+
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-head">
+            <h2>分叉基准、步长收敛与分区采样</h2>
+            <span class="badge">Hopf / Convergence / Regimes</span>
+          </div>
+          <div id="contract-benchmarks-wrap"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>设计草稿命题实测裁决</h2>
+            <span class="badge">Contract.claims/1</span>
+          </div>
+          <div id="contract-claims-wrap"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -8,11 +8,18 @@ defmodule Voy.World.MixProject do
       elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
       test_ignore_filters: [~r/^test\/support\//],
-      deps: []
+      deps: deps()
     ]
   end
 
   def application do
     [extra_applications: [:logger]]
+  end
+
+  defp deps do
+    [
+      {:plug, "~> 1.16"},
+      {:bandit, "~> 1.6"}
+    ]
   end
 end

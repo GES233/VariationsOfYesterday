@@ -1,6 +1,6 @@
 # Voy World
 
-《旧日变奏曲》的零外部依赖 Elixir 关系世界模型，用于设计验证、内容检查与 JSON 导出（不作为模组运行时依赖）。
+《旧日变奏曲》的 Elixir 关系世界模型与本地 Web 观测台，用于设计验证、内容检查、交互式式盘推演与 JSON 导出（不作为模组运行时依赖；仅 WebUI 额外引入 `plug` / `bandit`）。
 
 ## 模块职责
 
@@ -28,6 +28,7 @@
 
 ```sh
 mix test
+mix voy.web --port 4040 --open
 mix voy.content lint
 mix voy.content preview [baishui|heishui|xuanguan|nuoliang|mahao|tingshan|all] [--seed N]
 mix voy.content template <hop1|hop2|hop3|hop4|hop5|decoy>
