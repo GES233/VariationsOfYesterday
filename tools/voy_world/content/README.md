@@ -28,4 +28,4 @@
 
 ## 校验与预览
 
-完整语法与可用分支见[札记 05 §5](../../../docs/design-note-05-medikanren-microchains.md#5-常用命令)；日常用 `mix voy.content lint` 与 `mix voy.content preview all --seed 101`。
+完整语法与可用分支见[札记 05 §5](../docs/design-note-05-medikanren-microchains.md#5-常用命令)；日常用 `mix voy.content lint` 与 `mix voy.content preview all --seed 101`。

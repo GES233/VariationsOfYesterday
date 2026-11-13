@@ -17,6 +17,13 @@
 - `Voy.World.Canon`：时间线、结构、地形覆盖及五跳成链/消融/干扰排斥/单卡认知局部性静态检查。
 - `Voy.World`：JSON 边界门面（`compile_node` / `compile_branch` / `settle_open_dossier`）；Mix 任务 `mix voy.content` 见下。
 
+## 设计文档
+
+- [设计札记 02：关系世界模型（四纪编译、地形组合与六结局）](docs/design-note-02-kanren-worldview-engine.md)
+- [设计札记 05：五跳卷宗与内容管线（微链、种子物证与写作规范）](docs/design-note-05-medikanren-microchains.md)
+- [五跳内容包写作指南](content/README.md)
+- [地形与结局图集](docs/diagrams/)
+
 ## 常用命令
 
 ```sh

@@ -13,7 +13,8 @@ Attribution-NonCommercial-ShareAlike 4.0 International License
 Scope
 -----
 
-  * docs/                      design drafts and notes, the ARG dossier corpus
+  * docs/                      design drafts and notes (including incubator/ and archive/)
+  * tools/voy_world/docs/      relational engine design notes and generated diagrams
   * tools/voy_world/content/   narrative documents (the 32 + 4 dossier cards)
   * src/**/lang/*.json         player-facing prose (names, tooltips, wording)
   * src/**/textures/**         pixel art

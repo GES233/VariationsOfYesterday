@@ -1,6 +1,6 @@
 # 设计札记 05 — 五跳卷宗与内容管线（微链、种子物证与写作规范）
 
-> 状态：**现行规范**。原札记 03（内容流水线）已并入本文 §4–§5。实现见 `tools/voy_world/lib/voy/world/pathway.ex`、`witness.ex`、`content.ex` 与 `canon.ex`；作者内容在 `content/documents/`。
+> 状态：**已迁入 `tools/voy_world/docs/`（Elixir 内容管线规范）**。原札记 03（内容流水线）已并入本文 §4–§5。实现见 `lib/voy/world/pathway.ex`、`witness.ex`、`content.ex` 与 `canon.ex`；作者内容在 `content/documents/`；关系引擎背景见 [札记 02](design-note-02-kanren-worldview-engine.md)。
 
 ## 1. 设计目标：局部证据的多跳合一
 
@@ -80,7 +80,7 @@
 - **Hop 4（野外观测手簿）、Hop 5（现行条规）**：另声明 `fate`（六种结局之一）；
 - **干扰卡（Decoy）**：`role: decoy`，声明 `relic / decoy_class / title`。
 
-对于全部 $2 \times 6 = 12$ 个 `(relic, fate)` 组合，`Content.card_for/2` 为每条边唯一选出一张卡片（5 张主链 + 2 张干扰），缺卡或撞卡均直接报错。具体写作语法与占位符清单见 [content/README.md](<../tools/voy_world/content/README.md>)。
+对于全部 $2 \times 6 = 12$ 个 `(relic, fate)` 组合，`Content.card_for/2` 为每条边唯一选出一张卡片（5 张主链 + 2 张干扰），缺卡或撞卡均直接报错。具体写作语法与占位符清单见 [content/README.md](../content/README.md)。
 
 ### 4.3 种子物化与实测安全刻度
 

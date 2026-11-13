@@ -7,7 +7,7 @@
 - 模组 ID：`variations-of-yesterday`
 - 包名：`moe.chestnut.awa.voy`
 - 版本与坐标：`gradle.properties`（`mod_version=0.1.0`，`maven_group=moe.chestnut.awa.voy`）
-- 许可证：代码 MPL-2.0（`LICENSE`）；叙事与美术资源 CC BY-NC-SA 4.0（`LICENSE-CONTENT`，范围含 `docs/`、`tools/voy_world/content/`、lang 文案、贴图与图标）。Mojang EULA 规定模组不得售卖，故本协议只约束社区二创，不涉及商业分发。
+- 许可证：代码 MPL-2.0（`LICENSE`）；叙事与美术资源 CC BY-NC-SA 4.0（`LICENSE-CONTENT`，范围含 `docs/`、`tools/voy_world/docs/`、`tools/voy_world/content/`、lang 文案、贴图与图标）。Mojang EULA 规定模组不得售卖，故本协议只约束社区二创，不涉及商业分发。
 
 ## 技术栈
 
@@ -46,11 +46,12 @@
 - `src/main/java/moe/chestnut/awa/voy/mixin/` — mixin 层（`VillagerEntityMixin` 交易/繁殖/铁傀儡、`CropBlockMixin` 作物生长，均委托 `MandateEconomy`；Java 源与 Scala 联合编译，见 `build.gradle` 的 sourceSets 配置）
 - `src/test/scala/moe/chestnut/awa/voy/` — 19 个 JUnit 5 测试规范（`GridBenchmarkSpec` 默认跳过）；`inner/veins/` 下 15 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
-- `tools/voy_world/` — Elixir 关系世界模型与叙事无冲突沙盘：
+- `tools/voy_world/` — 独立 Elixir 关系世界模型与叙事无冲突沙盘（含 `docs/` 内的关系模型札记 02 / 05 与图集）：
   - `lib/voy/kanren/` — microKanren 内核与 DSL
   - `lib/voy/world/` — `Chronicle`（地形与四纪六结局、玩家干预求解）、`Pathway + Witness + Content + Canon + Timeline`（五跳局部证据链、种子物化、散文卡片加载与无冲突静态检查）、`Observation + Ascribe + Slice + Contract`（三方有损观测与 24 候选假说溯因反演沙盘）、`Schema + Texts + Fields`（地形与六结局单一真相表、上中下游建筑描述投影、统一字段访问）；门面 `Voy.World`、Mix 任务 `Mix.Tasks.Voy.Content`
   - `content/documents/` — 唯一叙事散文来源（32 张主链卡 + 4 张干扰卡）
-- `docs/` — 中文设计文档（索引与状态见 `docs/README.md`）：草案 01 与札记 02/05/06/07/08/09/10、验证报告 01；原札记 03/04 已分别并入 05/02。
+  - `docs/` — Elixir 式盘引擎与五跳卷宗设计文档（札记 02 / 05）及生成图集（`diagrams/`）
+- `docs/` — 模组本体中文设计文档（索引与边界重划见 `docs/README.md`）：草案 01、札记 06/07/08/10；`incubator/` 存放挂起构想（札记 09）；`archive/` 存放历史快照（验证报告 01）。原札记 03/04 已分别并入 05/02。
 
 ## 开发约定
 
