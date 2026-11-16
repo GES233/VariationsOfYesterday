@@ -87,7 +87,9 @@ def isSheltered: Boolean =
 | 4 | 其余 | `AnchoredOrMaintained` | 脉冲进方程；c0 剂量注入 + 注册钟源 |
 
 - **饱和但菌活的格子可以锚 c0**（旧 `SaturatedNoAnchor` 删除）——重锚是失能救赎链的一环（札记 06 §7 成本路径）。
-- 钟的视觉/听觉反馈四态可分：起搏＝琥珀铜尘 + 音符；校拍＝紫水晶清音 + 音符；失锚＝蜡烛闷熄 + 灰；过密＝锈红爆散 + 低音共鸣；无应＝几缕死灰。
+- 钟的视觉/听觉反馈三态可分（**裁决 ⑯ 后**）：叩钟＝琥珀铜尘 + 音符；过密＝锈红爆散 + 低音共鸣 + 闷响；无应＝蜡烛闷熄 + 死灰（"无回音"必须可辨认，不能与点空混淆）。
+
+> **⚠ 第 3 行（`SpikeSwallowed`）已作废**（2026-11-16 晚，裁决 ⑯）：敲钟不再以相位为门控，见[札记 12](design-note-12-canonical-semantics.md) §4。
 
 ### 1.6 世界观公理：「镇死 = 沉滞」
 
@@ -236,6 +238,10 @@ Step 0 探针与统计（`tools/lab/`、`PhaseTracker`）→ Step 1 加轴 + A/B
 **余脉与 c0（第二轮）**：⑨ 余脉寿命 = 局时尺度 30–60 min，不追求永久稳态（自然带全在恢复驼峰下降支、自激为正反馈，稳定不动点不存在于冻结方程）；⑩ 「镇死 = 沉滞」为世界观公理；⑪ c0 解耦 L2 库存化（源注册表通用化 `Chunk ↔ List[Source(kind,pos)]`，L3 方程化排入契约窗口）；⑫ 余脉弧线 = U 形三幕（压着 → 曲终回稳 → 冲向酸蚀）；⑬ 热点核必须可救（`u_core` 封顶在锚定可压制水平）；⑭ 空间分布结论：不可救死地只在热点核，山谷永远自愈；AMD 泄压设施单独立项（排在迁移之后，教学主题「镇（泄压）/养（起搏）」双手套）。
 
 **晚间修订（滞回语义）**：⑮ 退出滞回只保护 `Arrhythmic`，单位改为**本格周期**（`2 × periodOf(raw)`）；`Fast`/`Slow` 即时发布。依据：旧口径 `2 × nominalPeriod` 对所有非 `Beating` 生效，使过速延迟 ~79 s（叠加 3 间隔均值后 ~154 s）、停跳延迟 ~178 s（99 s 陈旧 + 79 s 滞回），既是「同一段等待算两遍」，也与「急性」语义相反。
+
+**⑯（敲钟去相位，2026-11-16 晚）**：敲钟不再以相位为门控。判定只留两条**状态**判据——生态死亡（`NoAnswer`）/ 过驱动守卫（`Overdriven`），其余一律 `Struck`（脉冲进方程 + 无条件锚 `c0`）。`SpikeSwallowed` 与 §1.5 表第 3 行作废；`校拍/静息/失锚/无应` 降级为**事后回声**（`PulseOutcome`，不进任何判定）。
+依据：§2.2 起搏器实测表（8 s 阻滞 / 12–20 s 2:1 / 30–60 s 1:1 / 90 s 过缓，**全按间隔判**）+ 裁决①「带内 → `Beating(Paced)`，不另设判据」——相位门控是札记 08 遗留，与裁决①自相矛盾。
+落地（S1）：`BellStrikeOutcome` → `BellOutcome{NoAnswer, Overdriven, Struck}`；`BellBaselineCalming` 删除（锚值只剩 `CalmingParam.tricklePerWeight` 与契约 `c0Intact` 两处，待札记 12 S3 收为 `MandateConstants.C0Anchor`）；`BellStrike`/`MandateWording` 的相位分支删除。测试：`MandateReadoutSpec` 敲钟四例重写为三态，新增「c0 库存不影响裁决」回归守卫。
 
 ---
 
