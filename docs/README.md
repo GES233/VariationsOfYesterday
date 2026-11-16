@@ -10,7 +10,8 @@
 | [设计草案 01](design-draft-01-living-world.md) | 总纲：动力学（FHN + M）、Node/格子场与休眠调度、聚落与沉滞心跳、Worldgen 路线、开放待办 | 0.1 结构冻结（ARG / 民俗线已与模组运行解耦） |
 | [设计札记 06](design-note-06-mycelial-grounding.md) | 生态落地：神经化菌网/AMD、M 动力学、感官签名、维护设施工单 | 实施规格 |
 | [设计札记 07](design-note-07-pulse-coupling.md) | 脉冲耦合链路与相位同步（自动化心跳 / 体外起搏涌现） | 事件层规范 |
-| [设计札记 08](design-note-08-fast-variable-and-stagnation.md) | 心跳脉冲语义：快变量读数、三正交轴与 `PulseStamp` 极简脉冲短窗（同步除颤分诊） | 已定稿落地 |
+| [设计札记 08](design-note-08-fast-variable-and-stagnation.md) | 心跳脉冲语义：快变量读数、三正交轴与 `PulseStamp` 极简脉冲短窗（同步除颤分诊） | **已被 11 取代（历史存档）** |
+| [设计札记 11](design-note-11-heartbeat-shelter.md) | **心跳即庇护**：节律轴 `Heartbeat`（Warming/Beating/Fast/Slow/Arrhythmic）、四裁决敲钟（起搏/校拍）、c0 源驱动库存与 U 形余脉弧、颜色语言 | **已定稿落地** |
 
 ## 孵化构想与历史归档
 
@@ -26,5 +27,5 @@
 | [设计札记 02](../tools/voy_world/docs/design-note-02-kanren-worldview-engine.md) | 关系世界模型：Kanren 分层、四纪编译（式盘历史）、六结局与时域结算、地形组合 | 已迁入 Elixir 侧；与模组运行时零耦合 |
 | [设计札记 05](../tools/voy_world/docs/design-note-05-medikanren-microchains.md) | 五跳卷宗与内容管线：微链图谱、种子物证、写作规则、Canon 不变量 | 已迁入 Elixir 侧 |
 
-- 模组阅读顺序：10（创作母题）→ 01 → 06 → 07 → 08；孵化与历史按需查证。
+- 模组阅读顺序：10（创作母题）→ 01 → 06 → 07 → **11（现行庇护语义）**；08 仅作历史参考；孵化与历史按需查证。
 - **合并说明**：原札记 03（内容流水线）已并入札记 05 §4–§5；原札记 04（可达性解耦与六结局）已并入札记 02 §3.1 与 §5。

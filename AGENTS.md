@@ -29,29 +29,31 @@
   - `mandate/` — Mandate 游戏侧接线层：
     - `MandateRuntime.scala` — Minecraft ↔ Mandate 桥接（引擎 actor 生命周期、tick gate、快照发布、动作回包队列）
     - `MandateOverworld.scala` — 主世界事件接线（采掘注入应力、敲钟/拆钟、验山读数、沉滞施加、感官签名发射、再接种；纯接线，裁决与文案外置）
-    - `BellRitual.scala` — 敲钟/共振裁决（`BellStrikeOutcome` + `evaluateBellStrike`，无 Minecraft 依赖、可单测）
-    - `MandateWording.scala` — 全部玩家可见文案（验山读数 / 叩钟六裁决 / 接种 / Regime 示警 / 相位盘，纯函数）
+    - `BellRitual.scala` — 敲钟/共振裁决（`BellStrikeOutcome` + `evaluateBellStrike`，四裁决：无应/过密/失锚/起搏·校拍；无 Minecraft 依赖、可单测）
+    - `MandateCalming.scala` — c0 安抚源注册表与重平衡接线（`Chunk ↔ List[Source(kind,pos)]`、世界扫描、60 s 重平衡广播、敲钟剂量；库存纯函数在 `inner/veins/CalmingStock`）
+    - `MandateWording.scala` — 全部玩家可见文案（验山读数 / 叩钟四裁决 / 接种 / Regime 示警 / 相位盘，纯函数；颜色语言与札记 11 §1.8 一致）
     - `MandatePhenomena.scala` — 感官签名、经济压力档与再接种的纯映射层（黄水三档 / 夜光 / 静默枯败 / `classifyEconomy` / `evaluateReInoculation`，无 Minecraft 依赖、可单测）
     - `MandateEconomy.scala` — 沉滞经济档的 mixin 桥接（交易加价 / 繁殖 / 铁傀儡 / 作物 keep 概率，概率判定集中在此）
-    - `MandateEffects.scala` — 自定义状态效果（`voy:stagnation` 基础档=无属性标记 / `voy:stagnation_spike` 尖峰档 ×0.09 / `voy:pulse_saturation` 脉冲过载）
-    - `MandatePersistence.scala` + `inner/veins/MandateSnapshot.scala` — 维度级持久化（`PersistentState`，整格快照含 `M`、通道、参数、边、链路与 `simTime`；状态与逐格参数来自存档，配置只作用于新注册格子、核心默认兜底）
+    - `MandateEffects.scala` — 自定义状态效果（`voy:stagnation` 基础档=无属性标记 / `voy:stagnation_spike` 急性档 ×0.09 / `voy:pulse_saturation` 过驱动反噬；色彩与心跳配色一致）
+    - `MandatePersistence.scala` + `inner/veins/MandateSnapshot.scala` — 维度级持久化（`PersistentState`，整格快照含 `M`、通道、参数、边、链路、`BeatStats` 节奏记忆与安抚源列表，`SchemaVersion = 3`；状态与逐格参数来自存档，配置只作用于新注册格子、核心默认兜底）
   - `blocks/` — 菌网共生与设施方块层（`VoyBlocks` 注册表与创造栏、`GastrodiaBedBlock` 菌塘及荧丝菌材/鲜伏根/煨伏根，含农夫乐事沃土与小刀零依赖软兼容钩子）
-  - `inner/veins/` — 核心模拟（「地脉」= 山的身体，`mandate/` = 人间制度的授命）：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`、`PhaseResponse`、`PulseCoupling`、`PulseLedger`（`PulseStamp` 极简庇护短窗与冷却间隔）、`MandateSnapshot`
+  - `inner/veins/` — 核心模拟（「地脉」= 山的身体，`mandate/` = 人间制度的授命）：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`（含 `PhaseTracker` 与 `BeatStats`）、`Heartbeat`（节律轴：Warming/Beating/Fast/Slow/Arrhythmic + 退出滞回）、`CalmingStock`（c0 源驱动库存纯函数）、`PhaseResponse`、`PulseCoupling`、`MandateSnapshot`
   - `inner/actor/Actor.scala` — 单线程 actor 内核（`ActorRef` 信箱，`tell` / `!` / `stop`）
-  - `inner/event/EventMsg.scala` — 入向通道与拓扑协议 `EventDTO`（通道电平/脉冲 + 格子、输运边、链路的增删；`PulseBookkeeping` 区分物理脉冲与玩法记账）
+  - `inner/event/EventMsg.scala` — 入向通道与拓扑协议 `EventDTO`（通道电平/脉冲 + 格子、输运边、链路的增删；`FirePulse.transmitter` 区分钟击与晶链，钟击在引擎内戳 `lastBellStrikeAt` 过驱动守卫）
   - `inner/action/ActionMsg.scala` — 出向动作协议 `MandateActionProtocol`
   - `inner/plant/PlantDTO.scala` — 植物与菌塘共生纯值词表（`GastrodiaBedVerdict`、`PlantDTO`）
   - `helpers/ODESolver.scala` — RK4 / Euler 求解器
-- `src/client/scala/moe/chestnut/awa/voy/` — 客户端入口与开发 HUD（`hud/MandateHud.scala`，`/voy hud [on|off]`）
+- `src/client/scala/moe/chestnut/awa/voy/` — 客户端入口与开发 HUD（`hud/MandateHud.scala` 心跳配色与两行 telemetry、`hud/CellChangeTracker.scala` 近期变化历史，`/voy hud [on|off]`）
 - `src/main/java/moe/chestnut/awa/voy/mixin/` — mixin 层（`VillagerEntityMixin` 交易/繁殖/铁傀儡、`CropBlockMixin` 作物生长，均委托 `MandateEconomy`；Java 源与 Scala 联合编译，见 `build.gradle` 的 sourceSets 配置）
-- `src/test/scala/moe/chestnut/awa/voy/` — 19 个 JUnit 5 测试规范（`GridBenchmarkSpec` 默认跳过）；`inner/veins/` 下 15 个，`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
+- `src/test/scala/moe/chestnut/awa/voy/` — 22 个 JUnit 5 测试规范（`GridBenchmarkSpec` 默认跳过）；`inner/veins/` 下 18 个（含 `HeartbeatSpec` / `HeartbeatParamSpec` / `CalmingStockSpec`），`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec` / `MandateNetworkingSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
+- `tools/lab/` — FHN 数值探针（心跳阈值与余脉弧的实测出处，纯 Python；`fhn_slow.py` 含慢系统 + c0 漏失仿真）
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
 - `tools/voy_world/` — 独立 Elixir 关系图谱、时代认知模型与卡片接线沙盘（含 `docs/` 内的历史设计札记 02 / 05 与图集）：
   - `lib/voy/kanren/` — microKanren 内核与 DSL
   - `lib/voy/world/` — `Graph`（mediKanren 风格开放属性图 `nodeo` / `edgeo` / `patho` / `bridgeo`）、`Epistemic`（时代粒度、概念越界、机构 `neq/2` 防火墙与接线校验）、`Store`（读写 `world/*.json`）、`Web`（`Plug + Bandit` 卡片接线画布服务）；门面 `Voy.World`、Mix 任务 `Mix.Tasks.Voy.Web`
   - `world/` — 人类可直接编辑的 `eras.json`（时代认知模型）与 `graph.json`（节点与档案卡片边）
   - `docs/` — 此前阶段的设计札记（02 / 05）及生成图集（`diagrams/`）
-- `docs/` — 模组本体中文设计文档（索引与边界重划见 `docs/README.md`）：草案 01、札记 06/07/08/10；`incubator/` 存放挂起构想（札记 09）；`archive/` 存放历史快照（验证报告 01）。原札记 03/04 已分别并入 05/02。
+- `docs/` — 模组本体中文设计文档（索引与边界重划见 `docs/README.md`）：草案 01、札记 06/07/10、**札记 11（现行庇护语义，取代 08）**；札记 08 为历史存档；`incubator/` 存放挂起构想（札记 09）；`archive/` 存放历史快照（验证报告 01）。原札记 03/04 已分别并入 05/02。
 
 ## 开发约定
 

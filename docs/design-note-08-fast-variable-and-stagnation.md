@@ -1,6 +1,8 @@
-# 札记 08（已定稿）：心跳脉冲语义——快变量读数、三正交轴与极简脉冲短窗
+# 札记 08（已被取代）：心跳脉冲语义——快变量读数、三正交轴与极简脉冲短窗
 
-> 状态：**已定稿落地**（2026-11-08 初版落地；**2026-11-13 重构精简为三正交读数轴 + `PulseStamp` 极简短窗/冷却**）。
+> **⚠️ 已被 [札记 11](design-note-11-heartbeat-shelter.md) 取代（2026-11-16）**：庇护语义已从「脉冲庇护窗」改为「心跳节律」，`PulseStamp` / `PulseLedger` / `PulseBookkeeping` 已整体删除；`c0` 从瞬时锚定改为源驱动的泄漏库存。本文保留为历史设计存档——除史实参考外，**请勿按本文实现**。
+
+> 状态：**历史存档**（2026-11-08 初版落地；2026-11-13 重构精简为三正交读数轴 + `PulseStamp` 极简短窗/冷却；2026-11-16 被札记 11 取代）。
 >
 > **2026-11-13 机制精简说明**：
 > - 移除早期的脉冲耐受度衰减账本（`ToleranceBook`）、世界侧急性锁闭窗（`OverloadLock`）与读数层叠加脉冲伪偏移（`Readout.effectiveA`），精简为双时间戳 `PulseStamp(shelterUntil, cooldownUntil)` 与三字段 `PulseParam(shelterWindow = 40.0, minInterval = 8.0, overloadPenaltyTicks = 120)`；存档 `schemaVersion` 升至 `2`。
