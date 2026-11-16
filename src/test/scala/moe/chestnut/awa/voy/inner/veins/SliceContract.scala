@@ -1,16 +1,14 @@
 package moe.chestnut.awa.voy.inner.veins
 
 import java.nio.file.{Files, Path, Paths}
-import java.security.MessageDigest
 
 /** The cycle windows the relational layer is allowed to name.
   *
-  * `absolute` and `relative` are the two `Voy.World.Profile` already
-  * declares; `late` is the recovery tail §1.2 and §1.4 both describe
+  * `absolute` and `relative` are the two the (now externalised) relational
+  * layer declared; `late` is the recovery tail §1.2 and §1.4 both describe
   * ("恢复晚期 ≳65%") but the stock never named. Bounds are the *declared*
   * ones; the measured behaviour at each window's midpoint lives next to
-  * them in the contract oracle, and the two are compared rather than
-  * assumed equal.
+  * them in the snapshot, and the two are compared rather than assumed equal.
   */
 enum PhaseWindow(val wire: String, val lo: Double, val hi: Double):
   case Absolute extends PhaseWindow("absolute", 0.20, 0.30)
@@ -20,20 +18,32 @@ enum PhaseWindow(val wire: String, val lo: Double, val hi: Double):
   def mid: Double = 0.5 * (lo + hi)
   def contains(phase: Double): Boolean = lo <= phase && phase <= hi
 
-/** Versioned, cross-stack contract for the 0.1 vertical slice.
+/** Versioned numeric snapshot of the 0.1 vertical slice.
   *
-  * `contracts/mandate-slice-v1.json` is the single artifact both stacks
-  * read: Scala owns the numeric oracle (Hopf point, measured period, the
-  * phase-response table, c0 footprints, chain behaviour) and Elixir owns
-  * the symbolic rules. Every number here is either
+  * **Downgraded 2026-11-16 (design note 12 §9.2; author's call).** This used to
+  * be a cross-stack contract: Scala rendered the numeric oracle and the Elixir
+  * relational sandbox read it. That side left the repository, and the future
+  * narrative layer is planned as a UI over the kernel's fact stream (note 12
+  * §5), so the cross-stack role is retired. What remains is what it still does
+  * well: a regression snapshot of the numbers this project actually verified,
+  * compared byte-for-byte on every test run.
+  *
+  * The **source-byte lock is removed** with it. `numeric_source_digest` hashed
+  * the whole text of `MandateState.scala` and `ODESolver.scala`, so a one-space
+  * edit to either file failed a test whose only visible diff was the hash — it
+  * discouraged exactly the refactoring those two files needed. Numbers still
+  * lock: if the integrator's behaviour changes, the snapshot moves and the test
+  * says so.
+  *
+  * Every number here is either
   *
   *   - **analytic** (closed form, no integration), or
   *   - **measured** at a declared step, with its step convergence recorded
   *     next to it and an independent reference to compare against;
   *
   * and every design-draft claim the slice depends on is recorded with the
-  * verdict the measurement supports. Disagreement is data: the contract
-  * exists to carry it across the stack, not to hide it.
+  * verdict the measurement supports. Disagreement is data: the snapshot exists
+  * to carry it, not to hide it.
   */
 object SliceContract:
   val contractId: String = "voy.mandate.slice"
@@ -62,7 +72,6 @@ object SliceContract:
       midTrial: Trial
   )
   final case class Data(
-      digest: String,
       hopfV: Double,
       hopfA: Double,
       hopfS: Double,
@@ -220,7 +229,6 @@ object SliceContract:
     }
 
     Data(
-      digest = sourceDigest,
       hopfV = vc,
       hopfA = ac,
       hopfS = fast.alpha - ac,
@@ -266,7 +274,10 @@ object SliceContract:
                 "src/main/scala/moe/chestnut/awa/voy/helpers/ODESolver.scala"
               ).map(Str(_))
             ),
-            "numeric_source_digest" -> Str(d.digest),
+            "source_lock" -> Str(
+              "none: this snapshot locks numbers, not source bytes " +
+                "(downgraded 2026-11-16, design note 12 §9.2)"
+            ),
             "state0" -> Obj(
               Seq(
                 "dissonance" -> Num(-1.2),
@@ -492,27 +503,6 @@ object SliceContract:
       case Some(x) => Json.Num(x)
       case None => Json.Null()
 
-  /** SHA-256 over the frozen numeric sources, so the contract records *which*
-    * integrator produced its numbers rather than a mutable claim about it.
-    */
-  def sourceDigest: String =
-    val files = Seq(
-      "src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateState.scala",
-      "src/main/scala/moe/chestnut/awa/voy/helpers/ODESolver.scala"
-    )
-    val md = MessageDigest.getInstance("SHA-256")
-    files.foreach { relative =>
-      // Hash the repository-relative path and the LF-normalised source text:
-      // neither the resolved absolute path nor the checkout's line endings may
-      // leak into the digest, or the golden only renders on one machine.
-      md.update(relative.getBytes("UTF-8"))
-      val text = new String(Files.readAllBytes(repoRoot.resolve(relative)), "UTF-8")
-      md.update(text.replace("\r\n", "\n").getBytes("UTF-8"))
-    }
-    val hex = new StringBuilder
-    md.digest().foreach(b => hex.append(String.format("%02x", Integer.valueOf(b & 0xff))))
-    hex.toString
-
   private var cachedRoot: Option[Path] = None
 
   /** Repository root, found by walking up from the working directory until
@@ -552,10 +542,10 @@ object SliceContract:
     Files.createDirectories(contractPath.getParent)
     Files.write(contractPath, contents.getBytes("UTF-8"))
 
-/** Minimal JSON renderer. The contract needs stable, byte-comparable output
+/** Minimal JSON renderer. The snapshot needs stable, byte-comparable output
   * and no dependency the game runtime does not already carry, so a tiny
-  * writer is cheaper than a library binding. Nothing here parses JSON; the
-  * Elixir side owns the reading half.
+  * writer is cheaper than a library binding. Nothing here parses JSON: the
+  * snapshot is read by humans and diffed in review.
   */
 object Json:
   sealed trait J

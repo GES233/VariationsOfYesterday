@@ -62,7 +62,7 @@
 | 档 | 范围 | 代价 | 何时做 |
 | :-- | :--- | :--- | :--- |
 | **A 免费** | 注释、文档、`mandate/`+`overworld/`+`client/` 内部符号、测试局部名、`inner/` 中不进 digest/存档/同步的符号 | 0 | **现在**（P0） |
-| **B 契约窗口** | `MandateState.scala`、`ODESolver.scala` 内的**任何**符号与注释（digest 全文哈希）；`PhaseDetection` 常量；`HeartbeatParam` 值 | 需 `-Dvoy.contract.write=true` 重生成 + 逐行评审 | **搭札记 11「后续工作 2」的契约窗口**（已排期） |
+| **B 数值快照** | `PhaseDetection` 常量与 `HeartbeatParam` 来源值（改数字 → 快照变化）；**`MandateState` / `ODESolver` 已不在此档**（2026-11-16 移除源码 digest，见 §9.2） | 需 `-Dvoy.contract.write=true` 重生成 + 逐行评审 | 搭札记 11「后续工作 2」的契约窗口 |
 | **C 断档/断协议** | NBT key、`MandateCurrent` 字段、S2C 形状、enum case 名（`valueOf`） | schema 4 / payload v2，旧档丢弃 | **一次做完**（0.1 窗口内，代价≈0） |
 
 ---
@@ -318,7 +318,7 @@ S2C 现在每格最多 31 次 `buf.write`、12+12 字段手写对称、5 处 `.o
 | **S1 敲钟 v2a** ✅ | 三态门控、删 `SpikeSwallowed`、删相位文案/音画分支、记裁决⑯ | 0.5 天 | ✅ 已落地：`./gradlew test` 22 套 169 例全绿、客户端编译通过；进游戏三态音画验证**待做** |
 | **S2 改名 A 档** | grep 禁止写法清单，改 `mandate/`+`overworld/`+`client/`+测试；`inner/` 中非 digest、非存档字段的符号 | 1–2 天 | `./gradlew test` 全绿；`grep` 禁止清单只剩注释 |
 | **S3 原子化（第一阶段）** | ① 敲钟改命令+回执（删 `lastBellStrikeAt`/`simTime` 出边界）② 阈值进 `SemanticsProfile` ③ `dialTick`/`PhaseLabel` 下沉 ④ `CellReadout` 降级为**引擎内部/调试遥测**，wiring 逐步改消费事实 ⑤ 每条通道标粒度（cell/player/world） | 3–5 天 | `BellRitual` 不再接收 `CellReadout`；S2C 不含阈值与 `dialTick`；169 例绿 |
-| **S4 改名 B/C 档** | 搭札记 11「后续工作 2」的契约窗口：`MandateState`/`ODESolver` 改名 + schema 4 + payload v2 | 3–5 天 | 契约重生成并逐行评审；旧档按声明丢弃 |
+| **S4 改名 B/C 档** | 搭札记 11「后续工作 2」的契约窗口：`PhaseDetection` / `HeartbeatParam` 数值变更 + schema 4 + payload v2（**`MandateState` / `ODESolver` 改名已随 digest 移除归入 A 档**，S4 成本下降） | 2–4 天 | 契约重生成并逐行评审；旧档按声明丢弃 |
 | **S5 v2b 回声** | `PulseOutcome` 观测窗（复用 `SpikeDetector`） | 1–2 天 | 敲钟后 3–10 s 收到 4 类回声之一；不影响任何判定 |
 
 **顺序理由**：S1 让"敲钟"先自洽（用户新想法的直接落点）；S2 是纯改名、零行为变化、先把词稳住；S3 才动边界（有 S2 的词做地基）；S4 借已有的契约窗口，不额外开闸；S5 是叙事增强，可随时砍。
@@ -354,7 +354,7 @@ S2C 现在每格最多 31 次 `buf.write`、12+12 字段手写对称、5 处 `.o
 | 位置 | 锁住的东西 | 为什么是计划内的 |
 | :--- | :--- | :--- |
 | `MandateReadoutSpec:72/92` | `Regime.Burnout`(s≥0.95) 与相位域**不一致**（一格同时"s=1 饱和"和"在跳"） | 札记 11 §7 后续工作 3「regime 轴重审」尚未做 |
-| `SliceContract` 全家（1016 行 = 测试代码 25%） | 跨栈数值金样 | 其消费者（Elixir 侧）已于 2026-11-16 外迁，**当前零跨栈读者**；留作回归网的成本/收益待定 |
+| `SliceContract` 全家（1016 行 = 测试代码 25%） | 数值快照（**已降级 2026-11-16**） | 源码 digest 移除 → `MandateState`/`ODESolver` 解锁，归入 A 档改名；角色改为内部回归快照。PRC sweep 是否移出 test 源集留作可选项：省 13.6 s / 减 25% 测试代码，但会失去 6 条机器可读的负知识，需先搬进文档 |
 | ~~`PrototypeHotspotSpec`~~ | ~~"热点永不尖峰"~~ | **已修（2026-11-16）**：原来用旧标定（0.08 驱动 / 0.18 种子）反向守护；现重写为守住现行两端——开场的核**必须**在跳（0.349 > onset），外场**必须**静默 |
 
 ### 9.3 两个设计问题——已裁定（2026-11-16）
@@ -376,7 +376,7 @@ S2C 现在每格最多 31 次 `buf.write`、12+12 字段手写对称、5 处 `.o
 | P1-1 | 每个 `@Test` 加 `@Tag`（`intent`/`measured`/`incidental`）+ spec 头一行出处 | 0.5 天 |
 | P1-2 | 给 9.2 的三类打 `@Tag("deferred")`，并在 `AGENTS.md` 一页图里加一句"`grep deferred` = 这些红是计划内的" | 2 h |
 | P1-3 | `VoyConfigSpec` 补"非默认值往返 + key 集断言"（现测试抓不到漏写 writer） | 0.5 天 |
-| P2 | 契约 oracle 去留决策（保留=当回归网，需补"运行时参数是否被锁"的断言；降级=移出 test 源集；归档） | 0.5–1 天 |
+| P2 ✅ | 契约降级：移除源码 digest 锁、角色改为内部数值快照（重生成 1 行 diff） | 已完成（2026-11-16） |
 
 ---
 

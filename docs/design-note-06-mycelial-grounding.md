@@ -17,7 +17,7 @@
 1. **数值冻结（四维核）**：四维 RK4 方程、参数与阈值保持不变；§7.1 裁定的 `M` / `Δ` 已作为追加状态落地（`StressParam` 默认休眠，契约切片与指纹台架仍测裸 FHN 核）。除此之外本文只新增：命名与文案、通道事件的发射源、读数投影的感官签名、维护设施方块。
 2. **确定性**：一切新机制通过既有事件通道（`EventMsg.SetCalming` / `SetBaselineCalming` / `SetDisturbance` / `FirePulse` / `StressInject` / `SetSustenance`）投递，与 tick 同信箱全序；禁止引入新的隐式状态耦合。
 3. **加载不变性**：新方块的行为不得依赖区块加载顺序；Node 调度见 `design-draft-01` §1.3（所有 Node 常驻动力学图、静息粗步进、不做离线加速风化）。
-4. **契约不动**：不得运行 `voy.contract.write=true` 重新生成 `contracts/mandate-slice-v1.json`（`M` 落地时已按 digest-only 重生成一次，此后非必要不再重生成）；`./gradlew test` 必须全程通过（Elixir 侧已外迁，`mix test` 不再属于本仓库验收门）。
+4. **契约不动**：`contracts/mandate-slice-v1.json` 的纪律是「除非刻意，不重生成」；确需重生成时走 `voy.contract.write=true` 并逐行评审 diff。2026-11-16 已按 [札记 12 §9.2](design-note-12-canonical-semantics.md) 降级一次（移除源码 digest 锁，数值逐位不变）。`./gradlew test` 必须全程通过（Elixir 侧已外迁，`mix test` 不再属于本仓库验收门）。
 5. **读数纪律**：连续量永不直接显示为数字；玩家只能看到感官签名与制度读表（分辨率受限）。
 
 > 第 2、4 条已落实；第 1 条按 §7.1 裁定修订；第 3 条的「离线按 Node 聚合结算」已由草案 01 §1.3 的「常驻 + 粗步进」设计取代（不做离线加速风化）。

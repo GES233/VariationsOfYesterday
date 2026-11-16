@@ -45,14 +45,14 @@ Minecraft 世界                         引擎（单线程 actor）            
 | 一个数值 / 阈值 | `VoyConfig.scala`（42 个 knob） | 被契约钉住的见「红线」 |
 | 菌塘 / 接种判定 | `mandate/MandatePhenomena.scala`（纯函数） | 调用方 `blocks/BedActions.scala`、`overworld/FieldInoculation.scala` |
 | 感官现象（黄水/菌光/死寂） | `overworld/StagnationRunner.scala`（`emitPhenomena`） | 判定在 `MandatePhenomena`，这里只管呈现 |
-| 玩家看到的一句话 | `mandate/MandateWording.scala` + `lang/*.json` | 中文不得进 `inner/` |
+| 玩家看到的一句话 | `mandate/MandateWording.scala` + `lang/*.json` | 长文案只写在这两处，别散进内核 |
 | 经济 / 身体惩罚 | `mandate/MandatePhenomena.scala` → `MandateEconomy.scala` + `mixin/` | — |
 | 同步给客户端什么 | `mandate/MandateSyncProtocol.scala` + `MandateNetworking.scala` | payload id 与字段序不可改 |
 | 存档里存什么 | `mandate/MandatePersistence.scala` + `inner/veins/MandateSnapshot.scala` | schema 3 不匹配即丢档 |
 
 **红线（改了就测试红，或旧档作废）**
 1. `contracts/mandate-slice-v1.json` 机器生成，改代码后重生成（`-Dvoy.contract.write=true`），**别手改**。
-2. `inner/veins/MandateState.scala` 与 `helpers/ODESolver.scala` 的**全文**被 digest 哈希：改一个空格就红，且 diff 里只显示 `numeric_source_digest` 一行——这是"看起来像环境问题"的假象。
+2. `contracts/mandate-slice-v1.json` 锁的是**数值**，不是源码字节：改 `MandateState` / `ODESolver` 的**行为**会让快照变化、测试报错；改注释、改名、重构结构不会（2026-11-16 降级，札记 12 §9.2）。
 3. 钉住的数值：`SectionLevel=1.2`、`SpikeLevel=1.8`、`nominalPeriod=39.47`、`strained/burnout/oscillatingQ`、`c0` 锚 0.03。
 4. 存档 `SchemaVersion=3` 不匹配即整体丢弃；S2C payload id 不可改，只能尾部加字段。
 
@@ -60,7 +60,7 @@ Minecraft 世界                         引擎（单线程 actor）            
 
 - `./gradlew build`、`./gradlew test`、`./gradlew runClient`。
 - 本机 JDK 21 路径等环境注意事项见 `ref/本地环境.md`（`ref/` 被 git 忽略）。
-- 测试：22 个 JUnit 5 spec（`inner/veins/` 17 个），`GridBenchmarkSpec` 需 `VOY_BENCH=1` 才运行；跨栈契约 oracle `SliceContract` / `SliceReplay` 也在 test 源集（不进模组 jar）。
+- 测试：22 个 JUnit 5 spec（`inner/veins/` 17 个），`GridBenchmarkSpec` 需 `VOY_BENCH=1` 才运行；数值快照 oracle `SliceContract` / `SliceReplay` 也在 test 源集（不进模组 jar；跨栈角色已于 2026-11-16 退役）。
 - 2026-11-16 起 Elixir 关系沙盘不在本仓库构建内（`mix test` 不适用）；存档与取回见 `docs/README.md`「已外迁」。
 
 ## 代码与目录组织
@@ -80,7 +80,7 @@ Minecraft 世界                         引擎（单线程 actor）            
 - `src/main/java/.../mixin/` — `VillagerEntityMixin` / `CropBlockMixin`，均委托 `MandateEconomy`；Java 与 Scala 联合编译（见 `build.gradle` 的 sourceSets）。
 - `src/test/scala/.../` — 上述 spec 与契约 oracle。
 - `tools/lab/` — FHN 数值探针（纯 Python，`Heartbeat` 阈值与余脉弧的实测出处）。
-- `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约，勿手改；须重生成时按 `build.gradle` 的 `voy.contract.write` 流程。
+- `contracts/mandate-slice-v1.json` — Scala 实测生成的**内部数值快照**（跨栈角色已退役），勿手改；须重生成时走 `build.gradle` 的 `voy.contract.write` 流程并评审 diff。
 - `docs/` — 中文设计文档与参考稿，索引见 `docs/README.md`；现行庇护语义看札记 11，**现行命名与边界语义看札记 12**（札记 08 仅供历史参考），其来源工作稿在 `docs/reference/`。
 
 ## 开发约定

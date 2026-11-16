@@ -3,17 +3,21 @@ package moe.chestnut.awa.voy.inner.veins
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.{Test, TestInstance}
 
-/** The cross-stack contract: what it claims, and what it must refuse to
-  * claim (§1.1, §1.2, §1.3).
+/** The numeric snapshot: what it claims, and what it must refuse to claim
+  * (§1.1, §1.2, §1.3).
   *
   * Three things are checked here and nothing else:
   *
   *  1. every analytic number is what the closed form says;
   *  2. every measured number is step-converged and carries its own
   *     disagreement with the design draft as data;
-  *  3. the checked-in JSON is exactly the rendering of what this run
-  *     measured — so the artifact Elixir reads cannot drift away from the
-  *     numbers Scala actually verified.
+  *  3. the checked-in JSON is exactly the rendering of this run, so the
+  *     snapshot cannot drift away from the numbers Scala actually verified.
+  *
+  * Cross-stack role retired 2026-11-16 (design note 12 §9.2): the Elixir reader
+  * left the repository and the future narrative layer is planned as a UI over
+  * the kernel's fact stream, so this is now an internal regression snapshot.
+  * The source-byte digest went with the role; the numbers still lock.
   *
   * Per-class lifecycle so the (expensive) measurement runs once for the
   * whole spec instead of once per test.

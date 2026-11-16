@@ -6,7 +6,7 @@
       "src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateState.scala",
       "src/main/scala/moe/chestnut/awa/voy/helpers/ODESolver.scala"
     ],
-    "numeric_source_digest": "35eb70ac8e71c4a52bdfb87c5f2025b0f17d08a73ff2d3b0943d6b209acff7a9",
+    "source_lock": "none: this snapshot locks numbers, not source bytes (downgraded 2026-11-16, design note 12 §9.2)",
     "state0": {
       "dissonance": -1.2,
       "entrench": -0.6,

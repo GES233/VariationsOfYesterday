@@ -110,7 +110,7 @@ jar {
 // Test
 test {
 	useJUnitPlatform()
-	// Deliberate, reviewed regeneration of the cross-stack contract
+	// Deliberate, reviewed regeneration of the numeric snapshot
 	// (`contracts/mandate-slice-v1.json`): an ordinary test run verifies the
 	// checked-in file byte for byte and fails if the measurement moved.
 	systemProperty "voy.contract.write", System.getProperty("voy.contract.write", "false")
