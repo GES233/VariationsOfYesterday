@@ -89,8 +89,11 @@ object MandateRuntime:
         VoyConfig.current.fastParam,
         VoyConfig.current.stressParam
       )
+      // Three-tier disturbance field (design note 11 ruling 12): hot core,
+      // remnant ring (the 8x8 "old-era pulse"), silent outer land.
       cell.disturbance =
         if distance < lattice.hotspotRadius then lattice.hotspotDisturbance
+        else if distance < lattice.remnantRadius then lattice.remnantDisturbance
         else lattice.ambientDisturbance
       cell.baselineCalming =
         if distance < lattice.calmingRadius then lattice.baselineCalming else 0.0

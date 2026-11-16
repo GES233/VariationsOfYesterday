@@ -25,7 +25,17 @@ final case class LatticeConfig(
     height: Int = 32,
     diffusion: Double = 0.002,
     hotspotRadius: Double = 2.0,
-    hotspotDisturbance: Double = 0.08,
+    /** measured (tools/lab/fhn_slow.py): the core reaches the acid line in
+      * ~33 min, and an anchored 0.04 calming stock can walk it back down
+      * (u_core <= 0.038 is the rescue window, ruling 13).
+      */
+    hotspotDisturbance: Double = 0.036,
+    /** measured: three-tier field — the 8x8 remnant ring keeps beating while
+      * sagging toward the onset edge (bottom ~0.28) and reaches the acid line
+      * in ~47 min (U-shaped arc, ruling 12).
+      */
+    remnantRadius: Double = 4.0,
+    remnantDisturbance: Double = 0.034,
     ambientDisturbance: Double = 0.002,
     calmingRadius: Double = 5.0,
     baselineCalming: Double = 0.03,
@@ -133,6 +143,8 @@ object VoyConfig:
       diffusion = dbl(o, "diffusion", d.diffusion),
       hotspotRadius = dbl(o, "hotspotRadius", d.hotspotRadius),
       hotspotDisturbance = dbl(o, "hotspotDisturbance", d.hotspotDisturbance),
+      remnantRadius = dbl(o, "remnantRadius", d.remnantRadius),
+      remnantDisturbance = dbl(o, "remnantDisturbance", d.remnantDisturbance),
       ambientDisturbance = dbl(o, "ambientDisturbance", d.ambientDisturbance),
       calmingRadius = dbl(o, "calmingRadius", d.calmingRadius),
       baselineCalming = dbl(o, "baselineCalming", d.baselineCalming),
@@ -200,6 +212,8 @@ object VoyConfig:
     l.addProperty("diffusion", cfg.lattice.diffusion)
     l.addProperty("hotspotRadius", cfg.lattice.hotspotRadius)
     l.addProperty("hotspotDisturbance", cfg.lattice.hotspotDisturbance)
+    l.addProperty("remnantRadius", cfg.lattice.remnantRadius)
+    l.addProperty("remnantDisturbance", cfg.lattice.remnantDisturbance)
     l.addProperty("ambientDisturbance", cfg.lattice.ambientDisturbance)
     l.addProperty("calmingRadius", cfg.lattice.calmingRadius)
     l.addProperty("baselineCalming", cfg.lattice.baselineCalming)

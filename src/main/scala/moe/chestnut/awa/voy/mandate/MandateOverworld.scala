@@ -20,7 +20,7 @@ import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.server.world.ServerWorld
 import net.minecraft.sound.{SoundCategory, SoundEvents}
 import net.minecraft.text.Text
-import net.minecraft.util.math.Box
+import net.minecraft.util.math.{BlockPos, Box}
 import net.minecraft.util.{ActionResult, Hand}
 import net.minecraft.world.World
 
@@ -369,6 +369,7 @@ object MandateOverworld:
         else if state.isOf(Blocks.BELL) then
           val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
           val outcome = BellRitual.evaluateBellStrike(readout, VoyConfig.current.heartbeatParam)
+          val serverWorld = world.asInstanceOf[ServerWorld]
           if outcome.anchorsC0 then
             // The strike is a DOSE into the chunk's calming stock, and the
             // bell itself is registered as a source so its trickle starts
@@ -380,10 +381,12 @@ object MandateOverworld:
           // Physics always applies (the bell always sounds); the guard stamp
           // is recorded engine-side from the Bell transmitter (note 11 §1.5).
           MandateRuntime.firePulseAt(chunkX, chunkZ, outcome.pulseArea)
+          // Four verdicts must be distinguishable without reading chat
+          // (design note 11 §1.5): particles + layered sounds per outcome.
+          bellFeedback(serverWorld, pos, outcome, readout)
           // Acute overdrive backlash (design note 11 §1.5 row 2): striking
           // inside the guard recoils on the striker immediately.
           if outcome.triggersOverloadPenalty then
-            val serverWorld = world.asInstanceOf[ServerWorld]
             player.addStatusEffect(
               new StatusEffectInstance(
                 MandateEffects.PulseSaturationEntry,
@@ -421,6 +424,61 @@ object MandateOverworld:
         else
           ActionResult.PASS
     }
+
+  /** Warm amber ring: the strike landed in the rhythm (bell-palette copper). */
+  private val StrikeAmber = new DustParticleEffect(0xe6b432, 1.0f)
+
+  /** Rust-red burst: overdrive backlash (matches the overload message hue). */
+  private val StrikeRust = new DustParticleEffect(0x8a3b32, 1.1f)
+
+  /** Per-verdict bell feedback (design note 11 §1.5). The vanilla bell keeps
+    * its own sound (the interaction stays PASS), and these layers make the
+    * four verdicts readable at a glance: amber + notes = paced, a muffled
+    * puff = swallowed, rust burst = overdrive, dead ash = no answer.
+    */
+  private def bellFeedback(
+      world: ServerWorld,
+      pos: BlockPos,
+      outcome: BellRitual.BellStrikeOutcome,
+      readout: CellReadout
+  ): Unit =
+    val x = pos.getX + 0.5
+    val y = pos.getY + 0.8
+    val z = pos.getZ + 0.5
+    outcome match
+      case BellRitual.BellStrikeOutcome.AnchoredOrMaintained =>
+        world.spawnParticles(StrikeAmber, x, y, z, 10, 0.35, 0.25, 0.35, 0.01)
+        readout.phase match
+          case PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory, _) =>
+            // Phase-corrected: a clear chime and rising notes.
+            world.playSound(
+              null,
+              pos,
+              SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME,
+              SoundCategory.BLOCKS,
+              0.9f,
+              1.4f
+            )
+            world.spawnParticles(ParticleTypes.NOTE, x, y + 0.4, z, 6, 0.4, 0.3, 0.4, 0.05)
+          case _ =>
+            world.spawnParticles(ParticleTypes.NOTE, x, y + 0.3, z, 3, 0.3, 0.2, 0.3, 0.02)
+
+      case BellRitual.BellStrikeOutcome.SpikeSwallowed =>
+        world.playSound(
+          null,
+          pos,
+          SoundEvents.BLOCK_CANDLE_EXTINGUISH,
+          SoundCategory.BLOCKS,
+          0.8f,
+          0.7f
+        )
+        world.spawnParticles(ParticleTypes.ASH, x, y, z, 6, 0.3, 0.3, 0.3, 0.01)
+
+      case BellRitual.BellStrikeOutcome.DeadMyceliumBurnout =>
+        world.spawnParticles(ParticleTypes.ASH, x, y - 0.2, z, 3, 0.4, 0.2, 0.4, 0.005)
+
+      case BellRitual.BellStrikeOutcome.PulseOverloadBurnout =>
+        world.spawnParticles(StrikeRust, x, y, z, 14, 0.5, 0.4, 0.5, 0.02)
 
   /** Periodic Overworld check (runs on server thread): applies or clears the
     * `沉滞` (Stagnation) debuff on players and nearby villagers depending on
