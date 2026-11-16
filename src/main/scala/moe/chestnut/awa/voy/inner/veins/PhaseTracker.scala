@@ -8,7 +8,7 @@ package moe.chestnut.awa.voy.inner.veins
   */
 class PhaseTracker(
     param: ReadoutParam = ReadoutParam(),
-    fast: MandateParam = MandateAgent.DefaultFastParam,
+    fast: FastParam = MandateAgent.DefaultFastParam,
     coupling: Double = 1.0,
     depth: Double = StressParam().sustenanceDepth
 ):
@@ -18,7 +18,7 @@ class PhaseTracker(
   private var crossTimes: List[Double] = Nil
   private var excursionCount = 0
 
-  // Heartbeat statistics (design note 11, Step 0: observed only, no
+  // RhythmVerdict statistics (design note 11, Step 0: observed only, no
   // behavioural effect). `periodHistory` is the bounded ring of recent
   // inter-upcrossing intervals, newest first; duty accumulates over the
   // current open cycle with the same rectangle rule as the lab probes.
@@ -45,18 +45,18 @@ class PhaseTracker(
   /** Number of section upcrossings seen: one per excursion. */
   def excursions: Int = excursionCount
 
-  /** Immutable rhythm statistics snapshot for the heartbeat classifier
-    * ([[Heartbeat.classify]]); pure data, safe to hand across threads.
+  /** Immutable rhythm statistics snapshot for the rhythm classifier
+    * ([[RhythmVerdict.classify]]); pure data, safe to hand across threads.
     */
-  def beatStats: BeatStats =
-    BeatStats(periodHistory, lastDutyV, lastCross, bornAtT)
+  def rhythmEvidence: RhythmEvidence =
+    RhythmEvidence(periodHistory, lastDutyV, lastCross, bornAtT)
 
   /** Restore rhythm statistics from a snapshot (design note 11 risk 2: a
     * reload must not reset every cell to a fresh Warming grace). The raw
     * crossing list and the excursion counter are not persisted — only the
     * period ring, duty, and the Warming anchors matter downstream.
     */
-  def restoreBeatStats(stats: BeatStats): Unit =
+  def restoreBeatStats(stats: RhythmEvidence): Unit =
     periodHistory = stats.periods.take(PhaseTracker.PeriodHistoryCap)
     lastDutyV = stats.lastDuty
     lastCross = stats.lastCross
@@ -66,7 +66,7 @@ class PhaseTracker(
     crossTimes = Nil
 
   def observe(t: Double, cur: MandateCurrent, sustenance: Double = 1.0): PhaseReading =
-    val v = cur.dissonance
+    val v = cur.excitation
     if bornAtT.isNaN then bornAtT = t
     if !tPrev.isNaN then
       if v >= param.spikeLevel then highTime += t - tPrev
@@ -96,8 +96,8 @@ class PhaseTracker(
     else if !Readout.oscillating(aSlow, fast) then
       val (vStar, wStar) = Readout.restPoint(aSlow, fast.beta)
       val atRest =
-        Math.abs(cur.dissonance - vStar) <= param.basinTol &&
-          Math.abs(cur.entrench - wStar) <= param.basinTol
+        Math.abs(cur.excitation - vStar) <= param.basinTol &&
+          Math.abs(cur.recovery - wStar) <= param.basinTol
       if atRest && lastCross.isNaN then PhaseReading.Basin(PhaseLabel.Resting)
       else PhaseReading.Undefined(UndefinedReason.TransientNoCycle)
     else
@@ -124,6 +124,6 @@ class PhaseTracker(
 
 object PhaseTracker:
   /** Ring capacity for recent inter-upcrossing intervals; comfortably covers
-    * `HeartbeatParam.minCycles` with margin for drift inspection.
+    * `RhythmParam.minCycles` with margin for drift inspection.
     */
   val PeriodHistoryCap: Int = 8

@@ -12,32 +12,32 @@
 | 项 | 内容 |
 |---|---|
 | 变更性质 | **语义层重构 + 净删子系统 + c0 库存化解耦**；不动四维 RK4 方程、不动 `contracts/mandate-slice-v1.json`、不动 actor 内核、不动经济 mixin 与方块层 |
-| 核心动作 | 删除 `PulseStamp` / `PulseLedger` / `PulseBookkeeping`（庇护窗 + 记账），新增 `Heartbeat` 节律轴；`c0` 从「瞬时锚定」改为「源驱动的泄漏库存」 |
-| 存档 | `MandatePersistence.SchemaVersion` 2 → 3：每格携带 `BeatStats`（节奏记忆），另新增可选字段「安抚源注册表」 |
+| 核心动作 | 删除 `PulseStamp` / `PulseLedger` / `PulseBookkeeping`（庇护窗 + 记账），新增 `RhythmVerdict` 节律轴；`c0` 从「瞬时锚定」改为「源驱动的泄漏库存」 |
+| 存档 | `MandatePersistence.SchemaVersion` 2 → 3：每格携带 `RhythmEvidence`（节奏记忆），另新增可选字段「安抚源注册表」 |
 | 现状 | 全部落地；测试全绿；分步记录见 §4，三幕弧标定记录见附录 C |
 
 ---
 
 ## 1. 新语义
 
-### 1.1 第三条读数轴：`Heartbeat`
+### 1.1 第三条读数轴：`RhythmVerdict`
 
-`inner/veins/Heartbeat.scala`（纯函数、无 Minecraft 依赖、可单测）：
+`inner/veins/Rhythm.scala`（纯函数、无 Minecraft 依赖、可单测）：
 
 ```scala
-enum Heartbeat:
+enum RhythmVerdict:
   case Warming                                   // 已可判定之前的宽限期（事件驱动，无时长常数）
-  case Beating(period, duty, source: BeatSource) // 健康节拍：周期在带内、连续 minCycles 稳定、duty 不超限
+  case Beating(period, duty, source: RhythmSource) // 健康节拍：周期在带内、连续 minCycles 稳定、duty 不超限
   case Fast(period)                              // 心动过速：period < periodMin
   case Slow(period)                              // 心动过缓：period > periodMax，或长期无穿越
   case Arrhythmic(lastPeriod, duty)              // 失律：周期抖动超差，或单周期占空比超限
 
-enum BeatSource:
+enum RhythmSource:
   case Intrinsic                                 // 格子处于振荡带内，自持
   case Paced                                     // 由外部节律（钟、激励源、晶链）牵着跳
 ```
 
-`BeatSource` 只记录来源、**不参与判定**；`Paced` 与 `Intrinsic` 同权庇护（否则早期玩家无法生存）。
+`RhythmSource` 只记录来源、**不参与判定**；`Paced` 与 `Intrinsic` 同权庇护（否则早期玩家无法生存）。
 
 ### 1.2 判定表（v2 锚规则）
 
@@ -53,7 +53,7 @@ enum BeatSource:
 
 **锚规则的意义**：40 s 健康周期凑够 `minCycles = 3` 个间隔需要 ~120 s，而 `staleCycles × nominalPeriod ≈ 99 s`；若以出生时刻为锚，健康新格会在 99–120 s 间出现判定空窗。改为以**最近一次穿越**为锚（无穿越时退回出生时刻），语义不变、空窗消除。
 
-**退出规则**（风险 3 对策，`Heartbeat.smooth`；2026-11-16 晚修订）：只有**失律**（`Arrhythmic`）需要抖动保护——它是唯一能被单个周期翻掉的判定（单周期占空比超限，或周期窗里一个离群值）。离开 `Beating` 需连续 `exitBadCycles = 2` 个**本格自己的周期**（`2 × periodOf(raw)`，而非 `2 × nominalPeriod`：旧口径对 `Fast` 是 4 个坏拍、对 `Slow` 还不到 1 拍，从不是「两个坏拍」）。`Fast`（过速）与 `Slow`（静默）**即时发布**：前者已过 `minCycles` 均值，后者已等满 `staleCycles`，再加一段滞回就是把同一段等待算两遍（旧口径下令停跳的格子继续报 `Beating` 约 178 s = 99 s 陈旧 + 79 s 滞回）。进入 `Beating` 与一切非 `Beating` 之间的转移仍然即时。
+**退出规则**（风险 3 对策，`RhythmVerdict.smooth`；2026-11-16 晚修订）：只有**失律**（`Arrhythmic`）需要抖动保护——它是唯一能被单个周期翻掉的判定（单周期占空比超限，或周期窗里一个离群值）。离开 `Beating` 需连续 `exitBadCycles = 2` 个**本格自己的周期**（`2 × periodOf(raw)`，而非 `2 × nominalPeriod`：旧口径对 `Fast` 是 4 个坏拍、对 `Slow` 还不到 1 拍，从不是「两个坏拍」）。`Fast`（过速）与 `Slow`（静默）**即时发布**：前者已过 `minCycles` 均值，后者已等满 `staleCycles`，再加一段滞回就是把同一段等待算两遍（旧口径下令停跳的格子继续报 `Beating` 约 178 s = 99 s 陈旧 + 79 s 滞回）。进入 `Beating` 与一切非 `Beating` 之间的转移仍然即时。
 
 ### 1.3 庇护定义
 
@@ -180,15 +180,15 @@ def isSheltered: Boolean =
 
 | 文件 | 动作 |
 |---|---|
-| `inner/veins/Heartbeat.scala` | **新增**：`Heartbeat`/`BeatSource`/`BeatStats`/`HeartbeatParam` + 纯分类器 + 退出滞回 |
+| `inner/veins/Rhythm.scala` | **新增**：`RhythmVerdict`/`RhythmSource`/`RhythmEvidence`/`RhythmParam` + 纯分类器 + 退出滞回 |
 | `inner/veins/CalmingStock.scala` | **新增**：`MandateSourceKind`/`MandateSource`/`CalmingParam` + 库存纯函数（`step`/`dose`） |
-| `inner/veins/{ReadoutVocab,CellReadout,PhaseTracker}.scala` | 原单文件 `MandateReadout.scala`，按类型拆为三份：`CellReadout.heartbeat` + `lastBellStrikeAt`；`isSheltered` 改节律；`PhaseTracker` 周期环 + duty 累计 + `beatStats` + `restoreBeatStats` |
-| `inner/veins/MandateAgent.scala` | 删 `recordPulse`/`pulseStamp`；Bell 脉冲记 `lastBellStrikeAt`；分类 + 滞回；快照带 `BeatStats` |
-| `inner/veins/MandateSnapshot.scala` | `pulseStamps` → `beatStats`（周期环/lastDuty/lastCross/bornAt） |
+| `inner/veins/{ReadoutVocab,CellReadout,PhaseTracker}.scala` | 原单文件 `MandateReadout.scala`，按类型拆为三份：`CellReadout.heartbeat` + `lastBellStrikeAt`；`isSheltered` 改节律；`PhaseTracker` 周期环 + duty 累计 + `rhythmEvidence` + `restoreBeatStats` |
+| `inner/veins/MandateAgent.scala` | 删 `recordPulse`/`pulseStamp`；Bell 脉冲记 `lastBellStrikeAt`；分类 + 滞回；快照带 `RhythmEvidence` |
+| `inner/veins/MandateSnapshot.scala` | `pulseStamps` → `rhythmEvidence`（周期环/lastDuty/lastCross/bornAt） |
 | `inner/veins/PulseLedger.scala` | **删除** |
 | `mandate/MandateCalming.scala` | **新增**：源注册表、世界扫描、60 s 重平衡广播、剂量 |
 | `mandate/BellRitual.scala` | 四裁决；守卫用 `lastBellStrikeAt`；未锚判据 `c0 < C0ShelterLevel` |
-| `mandate/MandatePersistence.scala` | `SchemaVersion = 3`；`BeatStats` + 源注册表读写 |
+| `mandate/MandatePersistence.scala` | `SchemaVersion = 3`；`RhythmEvidence` + 源注册表读写 |
 | `mandate/MandateSyncProtocol.scala` | `ClientCellView` 心跳类别打包 flags 位（4–6 位）；debug telemetry 删 `remainingShelter/remainingCooldown`，保留 period/duty |
 | `mandate/MandatePhenomena.scala` | 经济/肉体按心跳映射；生态死亡优先 |
 | `mandate/MandateOverworld.scala` + `mandate/overworld/` | 三层扰动场、敲钟四态 VFX、拆钟源移除 + 文案、20-tick 循环读节律、60 s 重平衡钩子（后按通道拆为 `overworld/` 模块，门面只留注册与转发） |
@@ -209,8 +209,8 @@ Step 0 探针与统计（`tools/lab/`、`PhaseTracker`）→ Step 1 加轴 + A/B
 
 ## 5. 测试
 
-- **新增**：`HeartbeatSpec`（分类表 + 真实轨迹积分 + 退出规则共 21 例）、`HeartbeatParamSpec`（8 条关系式断言）、`CalmingStockSpec`（6 例，含「拆两钟之一不归零」回归）。
-- **改写**：`MandateReadoutSpec`（庇护/四裁决/守卫/阈值）、`MandateAgentSpec`（守卫戳/晶链不戳/死格不戳/ Warming）、`MandatePhenomenaSpec`（心跳经济/肉体/菌塘）、`MandatePersistenceSpec`（BeatStats + 源注册表 + schema）、`MandateSnapshotSpec`（BeatStats 往返）、`MandateNetworkingSpec`、`VoyConfigSpec`。
+- **新增**：`RhythmSpec`（分类表 + 真实轨迹积分 + 退出规则共 21 例）、`RhythmParamSpec`（8 条关系式断言）、`CalmingStockSpec`（6 例，含「拆两钟之一不归零」回归）。
+- **改写**：`MandateReadoutSpec`（庇护/四裁决/守卫/阈值）、`MandateAgentSpec`（守卫戳/晶链不戳/死格不戳/ Warming）、`MandatePhenomenaSpec`（心跳经济/肉体/菌塘）、`MandatePersistenceSpec`（RhythmEvidence + 源注册表 + schema）、`MandateSnapshotSpec`（RhythmEvidence 往返）、`MandateNetworkingSpec`、`VoyConfigSpec`。
 - **删除**：`PulseLedgerSpec`。
 - **不动**：`SliceContractSpec`、`SliceReplaySpec`、`PhaseResponseSpec`、`PulseCouplingSpec`。
 
@@ -221,7 +221,7 @@ Step 0 探针与统计（`tools/lab/`、`PhaseTracker`）→ Step 1 加轴 + A/B
 | # | 风险 | 状态 |
 |---|---|---|
 | 1 | 开局全山停滞 | 已解：余脉初始场（导出式）+ `Warming` 宽限 |
-| 2 | 读档后全场 Warming 悬崖 | 已解：schema 3 快照携带 `BeatStats` |
+| 2 | 读档后全场 Warming 悬崖 | 已解：schema 3 快照携带 `RhythmEvidence` |
 | 3 | 心跳抖动导致沉滞闪烁 | 已解：失律专用退出滞回（2 × 本格周期）；`Fast`/`Slow` 即时发布（2026-11-16 晚修订） |
 | 4 | 玩家不知道窗没了该做什么 | 已解：HUD 拍子可视化 + 近期变化 + 四态钟反馈；开局教学见「后续工作 4」 |
 | 5 | 旧档不可迁移 | `SchemaVersion = 3`，按既有逻辑丢弃重生成（0.1 阶段无外部用户） |
@@ -231,9 +231,9 @@ Step 0 探针与统计（`tools/lab/`、`PhaseTracker`）→ Step 1 加轴 + A/B
 
 ## 7. 裁决（2026-11-16，14 条 + 晚间 1 条修订）
 
-**基础五条**：① `Paced` 算庇护、`BeatSource` 只记录；② 8 s 改名 `overdriveGuard`（1.6 τ_bell）；③ `Warming` 不设时长常数；④ 旧档直接丢弃（schema 3）；⑤ `PulseBookkeeping` 整个删除。
+**基础五条**：① `Paced` 算庇护、`RhythmSource` 只记录；② 8 s 改名 `overdriveGuard`（1.6 τ_bell）；③ `Warming` 不设时长常数；④ 旧档直接丢弃（schema 3）；⑤ `PulseBookkeeping` 整个删除。
 
-**三项后续**：⑥ 心跳模块无出处字面量纪律 + `HeartbeatParamSpec` 关系式断言；⑦ 初始应力峰值/衰减改导出式（8×8 余脉区、带内半径 4 格）；⑧ `regime` 轴不动（HUD/文案以心跳为准）。
+**三项后续**：⑥ 心跳模块无出处字面量纪律 + `RhythmParamSpec` 关系式断言；⑦ 初始应力峰值/衰减改导出式（8×8 余脉区、带内半径 4 格）；⑧ `regime` 轴不动（HUD/文案以心跳为准）。
 
 **余脉与 c0（第二轮）**：⑨ 余脉寿命 = 局时尺度 30–60 min，不追求永久稳态（自然带全在恢复驼峰下降支、自激为正反馈，稳定不动点不存在于冻结方程）；⑩ 「镇死 = 沉滞」为世界观公理；⑪ c0 解耦 L2 库存化（源注册表通用化 `Chunk ↔ List[Source(kind,pos)]`，L3 方程化排入契约窗口）；⑫ 余脉弧线 = U 形三幕（压着 → 曲终回稳 → 冲向酸蚀）；⑬ 热点核必须可救（`u_core` 封顶在锚定可压制水平）；⑭ 空间分布结论：不可救死地只在热点核，山谷永远自愈；AMD 泄压设施单独立项（排在迁移之后，教学主题「镇（泄压）/养（起搏）」双手套）。
 
@@ -249,7 +249,7 @@ Step 0 探针与统计（`tools/lab/`、`PhaseTracker`）→ Step 1 加轴 + A/B
 
 | 旧（札记 08 / 反模式） | 新（本札记） |
 |---|---|
-| 脉冲庇护窗 `PulseStamp` | 心跳 `Heartbeat` |
+| 脉冲庇护窗 `PulseStamp` | 心跳 `RhythmVerdict` |
 | 敲钟开窗 | 敲钟起搏 / 校拍 |
 | 40 s 窗时长 | 40 s 健康周期参考（文案） |
 | `minInterval` 8 s 冷却 | `overdriveGuard` 8 s（过驱动保护） |

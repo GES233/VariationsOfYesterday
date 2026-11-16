@@ -7,12 +7,12 @@ import net.minecraft.world.PersistentState
 import org.slf4j.{Logger, LoggerFactory}
 
 import moe.chestnut.awa.voy.inner.veins.{
-  BeatStats,
+  RhythmEvidence,
   CellCoord,
   CellSnapshot,
   LatticeEdge,
   MandateCurrent,
-  MandateParam,
+  FastParam,
   MandateSnapshot,
   MandateSource,
   MandateSourceKind,
@@ -112,8 +112,8 @@ object MandatePersistence:
       val c = NbtCompound()
       c.putInt("x", cs.coord.x)
       c.putInt("z", cs.coord.z)
-      c.putDouble("dissonance", cs.current.dissonance)
-      c.putDouble("entrench", cs.current.entrench)
+      c.putDouble("dissonance", cs.current.excitation)
+      c.putDouble("entrench", cs.current.recovery)
       c.putDouble("stress", cs.current.stress)
       c.putDouble("activity", cs.current.activity)
       c.putDouble("sustenance", cs.sustenance)
@@ -139,14 +139,14 @@ object MandatePersistence:
       c.putDouble("sustenanceBurn", sp.sustenanceBurn)
       c.putDouble("sustenanceBurnThreshold", sp.sustenanceBurnThreshold)
       c.putDouble("sustenanceFloor", sp.sustenanceFloor)
-      // Heartbeat rhythm memory (schema 3, design note 11 risk 2). NaN
+      // RhythmVerdict rhythm memory (schema 3, design note 11 risk 2). NaN
       // sentinels round-trip through NBT doubles unchanged.
       val periodList = NbtList()
-      cs.beatStats.periods.foreach(per => periodList.add(NbtDouble.of(per)))
+      cs.rhythmEvidence.periods.foreach(per => periodList.add(NbtDouble.of(per)))
       c.put("beatPeriods", periodList)
-      c.putDouble("beatDuty", cs.beatStats.lastDuty)
-      c.putDouble("lastCross", cs.beatStats.lastCross)
-      c.putDouble("bornAt", cs.beatStats.bornAt)
+      c.putDouble("beatDuty", cs.rhythmEvidence.lastDuty)
+      c.putDouble("lastCross", cs.rhythmEvidence.lastCross)
+      c.putDouble("bornAt", cs.rhythmEvidence.bornAt)
       cells.add(c)
     }
     nbt.put("cells", cells)
@@ -206,7 +206,7 @@ object MandatePersistence:
           calming = c.getDouble("calming"),
           baselineCalming = c.getDouble("baselineCalming"),
           impulse = c.getDouble("impulse"),
-          fastParam = MandateParam(
+          fastParam = FastParam(
             c.getDouble("alpha"),
             c.getDouble("beta"),
             c.getDouble("epsilon")
@@ -227,7 +227,7 @@ object MandatePersistence:
             sustenanceBurnThreshold = c.getDouble("sustenanceBurnThreshold"),
             sustenanceFloor = c.getDouble("sustenanceFloor")
           ),
-          beatStats = BeatStats(
+          rhythmEvidence = RhythmEvidence(
             periods = c.getList("beatPeriods", NbtElement.DOUBLE_TYPE).toArray.map {
               case d: NbtDouble => d.doubleValue()
             }.toVector,

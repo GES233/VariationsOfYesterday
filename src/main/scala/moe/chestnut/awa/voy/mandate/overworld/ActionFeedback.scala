@@ -53,7 +53,7 @@ object ActionFeedback:
             if VoyDebug.numbers then
               player.sendMessage(
                 Text.literal(
-                  f"§6[地脉尖峰] 区块 [$chunkX%d, $chunkZ%d] 激发地鸣 (v=${cur.dissonance}%.2f, s=${cur.stress}%.2f, $regime)"
+                  f"§6[地脉尖峰] 区块 [$chunkX%d, $chunkZ%d] 激发地鸣 (v=${cur.excitation}%.2f, s=${cur.stress}%.2f, $regime)"
                 ),
                 true
               )

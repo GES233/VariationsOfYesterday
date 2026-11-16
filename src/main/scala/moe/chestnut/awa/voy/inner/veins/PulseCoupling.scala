@@ -163,7 +163,7 @@ final class PulseLinkRunner(
     val fired = ArrayBuffer.empty[(CellCoord, Double)]
     cells.keys.toSeq.sortBy(c => (c.x, c.z)).foreach { coord =>
       val trend = trends.getOrElseUpdate(coord, new CellTrend)
-      trend.observe(now, cells(coord).getState.dissonance).foreach(at => fired += (coord -> at))
+      trend.observe(now, cells(coord).getState.excitation).foreach(at => fired += (coord -> at))
     }
     fired.foreach { case (src, at) =>
       linksV.foreach { link =>

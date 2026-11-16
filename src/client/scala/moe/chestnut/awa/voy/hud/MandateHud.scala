@@ -11,9 +11,9 @@ import moe.chestnut.awa.voy.mandate.{
   MandateWording,
   SyncedCellEntry
 }
-import moe.chestnut.awa.voy.inner.veins.Heartbeat
+import moe.chestnut.awa.voy.inner.veins.RhythmVerdict
 
-/** Development HUD overlay that visualises the mandate readout (heartbeat
+/** Development HUD overlay that visualises the mandate readout (rhythm
   * category, regime, phase dial, mycelial health, `c0` status, and continuous
   * state) of the chunks around the player using uniform-size color tiles.
   */
@@ -24,7 +24,7 @@ object MandateHud:
   private val tileStep = tileSize + tileGap
   private var enabled = false
 
-  // Palette (ARGB) — heartbeat-first colour language (design note 11): one
+  // Palette (ARGB) — rhythm-first colour language (design note 11): one
   // hue per rhythm category, shared with chat text and status-effect icons.
   private val ColPanelBg = 0xAA101318
   private val ColPanelBorder = 0xFF343B46
@@ -101,14 +101,14 @@ object MandateHud:
         val shelterTag = if view.isSheltered then "庇护" else "沉滞(STAGNANT)"
         val (t1, t2) = debugOpt match
           case Some(d) =>
-            val per = d.beatPeriod.map(x => f"$x%.1f").getOrElse("--")
-            val duty = d.beatDuty.map(x => f"$x%.3f").getOrElse("--")
+            val per = d.rhythmPeriod.map(x => f"$x%.1f").getOrElse("--")
+            val duty = d.rhythmDuty.map(x => f"$x%.3f").getOrElse("--")
             (
-              f"v=${d.dissonance}%+.2f  s=${d.stress}%.3f  q=${d.activity}%.3f  M=${d.sustenance}%.2f  c0=${d.baselineCalming}%.2f",
-              f"p=${d.pulseDrive}%.2f  hb=${Heartbeat.wireName(view.heartbeatOrdinal)}  per=$per  duty=$duty"
+              f"v=${d.excitation}%+.2f  s=${d.stress}%.3f  q=${d.activity}%.3f  M=${d.sustenance}%.2f  c0=${d.baselineCalming}%.2f",
+              f"p=${d.pulseDrive}%.2f  hb=${RhythmVerdict.wireName(view.rhythmOrdinal)}  per=$per  duty=$duty"
             )
           case None =>
-            (s"debug telemetry withheld (requires dev or OP);  hb=${Heartbeat.wireName(view.heartbeatOrdinal)}", "")
+            (s"debug telemetry withheld (requires dev or OP);  hb=${RhythmVerdict.wireName(view.rhythmOrdinal)}", "")
         val phaseStr = debugOpt
           .map(d => MandateWording.formatPhaseShort(d.phaseReading(view.phaseLabel)))
           .getOrElse(view.dialTick.map(t => s"刻度 $t/20").getOrElse("无周期"))
@@ -174,7 +174,7 @@ object MandateHud:
 
       context.fill(tx, ty, tx + tileSize, ty + tileSize, color)
 
-      if cellView.exists(_.c0Sheltered) then
+      if cellView.exists(_.hasCalmingStock) then
         val dotX = tx + tileSize / 2 - 1
         val dotY = ty + tileSize / 2 - 1
         context.fill(dotX, dotY, dotX + 2, dotY + 2, ColC0Dot)
@@ -229,7 +229,7 @@ object MandateHud:
         )
       }
 
-  /** Heartbeat-first tile colour (design note 11): the rhythm verdict is what
+  /** RhythmVerdict-first tile colour (design note 11): the rhythm verdict is what
     * the player reads; ecological death overrides it. Spikes no longer flash
     * the tile — the beat's high phase is part of the beat.
     */
@@ -237,9 +237,9 @@ object MandateHud:
     viewOpt match
       case None => ColOutside
       case Some(v) =>
-        if v.isBurnoutPhase then ColEcologicalDeath
+        if v.hasSilentBlight then ColEcologicalDeath
         else
-          v.heartbeatOrdinal match
+          v.rhythmOrdinal match
             case 0 => ColWarming
             case 1 => ColBeating
             case 2 => ColFast

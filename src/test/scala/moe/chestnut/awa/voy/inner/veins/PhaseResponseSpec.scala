@@ -12,7 +12,7 @@ import org.junit.jupiter.api.{Test, TestInstance}
   */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PhaseResponseSpec:
-  private val fast = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+  private val fast = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
   private val dt = 0.02
   private val osc = Oscillator(-0.30, fast)
 
@@ -103,7 +103,7 @@ class PhaseResponseSpec:
     st.state = snapshot
     var t = 0.0
     var crossings = 0
-    var prevBelow = st.getState.dissonance <= PhaseResponse.section
+    var prevBelow = st.getState.excitation <= PhaseResponse.section
     var spikes = 0
     var candidate = Double.NaN
     var peak = Double.MinValue
@@ -112,7 +112,7 @@ class PhaseResponseSpec:
       st.impulse = if t >= fireAt && t < fireAt + 1.0 then 1.0 else 0.0
       st.step(dt)
       t += dt
-      val v = st.getState.dissonance
+      val v = st.getState.excitation
       val above = v > PhaseResponse.section
       if above && !prevBelow then
         crossings += 1

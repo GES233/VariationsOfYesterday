@@ -15,14 +15,14 @@ enum Regime:
   *   - `Dead` (`M < floor`): depleted / absorbing state requiring external
   *     re-inoculation or neighbour diffusion.
   */
-enum MycelialHealth(val word: String):
-  case Intact extends MycelialHealth("完好")
-  case Damaged extends MycelialHealth("受损")
-  case Dead extends MycelialHealth("枯绝")
+enum SustenanceTier(val word: String):
+  case Intact extends SustenanceTier("完好")
+  case Damaged extends SustenanceTier("受损")
+  case Dead extends SustenanceTier("枯绝")
 
-  def isIntact: Boolean = this == MycelialHealth.Intact
-  def isViable: Boolean = this != MycelialHealth.Dead
-  def isDead: Boolean = this == MycelialHealth.Dead
+  def isIntact: Boolean = this == SustenanceTier.Intact
+  def isViable: Boolean = this != SustenanceTier.Dead
+  def isDead: Boolean = this == SustenanceTier.Dead
 
 /** The four-phase vocabulary of the action-potential analogy (§1.4). */
 enum PhaseLabel:
@@ -81,23 +81,23 @@ object Readout:
     else Regime.Calm
 
   /** Classify mycelial network health (`M`) into the canonical 3-tier enum. */
-  def mycelialHealth(
+  def sustenanceTier(
       sustenance: Double,
       floor: Double = StressParam().sustenanceFloor
-  ): MycelialHealth =
-    if sustenance < Math.max(floor, 1e-9) then MycelialHealth.Dead
-    else if sustenance < IntactSustenance then MycelialHealth.Damaged
-    else MycelialHealth.Intact
+  ): SustenanceTier =
+    if sustenance < Math.max(floor, 1e-9) then SustenanceTier.Dead
+    else if sustenance < IntactSustenance then SustenanceTier.Damaged
+    else SustenanceTier.Intact
 
   /** Recovery offset where the cubic's right knee (`v = +1`) removes the middle
     * branch (`a = -0.4666...` with default parameters).
     */
-  def burnoutA(fast: MandateParam): Double =
+  def burnoutA(fast: FastParam): Double =
     fast.beta * (1.0 - 1.0 / 3.0) - 1.0
 
   /** Slow recovery offset `a(s, M)` integrated by the ODE. */
   def slowA(
-      fast: MandateParam,
+      fast: FastParam,
       stress: Double,
       sustenance: Double = 1.0,
       coupling: Double = 1.0,
@@ -109,7 +109,7 @@ object Readout:
   def isSlowOffsetBelowKnee(
       stress: Double,
       sustenance: Double,
-      fast: MandateParam = MandateAgent.DefaultFastParam,
+      fast: FastParam = MandateAgent.DefaultFastParam,
       coupling: Double = 1.0,
       depth: Double = StressParam().sustenanceDepth
   ): Boolean =
@@ -118,19 +118,19 @@ object Readout:
   /** Shared ecological incapacitation guard: dead mycelial network OR `a_slow`
     * collapsed below the knee.
     */
-  def isEcologicalDeath(
+  def isEcologicallyDead(
       sustenance: Double,
       stress: Double,
-      fast: MandateParam = MandateAgent.DefaultFastParam,
+      fast: FastParam = MandateAgent.DefaultFastParam,
       coupling: Double = 1.0,
       depth: Double = StressParam().sustenanceDepth,
       floor: Double = StressParam().sustenanceFloor
   ): Boolean =
-    mycelialHealth(sustenance, floor).isDead ||
+    sustenanceTier(sustenance, floor).isDead ||
       isSlowOffsetBelowKnee(stress, sustenance, fast, coupling, depth)
 
   /** Whether a limit cycle exists at this recovery offset. */
-  def oscillating(a: Double, fast: MandateParam): Boolean =
+  def oscillating(a: Double, fast: FastParam): Boolean =
     val (_, ac) = PhaseResponse.hopfPoint(fast)
     a < ac && a > burnoutA(fast)
 
@@ -149,7 +149,7 @@ object Readout:
 
   /** Cycle-fraction label. `Excitation` is the positive spike level (`v >= spikeLevel`). */
   def label(cur: MandateCurrent, fraction: Double, p: ReadoutParam = ReadoutParam()): PhaseLabel =
-    if cur.dissonance >= p.spikeLevel then PhaseLabel.Excitation
+    if cur.excitation >= p.spikeLevel then PhaseLabel.Excitation
     else if fraction < p.fireWindowLo then PhaseLabel.AbsoluteRefractory
     else if fraction <= p.fireWindowHi then PhaseLabel.RelativeRefractory
     else PhaseLabel.Resting

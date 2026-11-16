@@ -31,7 +31,7 @@ class GridBenchmarkSpec:
     MandateGrid.rectangular(side, side, diffusion = 0.002, coord =>
       val cell = MandateState(
         MandateCurrent(0.0, 0.0, 0.0, 0.0),
-        MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+        FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
         sharedStressParam
       )
       cell.disturbance = if coord.x == side / 2 && coord.z == side / 2 then 0.08 else 0.002

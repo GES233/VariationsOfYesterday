@@ -43,8 +43,8 @@ object SliceReplay:
 
   def nodeState(c0: Double): MandateState =
     val st = MandateState(
-      state = MandateCurrent(dissonance = -1.2, entrench = -0.6),
-      param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+      state = MandateCurrent(excitation = -1.2, recovery = -0.6),
+      param = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
     )
     st.baselineCalming = c0
     st
@@ -84,7 +84,7 @@ object SliceReplay:
       val cur = st.getState
       val before = tracker.excursions
       tracker.observe(t, cur)
-      val v = cur.dissonance
+      val v = cur.excitation
       maxAbsV = Math.max(maxAbsV, Math.abs(v))
       if tracker.excursions > before && t - lastImpact > 5.0 then
         impacts += t
@@ -206,7 +206,7 @@ object SliceReplay:
       grid.step(dt)
       t += dt
       for (coord, cell) <- grid.cells do
-        val above = Math.abs(cell.getState.dissonance) > ChainProbeAmplitude
+        val above = Math.abs(cell.getState.excitation) > ChainProbeAmplitude
         if above && !wasAbove(coord) then spikes(coord) += t
         wasAbove(coord) = above
     val up = spikes(CellCoord(0, 0)).toSeq

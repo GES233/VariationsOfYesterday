@@ -4,7 +4,7 @@
 >
 > 前置阅读：[设计草案 01](design-draft-01-living-world.md) §1（动力学层）、[设计札记 07](design-note-07-pulse-coupling.md)（脉冲耦合链路）。历史与外置参考：[验证报告 01](archive/verification-report-01-mandate-slice.md)；设计札记 02（关系世界模型）与札记 05（五跳卷宗）已随 Elixir 工具链外迁（见 [docs/README](../README.md)「已外迁」）；制式验山盘见 [札记 09](incubator/design-note-09-mountain-dial.md)（挂起，第一阶段不实现）。
 >
-> **2026-11-13 名实订正**：读数层已精简为三条正交轴——`UndefinedReason.SlowOffsetBelowKnee`（`a(s, M) <= burnoutA`）、`MycelialHealth ∈ {Intact, Damaged, Dead}` 与 `PulseStamp(shelterUntil, cooldownUntil)`；静默枯败签名（`hasSilentBlight`）绑定 `!mycelium.isViable || isSlowOffsetBelowKnee`。本文 §2–§5 的实现描述已按该词表同步（庇护轴于 2026-11-16 改由札记 11 节律轴驱动）；§7 中带日期的历史裁定保留原词作历史对照。
+> **2026-11-13 名实订正**：读数层已精简为三条正交轴——`UndefinedReason.SlowOffsetBelowKnee`（`a(s, M) <= burnoutA`）、`SustenanceTier ∈ {Intact, Damaged, Dead}` 与 `PulseStamp(shelterUntil, cooldownUntil)`；静默枯败签名（`hasSilentBlight`）绑定 `!mycelium.isViable || isSlowOffsetBelowKnee`。本文 §2–§5 的实现描述已按该词表同步（庇护轴于 2026-11-16 改由札记 11 节律轴驱动）；§7 中带日期的历史裁定保留原词作历史对照。
 
 ---
 
@@ -30,8 +30,8 @@
 
 | 方程元素 | 生物学身份 |
 | :-- | :-- |
-| `dissonance v` | 菌网局部电活动 / 钙波幅度 |
-| `entrench w` | 恢复过程打包（Ca²⁺ 再螯合、后续通道过程） |
+| `excitation v` | 菌网局部电活动 / 钙波幅度 |
+| `recovery w` | 恢复过程打包（Ca²⁺ 再螯合、后续通道过程） |
 | `a(s, M) = α − Δ·(1−M) − k·s` | **菌网完整度决定兴奋性**：网络越碎，`a` 越小，越容易被点燃、越难回到静息；维持源被彻底抽走（`M → 0`）则进入去极化阻滞 |
 | `dM/dt = r·M·(1−M) − c·max(s−s_T,0)·M + D·∇²M` | 菌丝 logistic 生长 − 酸中毒（应力越过毒性阈值 `s_T` 才杀，与 §2.2 AMD 一致）+ 沿土壤/水系连续体扩散；`M = 0` 吸收态 |
 | 尖峰（正向 `v ≥ +1.8`） | 菌网电暴发 + 伴生的地球化学脉冲（见 2.2） |
@@ -105,9 +105,9 @@
 现实原型（内部考据，玩家文案不出现真实物种，见 §6）：一类无根无叶、全靠地下巨型菌丝网络供养的块根植物。菌网完整 = 块根收成，保护土地从道德劝诫变成经济利益。玩家侧一律使用虚构词 **荧丝 / 菌塘 / 鲜伏根 / 煨伏根**（札记 10 §1.1）。
 
 - **菌塘方块（`gastrodia_bed`）**：无独立动力学状态，每次随机刻与交互均为所在 Cell 快照的无状态投影（`MandatePhenomena.evaluateGastrodiaBed`）：
-  - `Growing`（`condition = 0`）：`Regime.Calm`（`s < 0.45`）、`MycelialHealth.Intact`（`M ≥ 0.60`）且 `!isSlowOffsetBelowKnee`，推进 `age = 0..3`；
-  - `Stalled`（`condition = 1`）：`MycelialHealth.Damaged`（`floor ≤ M < 0.60`）、`s ≥ 0.45`（`Strained` 及以上）或 `isSlowOffsetBelowKnee`，菌丝失水暂停生长；
-  - `Withered`（`condition = 2`）：**只由菌网枯绝**（`MycelialHealth.Dead`，即 `M < max(floor, 1e-9)`）触发；菌丝黑腐枯死并锁存为死塘，须待 `mycelium.isViable` 且 `!isToxicSoil`（`s < 0.60`）后手持**荧丝菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。
+  - `Growing`（`condition = 0`）：`Regime.Calm`（`s < 0.45`）、`SustenanceTier.Intact`（`M ≥ 0.60`）且 `!isSlowOffsetBelowKnee`，推进 `age = 0..3`；
+  - `Stalled`（`condition = 1`）：`SustenanceTier.Damaged`（`floor ≤ M < 0.60`）、`s ≥ 0.45`（`Strained` 及以上）或 `isSlowOffsetBelowKnee`，菌丝失水暂停生长；
+  - `Withered`（`condition = 2`）：**只由菌网枯绝**（`SustenanceTier.Dead`，即 `M < max(floor, 1e-9)`）触发；菌丝黑腐枯死并锁存为死塘，须待 `mycelium.isViable` 且 `!isToxicSoil`（`s < 0.60`）后手持**荧丝菌材**或菌种右键重铺（`canRefurbishGastrodiaBed`）。
 - **段木伴栽与荧丝菌材（`inoculated_timber`）**：
   - 在健康区块（`Growing`）手持野生菌种右键去皮原木可就地「段木发菌」转化为荧丝菌材（或工作台合制）；
   - 紧贴菌塘四周或正下方放置荧丝菌材构成「段木伴栽」，生长概率翻倍（`1/4 → 1/2`）、成熟起挖产量提升（`1–2 → 3–4`）；

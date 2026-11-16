@@ -28,12 +28,12 @@ class PrototypeHotspotSpec:
   /** Count positive section upcrossings: a beat, not merely a spike. */
   private def beats(cell: MandateState, seconds: Double): Int =
     var crossings = 0
-    var previous = cell.getState.dissonance
+    var previous = cell.getState.excitation
     var t = 0.0
     while t < seconds do
       cell.step(dt)
       t += dt
-      val v = cell.getState.dissonance
+      val v = cell.getState.excitation
       if previous < PhaseDetection.SectionLevel && v >= PhaseDetection.SectionLevel then
         crossings += 1
       previous = v

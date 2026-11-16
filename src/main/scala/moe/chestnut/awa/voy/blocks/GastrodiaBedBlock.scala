@@ -28,7 +28,7 @@ import moe.chestnut.awa.voy.mandate.{MandatePhenomena, MandateRuntime}
   *    from `0` to `3` (`MaxAge`), faster and with higher yield when a
   *    companion `菌材` (`inoculated_timber`) block touches the bed;
   *  - `condition = 1` (`Stalled`): `s >= 0.45`, `M < 0.60`, or ANY no-cycle
-  *    reason (`isBurnoutPhase`: an acute overload lockout or the readout
+  *    reason (`hasSilentBlight`: an acute overload lockout or the readout
   *    threshold below the knee); threads dry out and growth pauses, then
   *    resumes once the cause clears;
   *  - `condition = 2` (`Withered`): ONLY the mycelial network is below the

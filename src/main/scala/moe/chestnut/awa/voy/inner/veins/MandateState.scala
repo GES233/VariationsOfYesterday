@@ -7,13 +7,13 @@ import moe.chestnut.awa.voy.helpers.{NumericTuple, ODESolver}
   * `alpha` is the resting offset a0 of the recovery nullcline; the effective
   * value under land stress `s` is `a(s) = alpha - coupling * s`.
   */
-case class MandateParam(alpha: Double, beta: Double, epsilon: Double)
-    extends NumericTuple[MandateParam]:
+case class FastParam(alpha: Double, beta: Double, epsilon: Double)
+    extends NumericTuple[FastParam]:
   def toArray: Array[Double] =
     Array(alpha, beta, epsilon)
 
-  def fromArray(numbers: Array[Double]): MandateParam =
-    MandateParam(numbers(0), numbers(1), numbers(2))
+  def fromArray(numbers: Array[Double]): FastParam =
+    FastParam(numbers(0), numbers(1), numbers(2))
 
 /** Slow-subsystem (land stress) parameters.
   *
@@ -53,18 +53,18 @@ case class StressParam(
 
 /** Full state of the mandate system.
   *
-  * Fast: `dissonance` (v), `entrench` (w).
+  * Fast: `excitation` (v), `recovery` (w).
   * Slow: `stress` (s, land stress, clamped to [0, stressMax]), `activity`
   * (q, low-passed catastrophe activity tracer feeding back into stress).
   */
 case class MandateCurrent(
-    dissonance: Double,
-    entrench: Double,
+    excitation: Double,
+    recovery: Double,
     stress: Double = 0.0,
     activity: Double = 0.0
 ) extends NumericTuple[MandateCurrent]:
   def toArray: Array[Double] =
-    Array(dissonance, entrench, stress, activity)
+    Array(excitation, recovery, stress, activity)
 
   def fromArray(numbers: Array[Double]): MandateCurrent =
     MandateCurrent(numbers(0), numbers(1), numbers(2), numbers(3))
@@ -85,7 +85,7 @@ case class MandateCurrent(
   */
 class MandateState(
     var state: MandateCurrent,
-    var param: MandateParam,
+    var param: FastParam,
     var stressParam: StressParam = StressParam()
 ):
   // External forcing channels, fed from channel events (EventDTO) by the
@@ -200,4 +200,4 @@ class MandateState(
     state = state.copy(stress = raised)
 
   def getState: MandateCurrent = state
-  def getParam: MandateParam = param
+  def getParam: FastParam = param

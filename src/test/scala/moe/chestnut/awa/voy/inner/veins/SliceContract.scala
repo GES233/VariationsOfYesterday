@@ -50,7 +50,7 @@ object SliceContract:
   val version: Int = 1
   val fileName: String = "contracts/mandate-slice-v1.json"
 
-  val fast: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+  val fast: FastParam = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
   val dt: Double = 0.02
 
   final case class WindowRow(window: PhaseWindow, trial: Trial)

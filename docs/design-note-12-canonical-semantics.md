@@ -115,6 +115,10 @@
 
 ### 3.4 禁止写法清单（改名时 grep 这些）
 
+> **S2b 已执行（2026-11-16）**：`dissonance`→`excitation`、`entrench`→`recovery`、`Heartbeat`→`RhythmVerdict`、`HeartbeatParam`→`RhythmParam`、`BeatStats`→`RhythmEvidence`、`BeatSource`→`RhythmSource`、`MycelialHealth`→`SustenanceTier`、`mycelialHealth()`→`sustenanceTier()`、`isEcologicalDeath`→`isEcologicallyDead`、`isBurnoutPhase`→`hasSilentBlight`、`c0Sheltered`→`hasCalmingStock`、`MandateParam`→`FastParam`；文件 `inner/veins/Heartbeat.scala`→`Rhythm.scala`，两个 spec 同步改名；34+29 个文件、±433 行、169 例全绿、**契约文件零变化**。
+>
+> **刻意未改（C 档，改了会断存档/断配置/断遥测）**：NBT key `dissonance` / `entrench` / `beatPeriods` / `beatDuty`，config key `heartbeatParam`，以及 wire name `"Beating"`。规则：**wire/存档里的名字是冻结边界，代码名与它不同是正常的**（就像协议 id）。
+
 `dissonance` `entrench` `BeatStats` `BeatSource` `MycelialHealth` `BellStrikeOutcome` `SpikeSwallowed` `isEcologicalDeath` `isBurnoutPhase` `c0Sheltered` `c0Intact`（作阈值时）`BellBaselineCalming`（作剂量时）`MandateParam`（作快变量参数时 → `FastParam`）`section`（作阈值时）
 
 ---
@@ -316,7 +320,7 @@ S2C 现在每格最多 31 次 `buf.write`、12+12 字段手写对称、5 处 `.o
 | :-- | :--- | ---: | :--- |
 | **S0 定名**（本文档） | 词表 + 法则 + 禁止写法清单 | 本文档 | 团队认可（§8 三问拍板） |
 | **S1 敲钟 v2a** ✅ | 三态门控、删 `SpikeSwallowed`、删相位文案/音画分支、记裁决⑯ | 0.5 天 | ✅ 已落地：`./gradlew test` 22 套 169 例全绿、客户端编译通过；进游戏三态音画验证**待做** |
-| **S2 改名 A 档** | grep 禁止写法清单，改 `mandate/`+`overworld/`+`client/`+测试；`inner/` 中非 digest、非存档字段的符号 | 1–2 天 | `./gradlew test` 全绿；`grep` 禁止清单只剩注释 |
+| **S2 改名 A 档** ✅ | grep 禁止写法清单，改 `mandate/`+`overworld/`+`client/`+测试；`inner/` 中非存档字段的符号 + 三个文件改名 | 1–2 天 | ✅ 已落地 2026-11-16（见 §3.4），169 例全绿、契约未动 |
 | **S3 原子化（第一阶段）** | ① 敲钟改命令+回执（删 `lastBellStrikeAt`/`simTime` 出边界）② 阈值进 `SemanticsProfile` ③ `dialTick`/`PhaseLabel` 下沉 ④ `CellReadout` 降级为**引擎内部/调试遥测**，wiring 逐步改消费事实 ⑤ 每条通道标粒度（cell/player/world） | 3–5 天 | `BellRitual` 不再接收 `CellReadout`；S2C 不含阈值与 `dialTick`；169 例绿 |
 | **S4 改名 B/C 档** | 搭札记 11「后续工作 2」的契约窗口：`PhaseDetection` / `HeartbeatParam` 数值变更 + schema 4 + payload v2（**`MandateState` / `ODESolver` 改名已随 digest 移除归入 A 档**，S4 成本下降） | 2–4 天 | 契约重生成并逐行评审；旧档按声明丢弃 |
 | **S5 v2b 回声** | `PulseOutcome` 观测窗（复用 `SpikeDetector`） | 1–2 天 | 敲钟后 3–10 s 收到 4 类回声之一；不影响任何判定 |

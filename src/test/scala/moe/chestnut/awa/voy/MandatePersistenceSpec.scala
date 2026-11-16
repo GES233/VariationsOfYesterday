@@ -14,12 +14,12 @@ import net.minecraft.SharedConstants
 import net.minecraft.world.PersistentStateManager
 
 import moe.chestnut.awa.voy.inner.veins.{
-  BeatStats,
+  RhythmEvidence,
   CellCoord,
   CellSnapshot,
   LatticeEdge,
   MandateCurrent,
-  MandateParam,
+  FastParam,
   MandateSnapshot,
   MandateSource,
   MandateSourceKind,
@@ -43,10 +43,10 @@ class MandatePersistenceSpec:
         calming = 0.01,
         baselineCalming = 0.03,
         impulse = -0.2,
-        fastParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+        fastParam = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
         stressParam =
           StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-        beatStats = BeatStats(
+        rhythmEvidence = RhythmEvidence(
           periods = Vector(40.1, 39.8, 40.3),
           lastDuty = 0.05,
           lastCross = 54300.0,
@@ -61,9 +61,9 @@ class MandatePersistenceSpec:
         calming = 0.0,
         baselineCalming = 0.0,
         impulse = 0.0,
-        fastParam = MandateParam(alpha = 0.65, beta = 0.75, epsilon = 0.1),
+        fastParam = FastParam(alpha = 0.65, beta = 0.75, epsilon = 0.1),
         stressParam = StressParam(coupling = 1.4, stressMax = 0.9),
-        beatStats = BeatStats.zero // never-observed cell: NaN sentinels round-trip
+        rhythmEvidence = RhythmEvidence.zero // never-observed cell: NaN sentinels round-trip
       )
     ),
     edges = Seq(

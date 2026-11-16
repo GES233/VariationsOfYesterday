@@ -22,7 +22,7 @@ class MandatePhenomenaSpec:
       phase: PhaseReading = PhaseReading.Basin(PhaseLabel.Resting),
       c0: Double = 0.03,
       sustenance: Double = 1.0,
-      heartbeat: Heartbeat = Heartbeat.Warming,
+      rhythm: RhythmVerdict = RhythmVerdict.Warming,
       lastBellStrikeAt: Double = Double.NaN,
       simTime: Double = 0.0
   ): CellReadout =
@@ -32,7 +32,7 @@ class MandatePhenomenaSpec:
       phase = phase,
       baselineCalming = c0,
       sustenance = sustenance,
-      heartbeat = heartbeat,
+      rhythm = rhythm,
       lastBellStrikeAt = lastBellStrikeAt,
       simTime = simTime
     )
@@ -121,8 +121,8 @@ class MandatePhenomenaSpec:
     val viable = readout(s = 0.20, sustenance = 0.25)
     assertEquals(ReInoculationOutcome.AlreadyViable, MandatePhenomena.evaluateReInoculation(viable))
 
-  @Test def `economy tiers follow the heartbeat rhythm (design note 11 section 1 point 4)`(): Unit =
-    val beating = readout(heartbeat = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic))
+  @Test def `economy tiers follow the rhythm rhythm (design note 11 section 1 point 4)`(): Unit =
+    val beating = readout(rhythm = RhythmVerdict.Beating(40.0, 0.10, RhythmSource.Intrinsic))
     assertEquals(MandatePhenomena.EconomyMaintained, MandatePhenomena.classifyEconomy(beating))
     assertEquals(
       MandatePhenomena.EconomyMaintained,
@@ -140,15 +140,15 @@ class MandatePhenomenaSpec:
     )
     assertEquals(
       MandatePhenomena.EconomySpiking,
-      MandatePhenomena.classifyEconomy(readout(heartbeat = Heartbeat.Fast(20.0)))
+      MandatePhenomena.classifyEconomy(readout(rhythm = RhythmVerdict.Fast(20.0)))
     )
     assertEquals(
       MandatePhenomena.EconomySpiking,
-      MandatePhenomena.classifyEconomy(readout(heartbeat = Heartbeat.Arrhythmic(44.0, 0.45)))
+      MandatePhenomena.classifyEconomy(readout(rhythm = RhythmVerdict.Arrhythmic(44.0, 0.45)))
     )
     assertEquals(
       MandatePhenomena.EconomyStagnant,
-      MandatePhenomena.classifyEconomy(readout(heartbeat = Heartbeat.Slow(Double.NaN)))
+      MandatePhenomena.classifyEconomy(readout(rhythm = RhythmVerdict.Slow(Double.NaN)))
     )
     assertEquals(
       MandatePhenomena.EconomyStagnant,
@@ -163,19 +163,19 @@ class MandatePhenomenaSpec:
       "a below-knee cell stays stagnant regardless of the rhythm verdict"
     )
 
-  @Test def `heartbeat bodily strain: acute means Fast or Arrhythmic, never Slow`(): Unit =
-    val fast = readout(heartbeat = Heartbeat.Fast(20.0))
+  @Test def `rhythm bodily strain: acute means Fast or Arrhythmic, never Slow`(): Unit =
+    val fast = readout(rhythm = RhythmVerdict.Fast(20.0))
     assertTrue(MandatePhenomena.shouldApplyAcuteBodyStrain(fast))
     assertTrue(
-      MandatePhenomena.shouldApplyAcuteBodyStrain(readout(heartbeat = Heartbeat.Arrhythmic(44.0, 0.45)))
+      MandatePhenomena.shouldApplyAcuteBodyStrain(readout(rhythm = RhythmVerdict.Arrhythmic(44.0, 0.45)))
     )
     assertFalse(
-      MandatePhenomena.shouldApplyAcuteBodyStrain(readout(heartbeat = Heartbeat.Slow(Double.NaN))),
+      MandatePhenomena.shouldApplyAcuteBodyStrain(readout(rhythm = RhythmVerdict.Slow(Double.NaN))),
       "stagnation only presses the economy, never the body"
     )
     assertFalse(
       MandatePhenomena.shouldApplyAcuteBodyStrain(
-        readout(heartbeat = Heartbeat.Beating(40.0, 0.10, BeatSource.Paced))
+        readout(rhythm = RhythmVerdict.Beating(40.0, 0.10, RhythmSource.Paced))
       )
     )
 

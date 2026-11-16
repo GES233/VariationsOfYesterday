@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
-import moe.chestnut.awa.voy.inner.veins.HeartbeatParam
+import moe.chestnut.awa.voy.inner.veins.RhythmParam
 
 /** External configuration loading (`config/variations-of-yesterday.json`). */
 class VoyConfigSpec:
@@ -37,13 +37,13 @@ class VoyConfigSpec:
 
     assertEquals(0.025, cfg.tickDt, 1e-12)
     assertEquals(0.0007, cfg.stressParam.gamma, 1e-12, "the calibration knob")
-    assertEquals(9.6, cfg.heartbeatParam.overdriveGuard, 1e-12)
+    assertEquals(9.6, cfg.rhythmParam.overdriveGuard, 1e-12)
     assertEquals(0.01, cfg.calmingParam.dose, 1e-12)
     assertEquals(1800.0, cfg.calmingParam.tau, 1e-12)
     assertEquals(0.04, cfg.calmingParam.cap, 1e-12, "unspecified fields keep their defaults")
     assertEquals(0.01, VoyConfig().stressParam.gamma, 1e-12)
     assertEquals(1e-3, cfg.stressParam.sustenanceGrowth, 1e-12)
-    assertEquals(39.47, cfg.heartbeatParam.nominalPeriod, 1e-12)
+    assertEquals(39.47, cfg.rhythmParam.nominalPeriod, 1e-12)
     assertEquals(64, cfg.lattice.width)
     assertEquals(32, cfg.lattice.height)
     assertEquals(-16, cfg.lattice.originX)
@@ -57,7 +57,7 @@ class VoyConfigSpec:
       "a malformed file must never half-apply"
     )
 
-  @Test def `heartbeat parameters parse per field and keep derived relations`(): Unit =
+  @Test def `rhythm parameters parse per field and keep derived relations`(): Unit =
     Files.writeString(
       configPath,
       """{
@@ -65,10 +65,10 @@ class VoyConfigSpec:
         |}""".stripMargin
     )
     val cfg = VoyConfig.loadFrom(configPath)
-    assertEquals(42.0, cfg.heartbeatParam.nominalPeriod, 1e-12)
-    assertEquals(4, cfg.heartbeatParam.minCycles)
-    assertEquals(0.75 * 42.0, cfg.heartbeatParam.periodMin, 1e-12, "derived thresholds track")
-    assertEquals(HeartbeatParam().staleCycles, cfg.heartbeatParam.staleCycles, 0.0)
+    assertEquals(42.0, cfg.rhythmParam.nominalPeriod, 1e-12)
+    assertEquals(4, cfg.rhythmParam.minCycles)
+    assertEquals(0.75 * 42.0, cfg.rhythmParam.periodMin, 1e-12, "derived thresholds track")
+    assertEquals(RhythmParam().staleCycles, cfg.rhythmParam.staleCycles, 0.0)
 
   @Test def `derived lattice defaults are written out and reload identically`(): Unit =
     val cfg = VoyConfig.loadFrom(configPath)

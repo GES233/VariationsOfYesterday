@@ -31,10 +31,10 @@ object MandatePhenomena:
   def classifyEconomy(readout: CellReadout): EconomyProfile =
     if !readout.mycelium.isViable || readout.isSlowOffsetBelowKnee then EconomyStagnant
     else
-      readout.heartbeat match
-        case Heartbeat.Beating(_, _, _) | Heartbeat.Warming => EconomyMaintained
-        case Heartbeat.Fast(_) | Heartbeat.Arrhythmic(_, _) => EconomySpiking
-        case Heartbeat.Slow(_)                              => EconomyStagnant
+      readout.rhythm match
+        case RhythmVerdict.Beating(_, _, _) | RhythmVerdict.Warming => EconomyMaintained
+        case RhythmVerdict.Fast(_) | RhythmVerdict.Arrhythmic(_, _) => EconomySpiking
+        case RhythmVerdict.Slow(_)                              => EconomyStagnant
 
   /** 2. Player bodily exposure: only acute rhythm (`Fast`/`Arrhythmic`) or
     * saturated burnout on unsheltered ground affects the player's body.
@@ -43,7 +43,7 @@ object MandatePhenomena:
     */
   def shouldApplyAcuteBodyStrain(readout: CellReadout): Boolean =
     !readout.isSheltered &&
-      (readout.regime == Regime.Burnout || readout.heartbeat.isAcute)
+      (readout.regime == Regime.Burnout || readout.rhythm.isAcute)
 
   val ReInoculationSeed: Double = 0.05
   val RichReInoculationSeed: Double = 0.12
@@ -74,7 +74,7 @@ object MandatePhenomena:
       p: ReadoutParam = ReadoutParam()
   ): YellowSeepTier =
     val cur = readout.current
-    if Math.abs(cur.dissonance) >= p.spikeLevel then YellowSeepTier.Heavy
+    if Math.abs(cur.excitation) >= p.spikeLevel then YellowSeepTier.Heavy
     else if cur.activity >= 0.30 || cur.stress >= 0.75 then YellowSeepTier.Heavy
     else if cur.activity >= 0.10 || cur.stress >= p.strained then YellowSeepTier.Moderate
     else if cur.activity >= 0.02 || cur.stress >= 0.25 then YellowSeepTier.Light
@@ -94,16 +94,16 @@ object MandatePhenomena:
   ): PhenomenonProfile =
     val silentBlight = hasSilentBlight(readout)
     val seepTier = classifySeepTier(readout)
-    val c0Sheltered = readout.baselineCalming >= C0ShelterLevel
+    val hasCalmingStock = readout.baselineCalming >= C0ShelterLevel
     val mycelialGlow =
       !silentBlight &&
         isNight &&
         readout.regime == Regime.Calm &&
-        c0Sheltered &&
+        hasCalmingStock &&
         readout.mycelium.isIntact
     val precursorSpore =
       !silentBlight &&
-        c0Sheltered &&
+        hasCalmingStock &&
         (readout.regime == Regime.Strained || readout.regime == Regime.Oscillating)
     PhenomenonProfile(
       silentBlight = silentBlight,

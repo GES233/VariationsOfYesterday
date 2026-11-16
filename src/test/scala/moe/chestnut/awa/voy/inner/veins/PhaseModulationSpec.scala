@@ -21,8 +21,8 @@ class PhaseModulationSpec:
 
   private def freshState(): MandateState =
     MandateState(
-      state = MandateCurrent(dissonance = -1.2, entrench = -0.6),
-      param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+      state = MandateCurrent(excitation = -1.2, recovery = -0.6),
+      param = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
     )
 
   private val crossLevel = 1.2
@@ -45,7 +45,7 @@ class PhaseModulationSpec:
       st.disturbance = u
       st.step(dt)
       t += dt
-      val above = st.getState.dissonance > crossLevel
+      val above = st.getState.excitation > crossLevel
       if above && prevBelow && t - lastCross > refractory then
         crossings += t
         lastCross = t
@@ -84,7 +84,7 @@ class PhaseModulationSpec:
       else st.impulse = 0.0
       st.step(dt)
       t += dt
-      val v = st.getState.dissonance
+      val v = st.getState.excitation
       if !t1.isNaN && t2.isNaN then vMax = Math.max(vMax, v)
       val above = v > crossLevel
       if above && prevBelow && t - lastCross > refractory then
@@ -133,7 +133,7 @@ class PhaseModulationSpec:
       st.impulse = if t < 1.0 then 1.0 else 0.0
       st.step(dt)
       t += dt
-      val v = st.getState.dissonance
+      val v = st.getState.excitation
       maxV = Math.max(maxV, v)
       val above = v > crossLevel
       if above && prevBelow && t - lastCross > refractory then
@@ -143,8 +143,8 @@ class PhaseModulationSpec:
     assertEquals(1, crossings, "one kick must produce exactly one excursion")
     assertTrue(maxV > 1.5, "the excursion must be a full surge")
     assertTrue(
-      Math.abs(st.getState.dissonance - -1.185) < 0.2,
-      s"fast variable should settle back near rest, got ${st.getState.dissonance}"
+      Math.abs(st.getState.excitation - -1.185) < 0.2,
+      s"fast variable should settle back near rest, got ${st.getState.excitation}"
     )
     assertTrue(st.getState.stress < 0.05, "a single omen must not build up stress")
 
@@ -176,7 +176,7 @@ class PhaseModulationSpec:
         fired = true
       st.step(dt)
       t += dt
-      val v = st.getState.dissonance
+      val v = st.getState.excitation
       if !t1.isNaN && t2.isNaN then vMax = Math.max(vMax, v)
       val above = v > crossLevel
       if above && prevBelow && t - lastCross > refractory then

@@ -20,7 +20,7 @@ import moe.chestnut.awa.voy.inner.event.EventMsg
   */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PulseCouplingSpec:
-  private val fast = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+  private val fast = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
   private val dt = 0.02
 
   /** Saturation operating point of the slice (`a = -0.30`, `s = 1.0`). */
@@ -56,12 +56,12 @@ class PulseCouplingSpec:
     while t < warmup do
       st.step(step)
       t += step
-    var prev = st.getState.dissonance
+    var prev = st.getState.excitation
     var found = false
     while !found do
       st.step(step)
       t += step
-      val v = st.getState.dissonance
+      val v = st.getState.excitation
       if prev <= PhaseResponse.section && v > PhaseResponse.section then found = true
       prev = v
 
@@ -188,7 +188,7 @@ class PulseCouplingSpec:
 
   // ==== the detector discipline ==== //
 
-  /** Feed a hand-built dissonance trace to the detector; no ODE involved. */
+  /** Feed a hand-built excitation trace to the detector; no ODE involved. */
   private def feed(trace: Seq[Double], criterion: SpikeCriterion): Seq[(CellCoord, Double)] =
     val cell = MandateState(MandateCurrent(0.0, -0.6, 1.0, 0.0), fast, StressParam(gamma = 0.0))
     val runner = new PulseLinkRunner(

@@ -14,7 +14,7 @@ import moe.chestnut.awa.voy.VoyConfig
 import moe.chestnut.awa.voy.inner.veins.*
 import moe.chestnut.awa.voy.mandate.*
 
-/** Bell strike: the one ritual gesture that both *paces* the heartbeat and
+/** Bell strike: the one ritual gesture that both *paces* the rhythm and
   * *doses* the chunk's calming stock (design note 11 §1.5, ruling 11; note 12 §4,
   * ruling 16).
   *
@@ -41,7 +41,7 @@ object BellStrike:
   ): Option[ActionResult] =
     if state.isOf(Blocks.BELL) then
       val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-      val outcome = BellRitual.evaluateBellStrike(readout, VoyConfig.current.heartbeatParam)
+      val outcome = BellRitual.evaluateBellStrike(readout, VoyConfig.current.rhythmParam)
       if outcome.anchorsC0 then
         // The strike is a DOSE into the chunk's calming stock, and the
         // bell itself is registered as a source so its trickle starts
@@ -66,7 +66,7 @@ object BellStrike:
         player.addStatusEffect(
           new StatusEffectInstance(
             MandateEffects.PulseSaturationEntry,
-            VoyConfig.current.heartbeatParam.overloadPenaltyTicks,
+            VoyConfig.current.rhythmParam.overloadPenaltyTicks,
             0,
             false,
             true,

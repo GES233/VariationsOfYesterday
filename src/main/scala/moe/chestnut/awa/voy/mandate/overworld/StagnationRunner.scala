@@ -15,22 +15,22 @@ import net.minecraft.util.math.Box
 import moe.chestnut.awa.voy.mandate.{MandateCalming, MandateEffects, MandatePhenomena, MandateRuntime}
 
 /** Mandate -> Overworld, `沉滞` (Stagnation) channel (design draft §3.2;
-  * heartbeat-shelter model, design note 11).
+  * rhythm-shelter model, design note 11).
   *
-  * Chunks without a living heartbeat (`Slow` / `Fast` / `Arrhythmic`) are
+  * Chunks without a living rhythm (`Slow` / `Fast` / `Arrhythmic`) are
   * stagnated: the vanilla *economy* sags (trade prices, breeding, golem
   * summons, crop growth — see `MandateEconomy` and the mixins) and nearby
   * villagers visibly wear `voy:stagnation`. The baseline tier never touches
   * the player's body; while the rhythm runs acute or the ground sits in
   * saturated burnout the pressure turns bodily.
   *
-  * This module is also the 20-tick heartbeat of the world-side wiring: it
+  * This module is also the 20-tick rhythm of the world-side wiring: it
   * drives the per-player effect pass and owns the 60 s calming-stock
   * rebalance hook.
   */
 object StagnationRunner:
   /** Stagnation bookkeeping cadence and effect duration in server ticks
-    * (design draft §3.2: reapply outside heartbeat shelter, short enough that
+    * (design draft §3.2: reapply outside rhythm shelter, short enough that
     * a restored beat clears it immediately).
     */
   private val StagnationReapplyTicks = 20

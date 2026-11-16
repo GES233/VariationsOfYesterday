@@ -3,21 +3,21 @@ package moe.chestnut.awa.voy.inner.veins
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-/** Provenance relations of [[HeartbeatParam]] (2026-11-16 discipline: no
-  * unsourced literals in the heartbeat module). These asserts keep the
+/** Provenance relations of [[RhythmParam]] (2026-11-16 discipline: no
+  * unsourced literals in the rhythm module). These asserts keep the
   * thresholds tracking `nominalPeriod` and the shared readout sources, so a
   * future retune cannot silently desync them.
   */
-class HeartbeatParamSpec:
-  private val p = HeartbeatParam()
+class RhythmParamSpec:
+  private val p = RhythmParam()
 
   @Test def `thresholds are expressions of the nominal period`(): Unit =
     assertEquals(0.75 * p.nominalPeriod, p.periodMin, 1e-12)
     assertEquals(2.0 * p.nominalPeriod, p.periodMax, 1e-12)
 
   @Test def `the duty bound is half the measured saturated plateau fraction`(): Unit =
-    assertEquals(0.5 * HeartbeatParam.SaturationPlateauFraction, p.dutyMax, 1e-12)
-    assertEquals(0.606, HeartbeatParam.SaturationPlateauFraction, 1e-12, "measured, draft 01 §1.1")
+    assertEquals(0.5 * RhythmParam.SaturationPlateauFraction, p.dutyMax, 1e-12)
+    assertEquals(0.606, RhythmParam.SaturationPlateauFraction, 1e-12, "measured, draft 01 §1.1")
 
   @Test def `tolerances reuse the readout-layer sources`(): Unit =
     assertEquals(ReadoutParam().regularityTol, p.regularityTol, 0.0)
@@ -37,12 +37,12 @@ class HeartbeatParamSpec:
     assertEquals(39.47, p.nominalPeriod, 1e-12, "measured: mandate-slice-v1 settled_period")
 
   @Test def `relations track a retuned nominal period`(): Unit =
-    val retuned = HeartbeatParam(nominalPeriod = 50.0)
+    val retuned = RhythmParam(nominalPeriod = 50.0)
     assertEquals(37.5, retuned.periodMin, 1e-12)
     assertEquals(100.0, retuned.periodMax, 1e-12)
     assertEquals(p.dutyMax, retuned.dutyMax, 0.0, "dutyMax does not follow nominalPeriod")
 
-  @Test def `derived lattice defaults give an 8x8 remnant heartbeat zone`(): Unit =
+  @Test def `derived lattice defaults give an 8x8 remnant rhythm zone`(): Unit =
     // 2026-11-16 ruling 7: peak = s_onset + 0.25 × (s_acid − s_onset),
     // falloff = (peak − s_onset)/4 so the in-band radius is 4 cells.
     import moe.chestnut.awa.voy.LatticeConfig

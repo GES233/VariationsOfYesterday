@@ -34,7 +34,7 @@ class MandateAgentSpec:
   private def mkCell(disturbance: Double): MandateState =
     val cell = MandateState(
       MandateCurrent(0.0, 0.0, 0.0, 0.0),
-      MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+      FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
     )
     cell.disturbance = disturbance
     cell
@@ -71,7 +71,7 @@ class MandateAgentSpec:
     val expected = reference.getState
     val actual = published.get()(origin)
     assertEquals(expected.stress, actual.stress, 1e-12)
-    assertEquals(expected.dissonance, actual.dissonance, 1e-12)
+    assertEquals(expected.excitation, actual.excitation, 1e-12)
     assertTrue(actual.stress > 0.0, "disturbance should accumulate stress")
 
   @Test def noTickNoIntegration(): Unit =
@@ -261,8 +261,8 @@ class MandateAgentSpec:
       "re-registration resets the dynamics, and the guard stamp goes with it"
     )
     assertEquals(
-      Heartbeat.Warming,
-      readouts.get()(origin).heartbeat,
+      RhythmVerdict.Warming,
+      readouts.get()(origin).rhythm,
       "the rhythm memory is fresh again after re-registration"
     )
 
@@ -284,19 +284,19 @@ class MandateAgentSpec:
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(awaitPhase(latchRef))
     assertEquals(
-      Heartbeat.Warming,
-      readouts.get()(origin).heartbeat,
+      RhythmVerdict.Warming,
+      readouts.get()(origin).rhythm,
       "a freshly observed cell is in the Warming grace (design note 11)"
     )
     assertTrue(
       readouts.get()(origin).isSheltered,
-      "the Warming grace shelters under the heartbeat model"
+      "the Warming grace shelters under the rhythm model"
     )
 
   private def mkOscillatingCell(): MandateState =
     val cell = MandateState(
       MandateCurrent(-1.2, -0.6, 1.0, 0.0),
-      MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+      FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
     )
     cell.disturbance = 0.05
     cell
@@ -349,7 +349,7 @@ class MandateAgentSpec:
       linkEvents.foreach(agent ! _)
       for _ <- 1 to ticks do agent ! EventMsg.TickArrived(0.05, 20.0f)
       assertTrue(latch.await(5, TimeUnit.SECONDS))
-      published.get()(bystander).dissonance
+      published.get()(bystander).excitation
 
     val control = runBystander()
     val linked = runBystander(EventMsg.AddLink(link))
@@ -509,7 +509,7 @@ class MandateAgentSpec:
 
   @Test def registerCellUsesTheInjectedDefaultParameters(): Unit =
     val grid = singleCellGrid(mkCell(0.0))
-    val fast = MandateParam(alpha = 0.61, beta = 0.72, epsilon = 0.09)
+    val fast = FastParam(alpha = 0.61, beta = 0.72, epsilon = 0.09)
     val stress =
       StressParam(gamma = 7e-4, sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
     val added = CellCoord(1, 0)
@@ -521,7 +521,7 @@ class MandateAgentSpec:
 
   @Test def explicitRegisterCellParametersWinOverTheInjectedDefaults(): Unit =
     val grid = singleCellGrid(mkCell(0.0))
-    val explicit = MandateParam(alpha = 0.5, beta = 0.6, epsilon = 0.1)
+    val explicit = FastParam(alpha = 0.5, beta = 0.6, epsilon = 0.1)
     val added = CellCoord(2, 0)
 
     MandateAgent.applyEvent(

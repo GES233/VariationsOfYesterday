@@ -4,7 +4,7 @@
 >
 > 方程组结构、通道语义、格子场架构、加载不变性原则、相位调制与 α 突触脉冲结构保持稳定，实现期间只调参数。
 >
-> **2026-11-13 名实订正**：读数层（`MandateReadout`）已精简为三条正交轴——**动力学轴**（`Regime` + `PhaseReading`，无周期原因 `UndefinedReason` 回归纯动力学 `SlowOffsetBelowKnee` / `TransientNoCycle` / `NoCycleReference`）、**菌网健康轴**（`MycelialHealth ∈ {Intact, Damaged, Dead}`）与**庇护轴**（`isSheltered`；2026-11-16 起改由札记 11 的心跳节律驱动，`PulseStamp` 与 `PulseBookkeeping` 已删除）。本文正文已按此同步；方程结构、数值与设计意图未变。
+> **2026-11-13 名实订正**：读数层（`MandateReadout`）已精简为三条正交轴——**动力学轴**（`Regime` + `PhaseReading`，无周期原因 `UndefinedReason` 回归纯动力学 `SlowOffsetBelowKnee` / `TransientNoCycle` / `NoCycleReference`）、**菌网健康轴**（`SustenanceTier ∈ {Intact, Damaged, Dead}`）与**庇护轴**（`isSheltered`；2026-11-16 起改由札记 11 的心跳节律驱动，`PulseStamp` 与 `PulseBookkeeping` 已删除）。本文正文已按此同步；方程结构、数值与设计意图未变。
 >
 > **文档边界重划（2026-11-13；2026-11-16 外迁）**：Elixir 关系世界模型与五跳卷宗规范（原札记 02 / 05）已随独立工具链移出仓库，存档记录见 [docs/README](README.md)「已外迁」。模组运行时只运行连续动力学（§1–§3），不再由关系求解器锁死未来结局；§4 ARG-style 双模型主线与 §6 早期民俗参考书目保留为 0.1 冻结期历史记录。
 
@@ -20,7 +20,7 @@
 
 ### 1.1 模型结构：快变量 + 慢变量
 
-- **快子系统**：FitzHugh–Nagumo（FHN）可激发介质方程（状态 `dissonance` $v$ / `entrench` $w$，参数 `alpha` / `beta` / `epsilon`）。
+- **快子系统**：FitzHugh–Nagumo（FHN）可激发介质方程（状态 `excitation` $v$ / `recovery` $w$，参数 `alpha` / `beta` / `epsilon`）。
 - **慢子系统**：土地应力 `stress` $s \in [0, s_{\max}]$ 与灾变活动示踪量 `activity` $q$，通过参数耦合 $a(s, M)$ 驱动快系统跨越分岔点，同一状态向量内四维 RK4 同步积分；**维持度 `sustenance` $M$ 是第五慢变量**（菌网完整度，札记 06 §7.1），在每步 RK4 之后显式推进，不进 RK4 向量。
 
 ```
@@ -125,7 +125,7 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
 - **读数投影层（`MandateReadout`）**：呈现层不直接读取裸浮点数，统一通过 `ReadoutParam` 映射为三条正交轴：
   - **慢变量分级（`Regime`）**：`Calm` / `Strained` / `Oscillating` / `Burnout`；
   - **快变量相位读数（`PhaseReading`）**：周期轨道 `Cycle(label, fraction)`（四相标签 `Excitation` / `AbsoluteRefractory` / `RelativeRefractory` / `Resting` 及 20 格刻度 `dialTick`）、静息域 `Basin(Resting)`、无周期 `Undefined(reason)`，`reason ∈ {SlowOffsetBelowKnee, TransientNoCycle, NoCycleReference}`；
-  - **菌网健康与庇护**：`MycelialHealth ∈ {Intact, Damaged, Dead}` 与 `isSheltered`（心跳节律，札记 11 §1.3）。
+  - **菌网健康与庇护**：`SustenanceTier ∈ {Intact, Damaged, Dead}` 与 `isSheltered`（心跳节律，札记 11 §1.3）。
 - **Tick 事件驱动调度**：`END_SERVER_TICK` 投递固定步长 `TickArrived(dt = 0.05, tickRate)` 进入引擎单线程 actor（`inner/actor` 内核上的 `MandateAgent`），与通道/拓扑事件及持久化控制 `FlushNow` 同信箱全序处理（清单见 §1.3.2），仿真时间恒等于游戏时间。无玩家在线时不投递 tick。游戏线程只读 `@volatile` 快照（`MandateRuntime`）并在下一 tick 消费动作回包（`MandateOverworld`）。
 
 ## 2. 地势与谷地：因果的方向

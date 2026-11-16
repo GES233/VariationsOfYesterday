@@ -5,7 +5,7 @@ package moe.chestnut.awa.voy.inner.veins
   * Exposes three orthogonal dimensions without leaking internal parameter bags:
   *   1. **Dynamics**: `regime`, `phase`, `isSpiking`, `isSlowOffsetBelowKnee`
   *   2. **Mycelium**: `mycelium` (`Intact` / `Damaged` / `Dead`), `isToxicSoil`
-  *   3. **Shelter**: `isSheltered` — the heartbeat model (design note 11 §1.3):
+  *   3. **Shelter**: `isSheltered` — the rhythm model (design note 11 §1.3):
   *      a beating or warming rhythm on viable, non-collapsed ground
   */
 final case class CellReadout(
@@ -15,7 +15,7 @@ final case class CellReadout(
     sustenance: Double = 1.0,
     baselineCalming: Double = 0.0,
     pulseDrive: Double = 0.0,
-    heartbeat: Heartbeat = Heartbeat.Warming,
+    rhythm: RhythmVerdict = RhythmVerdict.Warming,
     /** simTime of the last bell strike on this cell; NaN = none. Drives the
       * bell's overdrive guard (design note 11 §1.5, `overdriveGuard`).
       */
@@ -25,10 +25,10 @@ final case class CellReadout(
     toxicityThreshold: Double = StressParam().sustenanceBurnThreshold
 ):
   /** Canonical 3-tier mycelial health of this cell. */
-  def mycelium: MycelialHealth = Readout.mycelialHealth(sustenance, sustenanceFloor)
+  def mycelium: SustenanceTier = Readout.sustenanceTier(sustenance, sustenanceFloor)
 
   /** Whether the cell is currently in a positive spike excursion (`v >= spikeLevel`). */
-  def isSpiking: Boolean = current.dissonance >= PhaseDetection.SpikeLevel
+  def isSpiking: Boolean = current.excitation >= PhaseDetection.SpikeLevel
 
   /** Whether the cell's slow recovery offset sits at or below the burnout knee. */
   def isSlowOffsetBelowKnee: Boolean =
@@ -45,7 +45,7 @@ final case class CellReadout(
     * part of it.
     */
   def isSheltered: Boolean =
-    (heartbeat.isBeating || heartbeat.isWarming) &&
+    (rhythm.isBeating || rhythm.isWarming) &&
       mycelium.isViable &&
       !isSlowOffsetBelowKnee
 

@@ -16,8 +16,8 @@ class MandateGridSpec:
       stressParam: StressParam = StressParam()
   ): MandateState =
     MandateState(
-      state = MandateCurrent(dissonance = -1.2, entrench = -0.6),
-      param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+      state = MandateCurrent(excitation = -1.2, recovery = -0.6),
+      param = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
       stressParam = stressParam
     )
 
@@ -98,7 +98,7 @@ class MandateGridSpec:
       grid.step(dt)
       t += dt
       for (coord, cell) <- cells do
-        val spiking = Math.abs(cell.getState.dissonance) > 1.9
+        val spiking = Math.abs(cell.getState.excitation) > 1.9
         if spiking && !wasSpiking(coord) then
           spikeCount(coord) += 1
           if !firstSpike.contains(coord) then firstSpike(coord) = t
@@ -129,7 +129,7 @@ class MandateGridSpec:
     while t < 6000.0 do
       grid.step(dt)
       t += dt
-      if Math.abs(cells(CellCoord(0, 0)).getState.dissonance) > 1.9 then
+      if Math.abs(cells(CellCoord(0, 0)).getState.excitation) > 1.9 then
         upstreamSpiked = true
 
     assertTrue(!upstreamSpiked, "upstream cell must stay calm")

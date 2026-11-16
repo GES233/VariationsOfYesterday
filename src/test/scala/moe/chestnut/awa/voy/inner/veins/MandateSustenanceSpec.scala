@@ -11,7 +11,7 @@ import moe.chestnut.awa.voy.inner.event.EventMsg
   * (1 unit = 1 second at the game tick).
   */
 class MandateSustenanceSpec:
-  private val fast = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+  private val fast = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
   private val dt = 0.05
 
   /** The tuned gameplay values (`MandateRuntime.buildGrid`); gamma frozen so

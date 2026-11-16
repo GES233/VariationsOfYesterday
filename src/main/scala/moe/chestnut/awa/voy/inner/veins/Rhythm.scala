@@ -2,13 +2,13 @@ package moe.chestnut.awa.voy.inner.veins
 
 /** Which rhythm keeps a cell beating (design note 11 §1.1).
   *
-  * Story-wise an intrinsic heartbeat (the cell sits inside its own
+  * Story-wise an intrinsic rhythm (the cell sits inside its own
   * oscillation band) and an externally paced one (a bell, a drive source or a
   * crystal link marching it along) are different things, so rewards and
   * wording can tell them apart; mechanically both shelter alike for now
   * (2026-11-16 ruling).
   */
-enum BeatSource:
+enum RhythmSource:
   case Intrinsic
   case Paced
 
@@ -16,7 +16,7 @@ enum BeatSource:
   * section-crossing statistics (design note 11 §1.1). Replaces the discrete
   * pulse-shelter window (`PulseStamp`) — the beat itself is the shelter.
   */
-enum Heartbeat:
+enum RhythmVerdict:
   /** Grace period before a verdict is possible (new / re-inoculated /
     * freshly loaded cell). Event-driven, no duration constant: it ends when
     * enough cycles are observed or when the cell provably has no beat.
@@ -26,7 +26,7 @@ enum Heartbeat:
   /** Healthy beat: period in band, stable over `minCycles` cycles, duty
     * within bounds.
     */
-  case Beating(period: Double, duty: Double, source: BeatSource)
+  case Beating(period: Double, duty: Double, source: RhythmSource)
 
   /** Tachycardia: period < periodMin (incl. the 8–30 s overdriven band). */
   case Fast(period: Double)
@@ -41,30 +41,30 @@ enum Heartbeat:
     */
   case Arrhythmic(lastPeriod: Double, duty: Double)
 
-  def isBeating: Boolean = this.isInstanceOf[Heartbeat.Beating]
-  def isWarming: Boolean = this == Heartbeat.Warming
+  def isBeating: Boolean = this.isInstanceOf[RhythmVerdict.Beating]
+  def isWarming: Boolean = this == RhythmVerdict.Warming
 
   /** Whether this verdict counts as acute overdrive (bodily strain / spiking
-    * economy tier under the heartbeat model).
+    * economy tier under the rhythm model).
     */
   def isAcute: Boolean = this match
-    case Heartbeat.Fast(_) | Heartbeat.Arrhythmic(_, _) => true
+    case RhythmVerdict.Fast(_) | RhythmVerdict.Arrhythmic(_, _) => true
     case _                                              => false
 
   /** Whether this verdict is arrhythmia: the only verdict a single cycle can
     * flip (one oversized duty cycle, or one outlier in the period window),
     * and therefore the only one the exit hysteresis guards.
     */
-  def isArrhythmic: Boolean = this.isInstanceOf[Heartbeat.Arrhythmic]
+  def isArrhythmic: Boolean = this.isInstanceOf[RhythmVerdict.Arrhythmic]
 
-object Heartbeat:
-  /** Stable wire ordinal for the heartbeat category (debug telemetry). */
-  def wireOrdinal(h: Heartbeat): Int = h match
-    case Heartbeat.Warming           => 0
-    case Heartbeat.Beating(_, _, _)  => 1
-    case Heartbeat.Fast(_)           => 2
-    case Heartbeat.Slow(_)           => 3
-    case Heartbeat.Arrhythmic(_, _)  => 4
+object RhythmVerdict:
+  /** Stable wire ordinal for the rhythm category (debug telemetry). */
+  def wireOrdinal(h: RhythmVerdict): Int = h match
+    case RhythmVerdict.Warming           => 0
+    case RhythmVerdict.Beating(_, _, _)  => 1
+    case RhythmVerdict.Fast(_)           => 2
+    case RhythmVerdict.Slow(_)           => 3
+    case RhythmVerdict.Arrhythmic(_, _)  => 4
 
   def wireName(ordinal: Int): String = ordinal match
     case 0 => "Warming"
@@ -75,17 +75,17 @@ object Heartbeat:
     case _ => "?"
 
   /** The period a verdict carries, when it carries one. */
-  def periodOf(h: Heartbeat): Option[Double] = h match
-    case Heartbeat.Beating(p, _, _)   => Some(p)
-    case Heartbeat.Fast(p)            => Some(p)
-    case Heartbeat.Slow(p)            => if p.isNaN then None else Some(p)
-    case Heartbeat.Arrhythmic(p, _)   => Some(p)
-    case Heartbeat.Warming            => None
+  def periodOf(h: RhythmVerdict): Option[Double] = h match
+    case RhythmVerdict.Beating(p, _, _)   => Some(p)
+    case RhythmVerdict.Fast(p)            => Some(p)
+    case RhythmVerdict.Slow(p)            => if p.isNaN then None else Some(p)
+    case RhythmVerdict.Arrhythmic(p, _)   => Some(p)
+    case RhythmVerdict.Warming            => None
 
   /** The duty a verdict carries, when it carries one. */
-  def dutyOf(h: Heartbeat): Option[Double] = h match
-    case Heartbeat.Beating(_, d, _)  => if d.isNaN then None else Some(d)
-    case Heartbeat.Arrhythmic(_, d)  => if d.isNaN then None else Some(d)
+  def dutyOf(h: RhythmVerdict): Option[Double] = h match
+    case RhythmVerdict.Beating(_, d, _)  => if d.isNaN then None else Some(d)
+    case RhythmVerdict.Arrhythmic(_, d)  => if d.isNaN then None else Some(d)
     case _                           => None
 
   /** Pure rhythm classifier over exported beat statistics (judgment table,
@@ -93,36 +93,36 @@ object Heartbeat:
     *
     * @param selfSustained whether the cell's recovery offset sits inside its
     *   own oscillation band (intrinsic beat) versus being marched by an
-    *   external drive (paced); records `BeatSource`, never gates the verdict
+    *   external drive (paced); records `RhythmSource`, never gates the verdict
     */
   def classify(
-      stats: BeatStats,
+      stats: RhythmEvidence,
       simTime: Double,
       selfSustained: Boolean,
-      p: HeartbeatParam = HeartbeatParam()
-  ): Heartbeat =
+      p: RhythmParam = RhythmParam()
+  ): RhythmVerdict =
     // v2 anchor: the last crossing when present, else the birth time — a
     // fresh healthy cell stays Warming until `minCycles` intervals are
     // observed, even past `staleCycles × nominalPeriod` since birth.
     val anchor = if stats.lastCross.isNaN then stats.bornAt else stats.lastCross
     val alive = !anchor.isNaN && simTime - anchor <= p.staleCycles * p.nominalPeriod
     if stats.periods.size < p.minCycles then
-      if alive then Heartbeat.Warming
-      else Heartbeat.Slow(stats.periods.headOption.getOrElse(Double.NaN))
+      if alive then RhythmVerdict.Warming
+      else RhythmVerdict.Slow(stats.periods.headOption.getOrElse(Double.NaN))
     else
       val recent = stats.periods.take(p.minCycles)
       val period = recent.sum / recent.size
-      if !alive then Heartbeat.Slow(period)
-      else if period < p.periodMin then Heartbeat.Fast(period)
-      else if period > p.periodMax then Heartbeat.Slow(period)
-      else if cv(recent) > p.regularityTol then Heartbeat.Arrhythmic(period, stats.lastDuty)
+      if !alive then RhythmVerdict.Slow(period)
+      else if period < p.periodMin then RhythmVerdict.Fast(period)
+      else if period > p.periodMax then RhythmVerdict.Slow(period)
+      else if cv(recent) > p.regularityTol then RhythmVerdict.Arrhythmic(period, stats.lastDuty)
       else if !stats.lastDuty.isNaN && stats.lastDuty > p.dutyMax then
-        Heartbeat.Arrhythmic(period, stats.lastDuty)
+        RhythmVerdict.Arrhythmic(period, stats.lastDuty)
       else
-        Heartbeat.Beating(
+        RhythmVerdict.Beating(
           period,
           stats.lastDuty,
-          if selfSustained then BeatSource.Intrinsic else BeatSource.Paced
+          if selfSustained then RhythmSource.Intrinsic else RhythmSource.Paced
         )
 
   /** Coefficient of variation (population std / mean) of recent periods. */
@@ -159,12 +159,12 @@ object Heartbeat:
     * @return the verdict to publish and the new `badSince`
     */
   def smooth(
-      raw: Heartbeat,
-      published: Heartbeat,
+      raw: RhythmVerdict,
+      published: RhythmVerdict,
       badSince: Double,
       simTime: Double,
-      p: HeartbeatParam = HeartbeatParam()
-  ): (Heartbeat, Double) =
+      p: RhythmParam = RhythmParam()
+  ): (RhythmVerdict, Double) =
     if raw.isBeating then (raw, Double.NaN)
     else if !published.isBeating then (raw, Double.NaN)
     else if !raw.isArrhythmic then (raw, Double.NaN)
@@ -175,7 +175,7 @@ object Heartbeat:
       else (raw, Double.NaN)
 
 /** Immutable per-cell rhythm statistics exported by `PhaseTracker` once per
-  * tick and handed to the pure classifier ([[Heartbeat.classify]]), keeping
+  * tick and handed to the pure classifier ([[RhythmVerdict.classify]]), keeping
   * the classifier free of tracker state.
   *
   * @param periods recent inter-upcrossing intervals, newest first
@@ -184,7 +184,7 @@ object Heartbeat:
   * @param lastCross time of the most recent section upcrossing; NaN if none
   * @param bornAt time of the tracker's first observation; NaN if never
   */
-final case class BeatStats(
+final case class RhythmEvidence(
     periods: Vector[Double],
     lastDuty: Double,
     lastCross: Double,
@@ -195,7 +195,7 @@ final case class BeatStats(
   // (boxed semantics) treats NaN == NaN; Vector elements are boxed, so
   // period equality is already NaN-safe.
   override def equals(other: Any): Boolean = other match
-    case o: BeatStats =>
+    case o: RhythmEvidence =>
       periods == o.periods &&
         java.lang.Double.compare(lastDuty, o.lastDuty) == 0 &&
         java.lang.Double.compare(lastCross, o.lastCross) == 0 &&
@@ -210,14 +210,14 @@ final case class BeatStats(
       Double.box(bornAt)
     )
 
-object BeatStats:
-  val zero: BeatStats = BeatStats(Vector.empty, Double.NaN, Double.NaN, Double.NaN)
+object RhythmEvidence:
+  val zero: RhythmEvidence = RhythmEvidence(Vector.empty, Double.NaN, Double.NaN, Double.NaN)
 
-/** Tuning for the heartbeat axis. Every literal carries its provenance
-  * (2026-11-16 discipline); `HeartbeatParamSpec` pins the relations so the
+/** Tuning for the rhythm axis. Every literal carries its provenance
+  * (2026-11-16 discipline); `RhythmParamSpec` pins the relations so the
   * thresholds track `nominalPeriod`.
   */
-final case class HeartbeatParam(
+final case class RhythmParam(
     /** measured: contract `mandate-slice-v1.json` `settled_period` at the
       * s = 1.0 saturated work point; consistent with the geometric mean of
       * the natural band ends (43.7 / 36.4 ≈ 39.9).
@@ -257,8 +257,8 @@ final case class HeartbeatParam(
   /** derived: half the saturated plateau fraction (measured: 0.606, draft 01
     * §1.1); healthy beats measure 6%–13% duty.
     */
-  val dutyMax: Double = 0.5 * HeartbeatParam.SaturationPlateauFraction
+  val dutyMax: Double = 0.5 * RhythmParam.SaturationPlateauFraction
 
-object HeartbeatParam:
+object RhythmParam:
   /** measured: high-plateau fraction of the saturated work point (draft 01 §1.1). */
   val SaturationPlateauFraction: Double = 0.606

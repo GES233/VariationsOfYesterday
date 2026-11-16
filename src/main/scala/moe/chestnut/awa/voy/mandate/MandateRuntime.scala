@@ -136,16 +136,16 @@ object MandateRuntime:
               s"simTime = ${snap.simTime})."
           )
           val grid = MandateSnapshot.restoreGrid(snap)
-          val beatStats = MandateSnapshot.restoreBeatStats(snap)
+          val rhythmEvidence = MandateSnapshot.restoreBeatStats(snap)
           logSavedParameters(snap)
-          (grid, snap.links, snap.simTime, beatStats)
+          (grid, snap.links, snap.simTime, rhythmEvidence)
         case None =>
           logger.info(
             s"Starting fresh mandate lattice (${width}x$height cells); " +
               s"parameters from config `${VoyConfig.FileName}` " +
               "(core defaults if absent)."
           )
-          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, BeatStats])
+          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, RhythmEvidence])
 
       persistence.geometry = expectedGeometry
       persistence.snapshot = Some(
@@ -172,7 +172,7 @@ object MandateRuntime:
             val pending = flushLatch.getAndSet(null)
             if pending != null then pending.countDown()
           },
-          heartbeatParam = VoyConfig.current.heartbeatParam,
+          rhythmParam = VoyConfig.current.rhythmParam,
           initialBeatStats = initialBeatStats
         )
       )

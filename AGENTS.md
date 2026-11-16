@@ -79,7 +79,7 @@ Minecraft 世界                         引擎（单线程 actor）            
 - `src/client/scala/.../` — 客户端入口、`mandate/ClientMandateCache` 与开发 HUD（`hud/`，`/voy hud [on|off]`）。
 - `src/main/java/.../mixin/` — `VillagerEntityMixin` / `CropBlockMixin`，均委托 `MandateEconomy`；Java 与 Scala 联合编译（见 `build.gradle` 的 sourceSets）。
 - `src/test/scala/.../` — 上述 spec 与契约 oracle。
-- `tools/lab/` — FHN 数值探针（纯 Python，`Heartbeat` 阈值与余脉弧的实测出处）。
+- `tools/lab/` — FHN 数值探针（纯 Python，`RhythmVerdict` 阈值与余脉弧的实测出处）。
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的**内部数值快照**（跨栈角色已退役），勿手改；须重生成时走 `build.gradle` 的 `voy.contract.write` 流程并评审 diff。
 - `docs/` — 中文设计文档与参考稿，索引见 `docs/README.md`；现行庇护语义看札记 11，**现行命名与边界语义看札记 12**（札记 08 仅供历史参考），其来源工作稿在 `docs/reference/`。
 

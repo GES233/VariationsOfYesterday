@@ -7,7 +7,7 @@ import moe.chestnut.awa.voy.mandate.SyncedCellEntry
 
 /** Client-side tracker that turns the 1 Hz sync stream of the player-centred
   * cell into a short human-readable change history ("近期变化") for the dev
-  * HUD: category transitions of heartbeat / regime / mycelium / shelter, plus
+  * HUD: category transitions of rhythm / regime / mycelium / shelter, plus
   * spike rising edges (the beat made visible). Purely observational; nothing
   * here feeds back into gameplay.
   */
@@ -18,7 +18,7 @@ object CellChangeTracker:
       regime: Regime,
       myceliumWord: String,
       sheltered: Boolean,
-      heartbeat: Int
+      rhythm: Int
   )
 
   private var lastChunk: Option[(Int, Int)] = None
@@ -48,13 +48,13 @@ object CellChangeTracker:
           wasSpiking = e.view.isSpiking
           push(s"§8— 移至 [$x, $z] —")
         val v = e.view
-        // Heartbeat category rides on the view's flags byte — available to
+        // RhythmVerdict category rides on the view's flags byte — available to
         // every player, no debug privilege needed (design note 11, Step 2).
-        val hbOrd = v.heartbeatOrdinal
+        val hbOrd = v.rhythmOrdinal
         val sig = Sig(v.regime, v.mycelium.word, v.isSheltered, hbOrd)
         lastSig.foreach { prev =>
-          if prev.heartbeat != sig.heartbeat then
-            push(s"心跳: ${hbWord(prev.heartbeat)} §7→§r ${hbWord(sig.heartbeat)}${beatNote(e)}")
+          if prev.rhythm != sig.rhythm then
+            push(s"心跳: ${hbWord(prev.rhythm)} §7→§r ${hbWord(sig.rhythm)}${beatNote(e)}")
           if prev.regime != sig.regime then
             push(s"地脉: ${regimeWord(prev.regime)} §7→§r ${regimeWord(sig.regime)}")
           if prev.myceliumWord != sig.myceliumWord then
@@ -76,7 +76,7 @@ object CellChangeTracker:
     while entries.size > Cap do entries.removeHead()
 
   private def beatNote(e: SyncedCellEntry): String =
-    e.debug.flatMap(_.beatPeriod).map(per => f" §8(周期 $per%.1f s)").getOrElse("")
+    e.debug.flatMap(_.rhythmPeriod).map(per => f" §8(周期 $per%.1f s)").getOrElse("")
 
   private def hbWord(ordinal: Int): String = ordinal match
     case 0 => "预热"

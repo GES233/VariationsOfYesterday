@@ -99,18 +99,18 @@ object MandateWording:
       val fracText = r.phase match
         case PhaseReading.Cycle(_, frac) => f" frac=$frac%.3f"
         case _ => ""
-      // Heartbeat axis observability (design note 11).
-      val hbText = r.heartbeat match
-        case Heartbeat.Beating(per, duty, src) =>
+      // RhythmVerdict axis observability (design note 11).
+      val hbText = r.rhythm match
+        case RhythmVerdict.Beating(per, duty, src) =>
           f" hb=Beating($src) per=$per%.1f duty=$duty%.3f"
-        case Heartbeat.Fast(per) => f" hb=Fast per=$per%.1f"
-        case Heartbeat.Slow(per) =>
+        case RhythmVerdict.Fast(per) => f" hb=Fast per=$per%.1f"
+        case RhythmVerdict.Slow(per) =>
           if per.isNaN then " hb=Slow(--)" else f" hb=Slow per=$per%.1f"
-        case Heartbeat.Arrhythmic(per, duty) =>
+        case RhythmVerdict.Arrhythmic(per, duty) =>
           f" hb=Arrhythmic per=$per%.1f duty=$duty%.3f"
-        case Heartbeat.Warming => " hb=Warming"
+        case RhythmVerdict.Warming => " hb=Warming"
       base +
-        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.dissonance}%.2f p=${r.pulseDrive}%.2f$fracText$hbText]"
+        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.excitation}%.2f p=${r.pulseDrive}%.2f$fracText$hbText]"
     else base
 
   def regimeWord(regime: Regime): String = regime match

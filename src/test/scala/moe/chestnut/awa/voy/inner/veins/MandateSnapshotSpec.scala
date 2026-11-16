@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test
   * in (orphan edges dropped, dead land stays dead).
   */
 class MandateSnapshotSpec:
-  private val fast = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+  private val fast = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
   private val mycelial =
     StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
 
@@ -115,13 +115,13 @@ class MandateSnapshotSpec:
   @Test def `beat statistics ride the snapshot round trip (note 11 risk 2)`(): Unit =
     val grid = mkGrid()
     val coord = CellCoord(1, 1)
-    val stats = BeatStats(Vector(40.1, 39.8), lastDuty = 0.05, lastCross = 120.0, bornAt = 0.0)
+    val stats = RhythmEvidence(Vector(40.1, 39.8), lastDuty = 0.05, lastCross = 120.0, bornAt = 0.0)
     val snap = MandateSnapshot.capture(grid, Nil, simTime = 130.0, Map(coord -> stats))
-    assertEquals(stats, snap.cells.find(_.coord == coord).get.beatStats)
+    assertEquals(stats, snap.cells.find(_.coord == coord).get.rhythmEvidence)
     val restored = MandateSnapshot.restoreBeatStats(snap)
     assertEquals(stats, restored(coord))
     assertEquals(
-      BeatStats.zero,
+      RhythmEvidence.zero,
       restored(CellCoord(0, 0)),
       "cells without rhythm history restore as fresh (NaN-safe equality)"
     )
@@ -135,7 +135,7 @@ class MandateSnapshotSpec:
     )
 
     val odd = snap.cells.head.copy(
-      fastParam = MandateParam(alpha = 0.65, beta = 0.75, epsilon = 0.1)
+      fastParam = FastParam(alpha = 0.65, beta = 0.75, epsilon = 0.1)
     )
     val mixed = snap.copy(cells = snap.cells.updated(0, odd))
     val sets = MandateSnapshot.parameterSets(mixed)

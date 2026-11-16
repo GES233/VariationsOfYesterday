@@ -14,7 +14,7 @@ class MandateNetworkingSpec:
   private val Overworld = Identifier.of("minecraft", "overworld")
 
   private def sampleReadout(
-      dissonance: Double = 0.4,
+      excitation: Double = 0.4,
       stress: Double = 0.50,
       activity: Double = 0.15,
       sustenance: Double = 0.72,
@@ -23,15 +23,15 @@ class MandateNetworkingSpec:
       sheltered: Boolean = true
   ): CellReadout =
     CellReadout(
-      current = MandateCurrent(dissonance, 0.1, stress, activity),
+      current = MandateCurrent(excitation, 0.1, stress, activity),
       regime = if stress >= 0.95 then Regime.Burnout else if stress >= 0.45 then Regime.Strained else Regime.Calm,
       phase = phase,
       sustenance = sustenance,
       baselineCalming = baselineCalming,
       pulseDrive = 0.1,
-      heartbeat =
-        if sheltered then Heartbeat.Beating(40.0, 0.08, BeatSource.Intrinsic)
-        else Heartbeat.Slow(Double.NaN),
+      rhythm =
+        if sheltered then RhythmVerdict.Beating(40.0, 0.08, RhythmSource.Intrinsic)
+        else RhythmVerdict.Slow(Double.NaN),
       lastBellStrikeAt = 4.0,
       simTime = 12.0
     )
@@ -39,13 +39,13 @@ class MandateNetworkingSpec:
   @Test
   def payloadCodecRoundTripsPublicAndDebugEntries(): Unit =
     val r1 = sampleReadout(
-      dissonance = 2.0,
+      excitation = 2.0,
       stress = 0.52,
       phase = PhaseReading.Cycle(PhaseLabel.Excitation, 0.25),
       sheltered = true
     )
     val r2 = sampleReadout(
-      dissonance = 0.1,
+      excitation = 0.1,
       stress = 0.10,
       sustenance = 0.0,
       baselineCalming = 0.0,

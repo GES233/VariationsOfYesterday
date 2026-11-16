@@ -4,7 +4,7 @@ import moe.chestnut.awa.voy.inner.veins.{
   CellCoord,
   LatticeEdge,
   MandateCurrent,
-  MandateParam,
+  FastParam,
   PulseLink,
   PulseTransmitter
 }
@@ -31,9 +31,9 @@ import moe.chestnut.awa.voy.inner.veins.{
   */
 sealed trait EventDTO
 
-/** Design note 11 (heartbeat-as-shelter): the discrete pulse ledger
+/** Design note 11 (rhythm-as-shelter): the discrete pulse ledger
   * (`PulseBookkeeping`, `PulseStamp`) is gone. A pulse is only physics now;
-  * shelter comes from the heartbeat rhythm axis, and the bell's overdrive
+  * shelter comes from the rhythm rhythm axis, and the bell's overdrive
   * guard is tracked per cell from `FirePulse.transmitter == Bell`.
   */
 object EventMsg:
@@ -124,7 +124,7 @@ object EventMsg:
   final case class RegisterCell(
       cell: CellCoord,
       initial: Option[MandateCurrent] = None,
-      fastParam: Option[MandateParam] = None
+      fastParam: Option[FastParam] = None
   ) extends EventDTO
 
   /** Remove one cell together with every transport edge that touches it.

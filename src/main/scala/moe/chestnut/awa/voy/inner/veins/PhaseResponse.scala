@@ -109,7 +109,7 @@ final case class DutyCycle(
   */
 final case class Oscillator(
     a: Double,
-    fast: MandateParam = MandateAgent.DefaultFastParam,
+    fast: FastParam = MandateAgent.DefaultFastParam,
     coupling: Double = 1.0,
     readout: ReadoutParam = ReadoutParam()
 ):
@@ -117,7 +117,7 @@ final case class Oscillator(
 
   def fresh(): MandateState =
     MandateState(
-      state = MandateCurrent(dissonance = -1.2, entrench = -0.6, stress = stress),
+      state = MandateCurrent(excitation = -1.2, recovery = -0.6, stress = stress),
       param = fast,
       stressParam = StressParam(gamma = 0.0, coupling = coupling)
     )
@@ -150,12 +150,12 @@ object PhaseResponse:
       st.step(dt)
       t += dt
     // Advance to the next upcrossing: that is phase 0.
-    var prev = st.getState.dissonance
+    var prev = st.getState.excitation
     var found = false
     while !found && t < tLimit do
       st.step(dt)
       t += dt
-      val v = st.getState.dissonance
+      val v = st.getState.excitation
       if prev <= section && v > section then found = true
       prev = v
     val snapshot = st.getState
@@ -200,7 +200,7 @@ object PhaseResponse:
       confirm = SpikeConfirm.AtZeroCrossing,
       interpolateCrossing = false
     )
-    detector.observe(0.0, st.getState.dissonance)
+    detector.observe(0.0, st.getState.excitation)
     var taps = 0
     var vMin = Double.MaxValue
     while t < tWindow do
@@ -212,7 +212,7 @@ object PhaseResponse:
         case _ => ()
       st.step(dt)
       t += dt
-      val v = st.getState.dissonance
+      val v = st.getState.excitation
       vMin = Math.min(vMin, v)
       detector.observe(t, v).foreach(s => out += Spike(s.at, s.peak))
     out.toSeq
@@ -283,7 +283,7 @@ object PhaseResponse:
         taps += 1
       st.step(dt)
       t += dt
-      vMin = Math.min(vMin, st.getState.dissonance)
+      vMin = Math.min(vMin, st.getState.excitation)
     vMin
 
   /** The unpulsed reference spike, measured once per sweep. */
@@ -307,14 +307,14 @@ object PhaseResponse:
     val st = osc.fresh()
     st.state = snapshot
     var t = 0.0
-    var prevV = st.getState.dissonance
+    var prevV = st.getState.excitation
     var repolarisedAt = Double.NaN
     var vMid = Double.NaN
     val midT = 0.50 * period
     while t <= period + dt do
       st.step(dt)
       t += dt
-      val v = st.getState.dissonance
+      val v = st.getState.excitation
       if repolarisedAt.isNaN && prevV >= 0.0 && v < 0.0 then
         val frac = if v == prevV then 0.0 else (0.0 - prevV) / (v - prevV)
         repolarisedAt = (t - dt) + frac * dt
@@ -385,7 +385,7 @@ object PhaseResponse:
       st.state = snapshot
       st.synapseTau = tau
       var t = 0.0
-      var prev = st.getState.dissonance
+      var prev = st.getState.excitation
       var candidate = Double.NaN
       var peak = Double.MinValue
       var fired = false
@@ -396,7 +396,7 @@ object PhaseResponse:
           taps = 1
         st.step(dt)
         t += dt
-        val v = st.getState.dissonance
+        val v = st.getState.excitation
         if prev <= section && v > section then
           candidate = t
           peak = v
@@ -428,7 +428,7 @@ object PhaseResponse:
     * pre-correction value): that number follows from `v_c ~ -1`, which drops
     * the `eps*beta` term. The corrected draft value is 0.4350.
     */
-  def hopfPoint(fast: MandateParam): (Double, Double) =
+  def hopfPoint(fast: FastParam): (Double, Double) =
     val vc = -Math.sqrt(1.0 - fast.epsilon * fast.beta)
     val ac = fast.beta * (vc - Math.pow(vc, 3) / 3.0) - vc
     (vc, ac)
@@ -463,7 +463,7 @@ object PhaseResponse:
     * verification of the measured period. The contract records both and the
     * gap between them.
     */
-  def relaxationPeriod(a: Double, fast: MandateParam, steps: Int = 4000): Double =
+  def relaxationPeriod(a: Double, fast: FastParam, steps: Int = 4000): Double =
     val knee = 2.0 / 3.0
     val h = 2.0 * knee / steps
     def integrand(w: Double): Double =

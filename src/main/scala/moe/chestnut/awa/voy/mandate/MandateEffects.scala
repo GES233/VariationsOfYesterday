@@ -18,7 +18,7 @@ import net.minecraft.util.Identifier
   * Arrhythmic or the ground sits in saturated burnout (×0.09 break speed,
   * plus vanilla `SLOWNESS` as a secondary cue), and `PulseSaturation` as the
   * immediate recoil for over-rapid bell striking (overdrive guard, note 11
-  * §1.5). Colours follow the heartbeat palette shared with the HUD and chat.
+  * §1.5). Colours follow the rhythm palette shared with the HUD and chat.
   *
   * Why these are *our* effects instead of vanilla `MINING_FATIGUE`: a vanilla
   * effect carries a vanilla name, icon and tooltip, so the pressure reads as
@@ -41,12 +41,12 @@ object MandateEffects:
   val StagnationSpikeId: Identifier = Identifier.of(Namespace, "stagnation_spike")
   val PulseSaturationId: Identifier = Identifier.of(Namespace, "pulse_saturation")
 
-  /** 沉滞: marker tier — this ground has no living heartbeat; the economy
+  /** 沉滞: marker tier — this ground has no living rhythm; the economy
     * sags, the player's hands are spared.
     */
   val Stagnation: StatusEffect = register(
     StagnationId,
-    new StagnationEffect(StagnationId, 0x526275, None) // heartbeat palette: Slow / stagnant blue-grey
+    new StagnationEffect(StagnationId, 0x526275, None) // rhythm palette: Slow / stagnant blue-grey
   )
 
   /** 沉滞·尖峰: what the same ground does to the body while it is spiking

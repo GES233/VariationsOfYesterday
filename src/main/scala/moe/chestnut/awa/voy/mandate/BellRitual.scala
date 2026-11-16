@@ -49,7 +49,7 @@ object BellRitual:
   /** Pure rule for evaluating a bell / resonance strike on a cell. */
   def evaluateBellStrike(
       readout: CellReadout,
-      p: HeartbeatParam = HeartbeatParam()
+      p: RhythmParam = RhythmParam()
   ): BellOutcome =
     if isEcologicallyDead(readout) then BellOutcome.NoAnswer
     else if inOverdriveGuard(readout, p) then BellOutcome.Overdriven
@@ -66,6 +66,6 @@ object BellRitual:
   private def isEcologicallyDead(readout: CellReadout): Boolean =
     readout.mycelium.isDead || readout.isSlowOffsetBelowKnee
 
-  private def inOverdriveGuard(readout: CellReadout, p: HeartbeatParam): Boolean =
+  private def inOverdriveGuard(readout: CellReadout, p: RhythmParam): Boolean =
     !readout.lastBellStrikeAt.isNaN &&
       readout.simTime - readout.lastBellStrikeAt < p.overdriveGuard

@@ -15,8 +15,8 @@ class MandateStateSpec:
 
   private def freshState(): MandateState =
     MandateState(
-      state = MandateCurrent(dissonance = -1.2, entrench = -0.6),
-      param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+      state = MandateCurrent(excitation = -1.2, recovery = -0.6),
+      param = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
     )
 
   private class Recorder:
@@ -26,7 +26,7 @@ class MandateStateSpec:
 
     def observe(t: Double, s: MandateState): Unit =
       maxStress = Math.max(maxStress, s.getState.stress)
-      val spiking = Math.abs(s.getState.dissonance) > 1.9
+      val spiking = Math.abs(s.getState.excitation) > 1.9
       if spiking && !wasSpiking then spikeTimes += t
       wasSpiking = spiking
 
@@ -103,13 +103,13 @@ class MandateStateSpec:
 
   @Test def `sub-threshold kick rings down without spiking`(): Unit =
     val state = freshState()
-    state.state = state.state.copy(dissonance = state.getState.dissonance + 0.3)
+    state.state = state.state.copy(excitation = state.getState.excitation + 0.3)
     val rec = run(state, tEnd = 200.0, _ => (0.0, 0.0))
 
     assertEquals(0, rec.spikeTimes.size, "a gentle kick must not trigger an excursion")
     assertTrue(
-      Math.abs(state.getState.dissonance - -1.185) < 0.2,
-      s"fast variable should settle back near rest, got ${state.getState.dissonance}"
+      Math.abs(state.getState.excitation - -1.185) < 0.2,
+      s"fast variable should settle back near rest, got ${state.getState.excitation}"
     )
 
   /** The indirect physical path a pulse can take to the mycelial network:
@@ -123,8 +123,8 @@ class MandateStateSpec:
     val gameStress = StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
     def make(): MandateState =
       val st = MandateState(
-        state = MandateCurrent(dissonance = -1.2, entrench = -0.6, stress = 0.2),
-        param = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+        state = MandateCurrent(excitation = -1.2, recovery = -0.6, stress = 0.2),
+        param = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
         stressParam = gameStress
       )
       st.disturbance = 0.0

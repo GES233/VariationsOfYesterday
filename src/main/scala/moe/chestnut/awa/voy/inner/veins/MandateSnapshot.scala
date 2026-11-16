@@ -13,12 +13,12 @@ final case class CellSnapshot(
     calming: Double,
     baselineCalming: Double,
     impulse: Double,
-    fastParam: MandateParam,
+    fastParam: FastParam,
     stressParam: StressParam,
     /** Rhythm memory (design note 11 risk 2): persisted so a reload resumes
-      * the cell's heartbeat verdict instead of restarting the Warming grace.
+      * the cell's rhythm verdict instead of restarting the Warming grace.
       */
-    beatStats: BeatStats = BeatStats.zero
+    rhythmEvidence: RhythmEvidence = RhythmEvidence.zero
 )
 
 /** The full snapshot: cells, edges, links, and the integration clock. */
@@ -35,7 +35,7 @@ object MandateSnapshot:
       grid: MandateGrid,
       links: Seq[PulseLink],
       simTime: Double,
-      beatStats: Map[CellCoord, BeatStats] = Map.empty
+      rhythmEvidence: Map[CellCoord, RhythmEvidence] = Map.empty
   ): MandateSnapshot =
     val cells = grid.cells.iterator.map { case (coord, state) =>
       CellSnapshot(
@@ -48,19 +48,19 @@ object MandateSnapshot:
         state.impulse,
         state.getParam,
         state.stressParam,
-        beatStats.getOrElse(coord, BeatStats.zero)
+        rhythmEvidence.getOrElse(coord, RhythmEvidence.zero)
       )
     }.toSeq.sortBy(c => (c.coord.x, c.coord.z))
     MandateSnapshot(simTime, cells, grid.edges, links)
 
   /** Extract the per-cell beat statistics from a captured snapshot.
-    * (No `== BeatStats.zero` filter: NaN fields make case-class equality
+    * (No `== RhythmEvidence.zero` filter: NaN fields make case-class equality
     * useless here, so empty stats are simply restored as fresh.)
     */
   def restoreBeatStats(
       snapshot: MandateSnapshot
-  ): Map[CellCoord, BeatStats] =
-    snapshot.cells.iterator.map(cs => cs.coord -> cs.beatStats).toMap
+  ): Map[CellCoord, RhythmEvidence] =
+    snapshot.cells.iterator.map(cs => cs.coord -> cs.rhythmEvidence).toMap
 
   /** Rebuild a lattice from a snapshot. Edges whose endpoints are not
     * both present are dropped.
@@ -85,7 +85,7 @@ object MandateSnapshot:
     */
   def parameterSets(
       snapshot: MandateSnapshot
-  ): Seq[(MandateParam, StressParam, Int)] =
+  ): Seq[(FastParam, StressParam, Int)] =
     snapshot.cells
       .groupBy(cs => (cs.fastParam, cs.stressParam))
       .toSeq

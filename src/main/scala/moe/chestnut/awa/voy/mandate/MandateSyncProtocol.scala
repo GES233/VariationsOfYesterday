@@ -18,18 +18,18 @@ final case class ClientCellView(
     chunkX: Int,
     chunkZ: Int,
     regime: Regime,
-    mycelium: MycelialHealth,
+    mycelium: SustenanceTier,
     isSheltered: Boolean,
     isSpiking: Boolean,
-    isBurnoutPhase: Boolean,
-    c0Sheltered: Boolean,
+    hasSilentBlight: Boolean,
+    hasCalmingStock: Boolean,
     seepTier: MandatePhenomena.YellowSeepTier,
     dialTick: Option[Int],
     phaseLabel: Option[PhaseLabel],
-    /** Heartbeat category wire ordinal (`Heartbeat.wireOrdinal`), packed into
+    /** RhythmVerdict category wire ordinal (`RhythmVerdict.wireOrdinal`), packed into
       * the flags byte (bits 4-6). Available to every player, not just debug.
       */
-    heartbeatOrdinal: Int = 0
+    rhythmOrdinal: Int = 0
 )
 
 object ClientCellView:
@@ -49,17 +49,17 @@ object ClientCellView:
       mycelium = readout.mycelium,
       isSheltered = readout.isSheltered,
       isSpiking = readout.isSpiking,
-      isBurnoutPhase = MandatePhenomena.hasSilentBlight(readout),
-      c0Sheltered = readout.baselineCalming >= MandatePhenomena.C0ShelterLevel,
+      hasSilentBlight = MandatePhenomena.hasSilentBlight(readout),
+      hasCalmingStock = readout.baselineCalming >= MandatePhenomena.C0ShelterLevel,
       seepTier = MandatePhenomena.classifySeepTier(readout),
       dialTick = readout.dialTick,
       phaseLabel = phaseLabel,
-      heartbeatOrdinal = Heartbeat.wireOrdinal(readout.heartbeat)
+      rhythmOrdinal = RhythmVerdict.wireOrdinal(readout.rhythm)
     )
 
 /** Full numerical telemetry attached only for dev environments or OP players. */
 final case class DebugCellTelemetry(
-    dissonance: Double,
+    excitation: Double,
     stress: Double,
     activity: Double,
     sustenance: Double,
@@ -69,11 +69,11 @@ final case class DebugCellTelemetry(
     phaseKind: Byte,
     phaseFraction: Double,
     undefinedReason: Option[UndefinedReason],
-    // Heartbeat axis observability (design note 11): precise period/duty live
+    // RhythmVerdict axis observability (design note 11): precise period/duty live
     // here; the category rides on ClientCellView's flags byte for everyone.
     // Options, not NaN sentinels: IEEE NaN != NaN would break payload equality.
-    beatPeriod: Option[Double] = None,
-    beatDuty: Option[Double] = None
+    rhythmPeriod: Option[Double] = None,
+    rhythmDuty: Option[Double] = None
 ):
   def phaseReading(label: Option[PhaseLabel]): PhaseReading =
     phaseKind match
@@ -88,7 +88,7 @@ object DebugCellTelemetry:
       case PhaseReading.Basin(_)     => (1.toByte, 0.0, None)
       case PhaseReading.Undefined(r) => (2.toByte, 0.0, Some(r))
     DebugCellTelemetry(
-      dissonance = readout.current.dissonance,
+      excitation = readout.current.excitation,
       stress = readout.current.stress,
       activity = readout.current.activity,
       sustenance = readout.sustenance,
@@ -98,8 +98,8 @@ object DebugCellTelemetry:
       phaseKind = kind,
       phaseFraction = frac,
       undefinedReason = reason,
-      beatPeriod = Heartbeat.periodOf(readout.heartbeat),
-      beatDuty = Heartbeat.dutyOf(readout.heartbeat)
+      rhythmPeriod = RhythmVerdict.periodOf(readout.rhythm),
+      rhythmDuty = RhythmVerdict.dutyOf(readout.rhythm)
     )
 
 final case class SyncedCellEntry(
@@ -153,9 +153,9 @@ object MandateChunkSyncPayload:
     val flags =
       (if v.isSheltered then FlagSheltered else 0) |
         (if v.isSpiking then FlagSpiking else 0) |
-        (if v.isBurnoutPhase then FlagBurnoutPhase else 0) |
-        (if v.c0Sheltered then FlagC0Sheltered else 0) |
-        ((v.heartbeatOrdinal & 0x7) << 4)
+        (if v.hasSilentBlight then FlagBurnoutPhase else 0) |
+        (if v.hasCalmingStock then FlagC0Sheltered else 0) |
+        ((v.rhythmOrdinal & 0x7) << 4)
     buf.writeByte(flags)
     buf.writeByte(v.seepTier.ordinal)
     buf.writeByte(v.dialTick.getOrElse(-1))
@@ -165,7 +165,7 @@ object MandateChunkSyncPayload:
         buf.writeBoolean(false)
       case Some(d) =>
         buf.writeBoolean(true)
-        buf.writeDouble(d.dissonance)
+        buf.writeDouble(d.excitation)
         buf.writeDouble(d.stress)
         buf.writeDouble(d.activity)
         buf.writeDouble(d.sustenance)
@@ -175,16 +175,16 @@ object MandateChunkSyncPayload:
         buf.writeByte(d.phaseKind)
         buf.writeDouble(d.phaseFraction)
         buf.writeByte(d.undefinedReason.map(_.ordinal).getOrElse(-1))
-        buf.writeBoolean(d.beatPeriod.isDefined)
-        d.beatPeriod.foreach(buf.writeDouble)
-        buf.writeBoolean(d.beatDuty.isDefined)
-        d.beatDuty.foreach(buf.writeDouble)
+        buf.writeBoolean(d.rhythmPeriod.isDefined)
+        d.rhythmPeriod.foreach(buf.writeDouble)
+        buf.writeBoolean(d.rhythmDuty.isDefined)
+        d.rhythmDuty.foreach(buf.writeDouble)
 
   private def decodeEntry(buf: RegistryByteBuf): SyncedCellEntry =
     val chunkX = buf.readInt()
     val chunkZ = buf.readInt()
     val regime = Regime.fromOrdinal(buf.readByte() & 0xff)
-    val mycelium = MycelialHealth.fromOrdinal(buf.readByte() & 0xff)
+    val mycelium = SustenanceTier.fromOrdinal(buf.readByte() & 0xff)
     val flags = buf.readByte() & 0xff
     val seepTier = MandatePhenomena.YellowSeepTier.fromOrdinal(buf.readByte() & 0xff)
     val rawDial = buf.readByte().toInt
@@ -198,18 +198,18 @@ object MandateChunkSyncPayload:
       mycelium = mycelium,
       isSheltered = (flags & FlagSheltered) != 0,
       isSpiking = (flags & FlagSpiking) != 0,
-      isBurnoutPhase = (flags & FlagBurnoutPhase) != 0,
-      c0Sheltered = (flags & FlagC0Sheltered) != 0,
+      hasSilentBlight = (flags & FlagBurnoutPhase) != 0,
+      hasCalmingStock = (flags & FlagC0Sheltered) != 0,
       seepTier = seepTier,
       dialTick = dialTick,
       phaseLabel = phaseLabel,
-      heartbeatOrdinal = (flags >> 4) & 0x7
+      rhythmOrdinal = (flags >> 4) & 0x7
     )
     val hasDebug = buf.readBoolean()
     val debug =
       if !hasDebug then None
       else
-        val dissonance = buf.readDouble()
+        val excitation = buf.readDouble()
         val stress = buf.readDouble()
         val activity = buf.readDouble()
         val sustenance = buf.readDouble()
@@ -221,11 +221,11 @@ object MandateChunkSyncPayload:
         val rawReason = buf.readByte().toInt
         val undefinedReason =
           if rawReason < 0 then None else Some(UndefinedReason.fromOrdinal(rawReason))
-        val beatPeriod = if buf.readBoolean() then Some(buf.readDouble()) else None
-        val beatDuty = if buf.readBoolean() then Some(buf.readDouble()) else None
+        val rhythmPeriod = if buf.readBoolean() then Some(buf.readDouble()) else None
+        val rhythmDuty = if buf.readBoolean() then Some(buf.readDouble()) else None
         Some(
           DebugCellTelemetry(
-            dissonance = dissonance,
+            excitation = excitation,
             stress = stress,
             activity = activity,
             sustenance = sustenance,
@@ -235,8 +235,8 @@ object MandateChunkSyncPayload:
             phaseKind = phaseKind,
             phaseFraction = phaseFraction,
             undefinedReason = undefinedReason,
-            beatPeriod = beatPeriod,
-            beatDuty = beatDuty
+            rhythmPeriod = rhythmPeriod,
+            rhythmDuty = rhythmDuty
           )
         )
     SyncedCellEntry(view, debug)

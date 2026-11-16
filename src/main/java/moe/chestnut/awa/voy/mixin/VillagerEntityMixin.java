@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Stagnation economy pressure on villagers (design draft §3.2, 2026-11-09
- * revision): on cells whose heartbeat does not shelter them, trades cost more,
+ * revision): on cells whose rhythm does not shelter them, trades cost more,
  * breeding usually fails and golem summons are usually swallowed. The
  * special-price bonus is safe to add on every trade-screen open because
  * vanilla clears special prices when the customer leaves.

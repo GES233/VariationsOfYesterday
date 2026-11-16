@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Stagnation economy pressure on crops (design draft §3.2, 2026-11-09
- * revision): on cells whose heartbeat does not shelter them, a share of growth
+ * revision): on cells whose rhythm does not shelter them, a share of growth
  * random-ticks is swallowed, so farms run at reduced speed instead of
  * stopping outright.
  */

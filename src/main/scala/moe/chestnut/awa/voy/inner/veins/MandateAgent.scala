@@ -14,8 +14,8 @@ import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
   * grid; readers consume the published immutable snapshot.
   */
 object MandateAgent:
-  val DefaultFastParam: MandateParam =
-    MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+  val DefaultFastParam: FastParam =
+    FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
 
   /** Dormant sustenance by default: the pure FHN core, as the contract
     * slice and the fingerprint rigs instantiate it.
@@ -30,7 +30,7 @@ object MandateAgent:
       var publishedRegime: Regime,
       var regimeCandidate: Option[(Regime, Double)] = None,
       var inSpike: Boolean = false,
-      var heartbeat: Heartbeat = Heartbeat.Warming,
+      var rhythm: RhythmVerdict = RhythmVerdict.Warming,
       var heartbeatBadSince: Double = Double.NaN,
       /** Last bell strike time for the overdrive guard (design note 11 §1.5).
         * Deliberately NOT persisted: an 8 s guard is meaningless across a
@@ -43,7 +43,7 @@ object MandateAgent:
   def applyEvent(
       grid: MandateGrid,
       event: EventDTO,
-      defaultFastParam: MandateParam = DefaultFastParam,
+      defaultFastParam: FastParam = DefaultFastParam,
       defaultStressParam: StressParam = DefaultStressParam
   ): Unit =
     def onCell(cell: CellCoord)(op: MandateState => Unit): Unit =
@@ -89,20 +89,20 @@ object MandateAgent:
       links: Seq[PulseLink] = Nil,
       spikeCriterion: SpikeCriterion = SpikeCriterion.PeakConfirmed,
       initialSimTime: Double = 0.0,
-      defaultFastParam: MandateParam = DefaultFastParam,
+      defaultFastParam: FastParam = DefaultFastParam,
       defaultStressParam: StressParam = DefaultStressParam,
       persistSink: MandateSnapshot => Unit = (_ => ()),
       persistPeriod: Double = 1.0,
-      initialBeatStats: Map[CellCoord, BeatStats] = Map.empty,
+      initialBeatStats: Map[CellCoord, RhythmEvidence] = Map.empty,
       regimeDwell: Double = 5.0,
-      heartbeatParam: HeartbeatParam = HeartbeatParam()
+      rhythmParam: RhythmParam = RhythmParam()
   ): ActorRef[EventDTO] =
     val readoutParam = ReadoutParam()
     var simTime: Double = initialSimTime
     var nextPersistAt: Double = initialSimTime
     val linkRunner = new PulseLinkRunner(links, criterion = spikeCriterion)
 
-    def mkSlot(cell: MandateState, stats: BeatStats = BeatStats.zero): CellSlot =
+    def mkSlot(cell: MandateState, stats: RhythmEvidence = RhythmEvidence.zero): CellSlot =
       val tracker = new PhaseTracker(
         readoutParam,
         cell.param,
@@ -120,11 +120,11 @@ object MandateAgent:
 
     val slots = scala.collection.mutable.HashMap.empty[CellCoord, CellSlot]
     grid.cells.foreach { case (coord, cell) =>
-      slots(coord) = mkSlot(cell, initialBeatStats.getOrElse(coord, BeatStats.zero))
+      slots(coord) = mkSlot(cell, initialBeatStats.getOrElse(coord, RhythmEvidence.zero))
     }
 
-    def currentBeatStats: Map[CellCoord, BeatStats] =
-      slots.iterator.map { case (c, slot) => c -> slot.tracker.beatStats }.toMap
+    def currentBeatStats: Map[CellCoord, RhythmEvidence] =
+      slots.iterator.map { case (c, slot) => c -> slot.tracker.rhythmEvidence }.toMap
 
     /** Bell strikes stamp the overdrive guard on living cells (dead land
       * answers nothing and is not guarded — design note 11 §1.5 row 1).
@@ -133,7 +133,7 @@ object MandateAgent:
       if area > 0.0 then
         grid.cells.get(coord).foreach { state =>
           val cur = state.getState
-          val ecoDead = Readout.isEcologicalDeath(
+          val ecoDead = Readout.isEcologicallyDead(
             state.sustenance,
             cur.stress,
             state.getParam,
@@ -184,12 +184,12 @@ object MandateAgent:
         val regime = slot.publishedRegime
         val pDrive = cell.impulse + cell.synapseOutput
 
-        // Heartbeat axis (design note 11): classify the tracker's rhythm
+        // RhythmVerdict axis (design note 11): classify the tracker's rhythm
         // statistics, then publish through the exit rule: arrhythmia is held
         // for two of its own periods (single-cycle flicker guard), while
         // over-pacing and silence publish immediately — their evidence is
         // already averaged / waited. `selfSustained` only records
-        // `BeatSource`, never gates.
+        // `RhythmSource`, never gates.
         val aSlow = Readout.slowA(
           cell.param,
           cur.stress,
@@ -197,20 +197,20 @@ object MandateAgent:
           cell.stressParam.coupling,
           cell.stressParam.sustenanceDepth
         )
-        val rawHeartbeat = Heartbeat.classify(
-          slot.tracker.beatStats,
+        val rawHeartbeat = RhythmVerdict.classify(
+          slot.tracker.rhythmEvidence,
           simTime,
           selfSustained = Readout.oscillating(aSlow, cell.param),
-          heartbeatParam
+          rhythmParam
         )
-        val (heartbeat, badSince) = Heartbeat.smooth(
+        val (rhythm, badSince) = RhythmVerdict.smooth(
           rawHeartbeat,
-          slot.heartbeat,
+          slot.rhythm,
           slot.heartbeatBadSince,
           simTime,
-          heartbeatParam
+          rhythmParam
         )
-        slot.heartbeat = heartbeat
+        slot.rhythm = rhythm
         slot.heartbeatBadSince = badSince
 
         readoutBuilder += (coord -> CellReadout(
@@ -220,14 +220,14 @@ object MandateAgent:
           sustenance = cell.sustenance,
           baselineCalming = cell.baselineCalming,
           pulseDrive = pDrive,
-          heartbeat = heartbeat,
+          rhythm = rhythm,
           lastBellStrikeAt = slot.lastBellStrikeAt,
           simTime = simTime,
           sustenanceFloor = cell.stressParam.sustenanceFloor,
           toxicityThreshold = cell.stressParam.sustenanceBurnThreshold
         ))
 
-        val spikingNow = cur.dissonance >= readoutParam.spikeLevel
+        val spikingNow = cur.excitation >= readoutParam.spikeLevel
         if spikingNow && !slot.inSpike then
           slot.inSpike = true
           actionSink(ActionMsgPool.CellSpikeTriggered(coord, cur, regime))

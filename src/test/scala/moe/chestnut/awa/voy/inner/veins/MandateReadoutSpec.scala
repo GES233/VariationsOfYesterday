@@ -8,12 +8,12 @@ import moe.chestnut.awa.voy.mandate.BellRitual.BellOutcome
 
 /** Defined-domain behaviour of the 3-axis readout and bell strike adjudication. */
 class MandateReadoutSpec:
-  private val fast = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+  private val fast = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
   private val dt = 0.02
 
   private def cell(stress: Double, coupling: Double = 1.0): MandateState =
     MandateState(
-      state = MandateCurrent(dissonance = -1.2, entrench = -0.6, stress = stress),
+      state = MandateCurrent(excitation = -1.2, recovery = -0.6, stress = stress),
       param = fast,
       stressParam = StressParam(gamma = 0.0, coupling = coupling)
     )
@@ -101,14 +101,14 @@ class MandateReadoutSpec:
     assertTrue(tr.reading(t, cur).isInstanceOf[PhaseReading.Cycle])
 
   @Test def `mycelial health 3-tier classification`(): Unit =
-    assertEquals(MycelialHealth.Dead, Readout.mycelialHealth(0.0))
-    assertEquals(MycelialHealth.Dead, Readout.mycelialHealth(0.5 * StressParam().sustenanceFloor))
-    assertEquals(MycelialHealth.Damaged, Readout.mycelialHealth(StressParam().sustenanceFloor))
-    assertEquals(MycelialHealth.Damaged, Readout.mycelialHealth(0.35))
-    assertEquals(MycelialHealth.Intact, Readout.mycelialHealth(0.60))
-    assertEquals(MycelialHealth.Intact, Readout.mycelialHealth(1.0))
+    assertEquals(SustenanceTier.Dead, Readout.sustenanceTier(0.0))
+    assertEquals(SustenanceTier.Dead, Readout.sustenanceTier(0.5 * StressParam().sustenanceFloor))
+    assertEquals(SustenanceTier.Damaged, Readout.sustenanceTier(StressParam().sustenanceFloor))
+    assertEquals(SustenanceTier.Damaged, Readout.sustenanceTier(0.35))
+    assertEquals(SustenanceTier.Intact, Readout.sustenanceTier(0.60))
+    assertEquals(SustenanceTier.Intact, Readout.sustenanceTier(1.0))
 
-  @Test def `heartbeat shelter and 20-division dial tick semantics`(): Unit =
+  @Test def `rhythm shelter and 20-division dial tick semantics`(): Unit =
     val calmWarming = CellReadout(
       MandateCurrent(-1.2, -0.6, 0.05, 0.0),
       Regime.Calm,
@@ -120,10 +120,10 @@ class MandateReadoutSpec:
     val calmMaintained = calmWarming.copy(baselineCalming = 0.03)
     assertTrue(calmMaintained.isSheltered, "c0 is unrelated to shelter (decoupled, note 08/11)")
 
-    val silent = calmMaintained.copy(heartbeat = Heartbeat.Slow(Double.NaN))
-    assertFalse(silent.isSheltered, "no heartbeat -> stagnant")
+    val silent = calmMaintained.copy(rhythm = RhythmVerdict.Slow(Double.NaN))
+    assertFalse(silent.isSheltered, "no rhythm -> stagnant")
 
-    val beating = calmMaintained.copy(heartbeat = Heartbeat.Beating(40.0, 0.1, BeatSource.Intrinsic))
+    val beating = calmMaintained.copy(rhythm = RhythmVerdict.Beating(40.0, 0.1, RhythmSource.Intrinsic))
     assertTrue(beating.isSheltered, "a healthy beat shelters the cell")
 
     val spikingBeating = beating.copy(

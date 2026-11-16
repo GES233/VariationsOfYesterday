@@ -11,7 +11,7 @@
 | [设计札记 06](design-note-06-mycelial-grounding.md) | 生态落地：神经化菌网/AMD、M 动力学、感官签名、维护设施工单 | 实施规格 |
 | [设计札记 07](design-note-07-pulse-coupling.md) | 脉冲耦合链路与相位同步（自动化心跳 / 体外起搏涌现） | 事件层规范 |
 | [设计札记 08](design-note-08-fast-variable-and-stagnation.md) | 心跳脉冲语义：快变量读数、三正交轴与 `PulseStamp` 极简脉冲短窗（同步除颤分诊） | **已被 11 取代（历史存档）** |
-| [设计札记 11](design-note-11-heartbeat-shelter.md) | **心跳即庇护**：节律轴 `Heartbeat`（Warming/Beating/Fast/Slow/Arrhythmic）、四裁决敲钟（起搏/校拍）、c0 源驱动库存与 U 形余脉弧、颜色语言 | **已定稿落地** |
+| [设计札记 11](design-note-11-heartbeat-shelter.md) | **心跳即庇护**：节律轴 `RhythmVerdict`（Warming/Beating/Fast/Slow/Arrhythmic）、四裁决敲钟（起搏/校拍）、c0 源驱动库存与 U 形余脉弧、颜色语言 | **已定稿落地** |
 | [设计札记 12](design-note-12-canonical-semantics.md) | **语义宪章**：一物一名四法则与核心词表、改名成本三档、敲钟 v2（钟即起搏器，去相位门控 + 事后回声）、内核只发原子事实（遥测/变更/回执三通道）与多人预留 8 条（含粒度） | **草案（S1 敲钟 v2a 已落地；3 处待拍板）** |
 
 ## 孵化构想与历史归档

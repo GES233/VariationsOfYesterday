@@ -8,9 +8,9 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import moe.chestnut.awa.voy.inner.veins.{
   CalmingParam,
-  HeartbeatParam,
+  RhythmParam,
   MandateAgent,
-  MandateParam,
+  FastParam,
   PhaseResponse,
   StressParam
 }
@@ -52,7 +52,7 @@ object LatticeConfig:
     fast.alpha - PhaseResponse.hopfPoint(fast)._2
 
   /** derived: `s_onset + 0.25 × (s_acid − s_onset)` ≈ 0.349 — the opening
-    * keeps a small "old-era remnant pulse" inside the natural heartbeat band
+    * keeps a small "old-era remnant pulse" inside the natural rhythm band
     * `[s_onset, s_acid)` (2026-11-16 ruling, risk 1 of design note 11).
     */
   val DefaultInitialStressPeak: Double =
@@ -73,10 +73,10 @@ object LatticeConfig:
 final case class VoyConfig(
     tickDt: Double = 0.05,
     lattice: LatticeConfig = LatticeConfig(),
-    fastParam: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
+    fastParam: FastParam = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
     stressParam: StressParam =
       StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-    heartbeatParam: HeartbeatParam = HeartbeatParam(),
+    rhythmParam: RhythmParam = RhythmParam(),
     calmingParam: CalmingParam = CalmingParam()
 )
 
@@ -111,7 +111,7 @@ object VoyConfig:
         lattice = latticeFrom(obj(root, "lattice")),
         fastParam = fastFrom(obj(root, "fastParam")),
         stressParam = stressFrom(obj(root, "stressParam")),
-        heartbeatParam = heartbeatFrom(obj(root, "heartbeatParam")),
+        rhythmParam = rhythmFrom(obj(root, "heartbeatParam")),
         calmingParam = calmingFrom(obj(root, "calmingParam"))
       )
     catch
@@ -152,9 +152,9 @@ object VoyConfig:
       initialStressFalloff = dbl(o, "initialStressFalloff", d.initialStressFalloff)
     )
 
-  private def fastFrom(o: JsonObject): MandateParam =
+  private def fastFrom(o: JsonObject): FastParam =
     val d = MandateAgent.DefaultFastParam
-    MandateParam(
+    FastParam(
       alpha = dbl(o, "alpha", d.alpha),
       beta = dbl(o, "beta", d.beta),
       epsilon = dbl(o, "epsilon", d.epsilon)
@@ -188,9 +188,9 @@ object VoyConfig:
       cap = dbl(o, "cap", d.cap)
     )
 
-  private def heartbeatFrom(o: JsonObject): HeartbeatParam =
-    val d = HeartbeatParam()
-    HeartbeatParam(
+  private def rhythmFrom(o: JsonObject): RhythmParam =
+    val d = RhythmParam()
+    RhythmParam(
       nominalPeriod = dbl(o, "nominalPeriod", d.nominalPeriod),
       minCycles = int(o, "minCycles", d.minCycles),
       regularityTol = dbl(o, "regularityTol", d.regularityTol),
@@ -245,7 +245,7 @@ object VoyConfig:
     s.addProperty("sustenanceFloor", sp.sustenanceFloor)
     root.add("stressParam", s)
 
-    val hp = cfg.heartbeatParam
+    val hp = cfg.rhythmParam
     val h = JsonObject()
     h.addProperty("nominalPeriod", hp.nominalPeriod)
     h.addProperty("minCycles", hp.minCycles)

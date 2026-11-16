@@ -27,7 +27,7 @@ class SliceReplaySpec:
     val b = SliceReplay.replay(chain(), script, ticks = 400, dt = dt)
     assertEquals(a.size, 400)
     for i <- a.indices do
-      assertEquals(a(i)(CellCoord(0, 0)).dissonance, b(i)(CellCoord(0, 0)).dissonance, 0.0)
+      assertEquals(a(i)(CellCoord(0, 0)).excitation, b(i)(CellCoord(0, 0)).excitation, 0.0)
       assertEquals(a(i)(CellCoord(0, 0)).stress, b(i)(CellCoord(0, 0)).stress, 0.0)
 
   @Test def `the replay applies events before the tick that carries them`(): Unit =
