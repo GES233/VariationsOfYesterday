@@ -14,16 +14,14 @@ Scope
 -----
 
   * docs/                      design drafts and notes (including incubator/ and archive/)
-  * tools/voy_world/docs/      relational engine design notes and generated diagrams
-  * tools/voy_world/world/     human-editable eras and narrative graph cards (eras.json, graph.json)
   * src/**/lang/*.json         player-facing prose (names, tooltips, wording)
   * src/**/textures/**         pixel art
   * src/main/resources/assets/**/icon.png
   * README.md, README-zh.md     preamble and framing text
 
 Everything else in this repository — the simulation engine, the game-side
-wiring, the mixins, the Elixir tooling, the build scripts — is licensed under
-the Mozilla Public License 2.0; see LICENSE.
+wiring, the mixins, the build scripts — is licensed under the Mozilla Public
+License 2.0; see LICENSE.
 
 What this means in practice
 ---------------------------

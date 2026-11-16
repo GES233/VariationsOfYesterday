@@ -7,18 +7,18 @@
 - 模组 ID：`variations-of-yesterday`
 - 包名：`moe.chestnut.awa.voy`
 - 版本与坐标：`gradle.properties`（`mod_version=0.1.0`，`maven_group=moe.chestnut.awa.voy`）
-- 许可证：代码 MPL-2.0（`LICENSE`）；叙事与美术资源 CC BY-NC-SA 4.0（`LICENSE-CONTENT`，范围含 `docs/`、`tools/voy_world/docs/`、`tools/voy_world/world/`、lang 文案、贴图与图标）。Mojang EULA 规定模组不得售卖，故本协议只约束社区二创，不涉及商业分发。
+- 许可证：代码 MPL-2.0（`LICENSE`）；叙事与美术资源 CC BY-NC-SA 4.0（`LICENSE-CONTENT`，范围含 `docs/`、lang 文案、贴图与图标；Elixir 侧内容已随外迁移出本仓库）。Mojang EULA 规定模组不得售卖，故本协议只约束社区二创，不涉及商业分发。
 
 ## 技术栈
 
 - **语言与平台**：Scala 3（3.6.3，显著缩进风格）+ Java 21，Minecraft 1.21.2 + Yarn + Fabric Loader 0.16.10 + Fabric API 0.106.1+1.21.2，通过 `kotori_scala` 加载。
 - **并发与调度**：自建单线程 actor 内核（`inner/actor/`），便于直接发版。`MandateRuntime` 随服务器生命周期启停；`END_SERVER_TICK` 投递固定步长 `TickArrived(dt = 配置 tickDt，默认 0.05, tickRate)`，与通道事件在 `MandateAgent` 信箱内全序处理。游戏线程只投递事件、读取 `@volatile` 快照并在下一 tick 消费动作队列。
-- **关系图谱与时代认知沙盘**：`tools/voy_world/`（独立 Elixir Mix 包，不进模组 jar），内置 microKanren 引擎（`Voy.Kanren`）与 `Plug + Bandit` 本地桌面卡片接线沙盘。
+- **关系图谱与时代认知沙盘**：已外迁（2026-11-16）。原 `tools/voy_world/`（独立 Elixir Mix 包，内置 microKanren 引擎 `Voy.Kanren` 与 `Plug + Bandit` 本地卡片接线沙盘）与模组运行时零耦合，现作为独立工程在仓库外开发；存档位置与取回方式见「代码与目录组织」末尾。
 
 ## 构建与测试
 
 - 构建与测试（JVM）：`./gradlew build`、`./gradlew test`、`./gradlew runClient`
-- 关系沙盘与 WebUI（Elixir）：在 `tools/voy_world/` 下运行 `mix test`、`mix voy.web [--port 4040 --open]`
+- 关系沙盘与 WebUI（Elixir）：已于 2026-11-16 外迁，不再属于本仓库构建；`mix test` / `mix voy.web` 在外部工程内运行（见文末存档记录）。
 - 本机环境注意：JDK 21 路径等本机配置见 `ref/本地环境.md`（`ref/` 被 git 忽略）。
 
 ## 代码与目录组织
@@ -49,11 +49,10 @@
 - `src/test/scala/moe/chestnut/awa/voy/` — 22 个 JUnit 5 测试规范（`GridBenchmarkSpec` 默认跳过）；`inner/veins/` 下 18 个（含 `HeartbeatSpec` / `HeartbeatParamSpec` / `CalmingStockSpec`），`inner/actor/ActorSpec` 覆盖 actor 内核，顶层另有 `VoyConfigSpec` / `MandatePersistenceSpec` / `MandatePhenomenaSpec` / `MandateNetworkingSpec`；契约 oracle `SliceContract` / `SliceReplay` 也在此源集（不再进模组 jar）
 - `tools/lab/` — FHN 数值探针（心跳阈值与余脉弧的实测出处，纯 Python；`fhn_slow.py` 含慢系统 + c0 漏失仿真）
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的跨栈数值契约（含逐 tick 实测 `safe_ticks`）
-- `tools/voy_world/` — 独立 Elixir 关系图谱、时代认知模型与卡片接线沙盘（含 `docs/` 内的历史设计札记 02 / 05 与图集）：
-  - `lib/voy/kanren/` — microKanren 内核与 DSL
-  - `lib/voy/world/` — `Graph`（mediKanren 风格开放属性图 `nodeo` / `edgeo` / `patho` / `bridgeo`）、`Epistemic`（时代粒度、概念越界、机构 `neq/2` 防火墙与接线校验）、`Store`（读写 `world/*.json`）、`Web`（`Plug + Bandit` 卡片接线画布服务）；门面 `Voy.World`、Mix 任务 `Mix.Tasks.Voy.Web`
-  - `world/` — 人类可直接编辑的 `eras.json`（时代认知模型）与 `graph.json`（节点与档案卡片边）
-  - `docs/` — 此前阶段的设计札记（02 / 05）及生成图集（`diagrams/`）
+- **已外迁（2026-11-16）：`tools/voy_world/`** — 原独立 Elixir 关系图谱、时代认知模型与卡片接线沙盘（microKanren 内核与 DSL、`Graph`（mediKanren 风格开放属性图）/`Epistemic`（时代粒度、概念越界、`neq/2` 防火墙）/`Store`/`Web`（`Plug + Bandit` 画布）、人类可编辑的 `world/eras.json` 与 `world/graph.json`、历史设计札记 02 / 05 与图集）。为在跑通最小循环后作为独立工程继续开发，该包与其 CI（`.github/workflows/voy_world.yml`）已移出本仓库：
+  - 存档：`D:\CodeRepo\MinecraftDev\variations-of-yesterday-archive\voy_world-2026-11-16.zip`（仅含 git 跟踪的 39 个文件 / 4.06 MB，SHA-256 `61A65F6394994C1362F7B0FE07216793FA8C53D13B30B195A1B24D68999003C0`，压缩包内附 `ARCHIVE-NOTE.md`）；
+  - 取回：`git checkout ffd0a70 -- tools/voy_world`（保留全部提交历史），或解压存档后 `mix deps.get && mix test`；
+  - 依赖方向不变：契约仍由 Scala 实测产出（`contracts/mandate-slice-v1.json`），Elixir 侧只读，双方不在运行时通信。
 - `docs/` — 模组本体中文设计文档（索引与边界重划见 `docs/README.md`）：草案 01、札记 06/07/10、**札记 11（现行庇护语义，取代 08）**；札记 08 为历史存档；`incubator/` 存放挂起构想（札记 09）；`archive/` 存放历史快照（验证报告 01）。原札记 03/04 已分别并入 05/02。
 
 ## 开发约定

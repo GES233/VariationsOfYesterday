@@ -1,6 +1,8 @@
 # 文档索引
 
-> **2026-11-13 文档重组**：将模组本体（活体生物电菌网、AMD 酸化与同步除颤）与独立 Elixir 关系式盘工具链（`tools/voy_world/`）拆清边界；关系世界模型与五跳卷宗规范迁入 [`tools/voy_world/docs/`](../tools/voy_world/docs/)，挂起构想与 0.1 冻结期快照分别归入 `incubator/` 与 `archive/`。
+> **2026-11-13 文档重组**：将模组本体（活体生物电菌网、AMD 酸化与同步除颤）与独立 Elixir 关系式盘工具链（`tools/voy_world/`）拆清边界；关系世界模型与五跳卷宗规范迁入 `tools/voy_world/docs/`，挂起构想与 0.1 冻结期快照分别归入 `incubator/` 与 `archive/`。
+>
+> **2026-11-16 外迁**：Elixir 关系工具链整体移出仓库（存档与取回方式见 [`AGENTS.md`](../AGENTS.md) 文末「已外迁」记录），随包外迁的还有其 `docs/` 下的**设计札记 02 / 05** 与图集。本索引只索引留在仓库内的模组本体文档。
 
 ## 模组本体（动力学、生态与元叙事）
 
@@ -20,12 +22,13 @@
 | [设计札记 09](incubator/design-note-09-mountain-dial.md) | 制式验山盘：有限域约束弛豫仪（定针/游核、同相互耗、盘契约、FORCEDENTRY 保留条款） | **挂起（第一阶段不实现）**；待拆清「体外自适应起搏器」与「24 候选推理盘」归属 |
 | [验证报告 01](archive/verification-report-01-mandate-slice.md) | 0.1 纵切片数值验证与溯因 | 历史快照（回归参考） |
 
-## 独立工具链（已迁入 `tools/voy_world/docs/`）
+## 已外迁：独立工具链（2026-11-16）
 
-| 文档 | 主题 | 说明 |
-| :--- | :--- | :--- |
-| [设计札记 02](../tools/voy_world/docs/design-note-02-kanren-worldview-engine.md) | 关系世界模型：Kanren 分层、四纪编译（式盘历史）、六结局与时域结算、地形组合 | 已迁入 Elixir 侧；与模组运行时零耦合 |
-| [设计札记 05](../tools/voy_world/docs/design-note-05-medikanren-microchains.md) | 五跳卷宗与内容管线：微链图谱、种子物证、写作规则、Canon 不变量 | 已迁入 Elixir 侧 |
+Elixir 关系世界模型与五跳卷宗规范（**设计札记 02 / 05**）连同图集，原在 `tools/voy_world/docs/`；该包与模组运行时零耦合，已整体移出仓库，待最小循环跑通后作为独立工程继续开发。
+
+- 存档：`D:\CodeRepo\MinecraftDev\variations-of-yesterday-archive\voy_world-2026-11-16.zip`
+- 取回：`git checkout ffd0a70 -- tools/voy_world`，或解压存档后 `mix deps.get && mix test`
+- 两篇札记与图集在压缩包的 `voy_world/docs/` 下；包内 `ARCHIVE-NOTE.md` 有完整说明。
 
 - 模组阅读顺序：10（创作母题）→ 01 → 06 → 07 → **11（现行庇护语义）**；08 仅作历史参考；孵化与历史按需查证。
 - **合并说明**：原札记 03（内容流水线）已并入札记 05 §4–§5；原札记 04（可达性解耦与六结局）已并入札记 02 §3.1 与 §5。

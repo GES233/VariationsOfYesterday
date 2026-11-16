@@ -20,7 +20,7 @@ _去看看吧，顺着水流逆流而上，在这片土地的旧日，到底发�
 
 **开发中 · 0.1 · 单人** ｜ Minecraft 1.21.2（Fabric / Scala 3）
 
-设计文档在 [`docs/`](docs/)。构建与测试：`./gradlew test`，`cd tools/voy_world && mix test`。
+设计文档在 [`docs/`](docs/)。构建与测试：`./gradlew test`。（Elixir 关系沙盘已于 2026-11-16 移出本仓库，存档与取回方式见 [`AGENTS.md`](AGENTS.md) 文末。）
 
 ## 系列坐标
 

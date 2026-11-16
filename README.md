@@ -21,7 +21,7 @@ _Go and see for yourself. Follow the water upstream, and find out what really ha
 
 **In development · 0.1 · single-player** ｜ Minecraft 1.21.2 (Fabric / Scala 3)
 
-Design notes live in [`docs/`](docs/) (in Chinese). Build & test: `./gradlew test`, `cd tools/voy_world && mix test`.
+Design notes live in [`docs/`](docs/) (in Chinese). Build & test: `./gradlew test`. (The Elixir relational sandbox was moved out of this repository on 2026-11-16; see the archive note at the end of [`AGENTS.md`](AGENTS.md).)
 
 ## Series Context
 

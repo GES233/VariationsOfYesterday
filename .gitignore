@@ -50,6 +50,3 @@ replay_*.log
 # local machine notes (per-device, not tracked)
 
 ref/
-
-# Dump results within `tools_world/voy_world`
-erl_crash.dump

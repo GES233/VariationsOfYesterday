@@ -2,7 +2,7 @@
 
 > 状态：**实施规格（WO-1/3/4 已落地，WO-2 待排期）**。本文档面向实现者（含编码代理）：第 1–4 节是不可违背的设计约束与映射，第 5 节是分阶段工单（WO-1…WO-4），第 6 节是考据与证据分级。
 >
-> 前置阅读：[设计草案 01](design-draft-01-living-world.md) §1（动力学层）、[设计札记 07](design-note-07-pulse-coupling.md)（脉冲耦合链路）。历史与外置参考：[验证报告 01](archive/verification-report-01-mandate-slice.md)、[札记 02（关系世界模型）](../tools/voy_world/docs/design-note-02-kanren-worldview-engine.md)、[札记 05（五跳卷宗）](../tools/voy_world/docs/design-note-05-medikanren-microchains.md)；制式验山盘见 [札记 09](incubator/design-note-09-mountain-dial.md)（挂起，第一阶段不实现）。
+> 前置阅读：[设计草案 01](design-draft-01-living-world.md) §1（动力学层）、[设计札记 07](design-note-07-pulse-coupling.md)（脉冲耦合链路）。历史与外置参考：[验证报告 01](archive/verification-report-01-mandate-slice.md)；设计札记 02（关系世界模型）与札记 05（五跳卷宗）已随 Elixir 工具链外迁（见 [`AGENTS.md`](../AGENTS.md) 文末存档记录）；制式验山盘见 [札记 09](incubator/design-note-09-mountain-dial.md)（挂起，第一阶段不实现）。
 >
 > **2026-11-13 名实订正**：读数层已精简为三条正交轴——`UndefinedReason.SlowOffsetBelowKnee`（`a(s, M) <= burnoutA`）、`MycelialHealth ∈ {Intact, Damaged, Dead}` 与 `PulseStamp(shelterUntil, cooldownUntil)`；静默枯败签名（`hasSilentBlight`）绑定 `!mycelium.isViable || isSlowOffsetBelowKnee`。本文 §2–§5 的实现描述已按现行词表同步；§7 中带日期的历史裁定保留原词作历史对照。
 
@@ -17,7 +17,7 @@
 1. **数值冻结（四维核）**：四维 RK4 方程、参数与阈值保持不变；§7.1 裁定的 `M` / `Δ` 已作为追加状态落地（`StressParam` 默认休眠，契约切片与指纹台架仍测裸 FHN 核）。除此之外本文只新增：命名与文案、通道事件的发射源、读数投影的感官签名、维护设施方块。
 2. **确定性**：一切新机制通过既有事件通道（`EventMsg.SetCalming` / `SetBaselineCalming` / `SetDisturbance` / `FirePulse` / `StressInject` / `SetSustenance`）投递，与 tick 同信箱全序；禁止引入新的隐式状态耦合。
 3. **加载不变性**：新方块的行为不得依赖区块加载顺序；Node 调度见 `design-draft-01` §1.3（所有 Node 常驻动力学图、静息粗步进、不做离线加速风化）。
-4. **契约不动**：不得运行 `voy.contract.write=true` 重新生成 `contracts/mandate-slice-v1.json`（`M` 落地时已按 digest-only 重生成一次，此后非必要不再重生成）；`./gradlew test` 与 `cd tools/voy_world && mix test` 必须全程通过。
+4. **契约不动**：不得运行 `voy.contract.write=true` 重新生成 `contracts/mandate-slice-v1.json`（`M` 落地时已按 digest-only 重生成一次，此后非必要不再重生成）；`./gradlew test` 必须全程通过（Elixir 侧已外迁，`mix test` 不再属于本仓库验收门）。
 5. **读数纪律**：连续量永不直接显示为数字；玩家只能看到感官签名与制度读表（分辨率受限）。
 
 > 第 2、4 条已落实；第 1 条按 §7.1 裁定修订；第 3 条的「离线按 Node 聚合结算」已由草案 01 §1.3 的「常驻 + 粗步进」设计取代（不做离线加速风化）。
