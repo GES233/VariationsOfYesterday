@@ -132,7 +132,11 @@ class MandatePhenomenaSpec:
     assertEquals(
       MandatePhenomena.EconomyMaintained,
       MandatePhenomena.classifyEconomy(CellReadout.zero),
-      "a never-observed cell rests in the Warming grace"
+      // Ruling 2026-11-16 (note 12 §9.3-1): chunks outside the simulated lattice
+      // are the ORDINARY region and are safe by design; stagnation belongs to the
+      // story region (the active valley). This is a design ruling, not an
+      // artefact of `Warming` being the default.
+      "the ordinary region outside the lattice is not pressured"
     )
     assertEquals(
       MandatePhenomena.EconomySpiking,
