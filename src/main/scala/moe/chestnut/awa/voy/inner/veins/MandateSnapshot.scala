@@ -53,11 +53,11 @@ object MandateSnapshot:
     }.toSeq.sortBy(c => (c.coord.x, c.coord.z))
     MandateSnapshot(simTime, cells, grid.edges, links)
 
-  /** Extract the per-cell beat statistics from a captured snapshot.
+  /** Extract the per-cell rhythm evidence from a captured snapshot.
     * (No `== RhythmEvidence.zero` filter: NaN fields make case-class equality
     * useless here, so empty stats are simply restored as fresh.)
     */
-  def restoreBeatStats(
+  def restoreRhythmEvidence(
       snapshot: MandateSnapshot
   ): Map[CellCoord, RhythmEvidence] =
     snapshot.cells.iterator.map(cs => cs.coord -> cs.rhythmEvidence).toMap

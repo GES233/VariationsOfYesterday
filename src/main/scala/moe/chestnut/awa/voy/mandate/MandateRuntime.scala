@@ -16,12 +16,6 @@ import moe.chestnut.awa.voy.inner.veins.*
 /** Game-side bridge between Minecraft and the mandate engine actor: owns the
   * engine actor lifecycle, the tick gate, readout publication, and the action
   * drain.
-  *
-  * There is exactly one published channel (`readoutSnapshot`, consumed by the
-  * wiring layer) plus the action stream. A second `Map[CellCoord,
-  * MandateCurrent]` snapshot used to be republished here every tick; it had no
-  * reader and was deleted in the S2 subtraction pass, so the "two publish
-  * channels" model it implied is gone.
   */
 object MandateRuntime:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
@@ -128,7 +122,7 @@ object MandateRuntime:
         matches
       }
 
-      val (grid, links, initialSimTime, initialBeatStats) = restored match
+      val (grid, links, initialSimTime, initialRhythmEvidence) = restored match
         case Some(snap) =>
           logger.info(
             s"Restoring mandate lattice from saved state " +
@@ -136,7 +130,7 @@ object MandateRuntime:
               s"simTime = ${snap.simTime})."
           )
           val grid = MandateSnapshot.restoreGrid(snap)
-          val rhythmEvidence = MandateSnapshot.restoreBeatStats(snap)
+          val rhythmEvidence = MandateSnapshot.restoreRhythmEvidence(snap)
           logSavedParameters(snap)
           (grid, snap.links, snap.simTime, rhythmEvidence)
         case None =>
@@ -149,7 +143,7 @@ object MandateRuntime:
 
       persistence.geometry = expectedGeometry
       persistence.snapshot = Some(
-        MandateSnapshot.capture(grid, links, initialSimTime, initialBeatStats)
+        MandateSnapshot.capture(grid, links, initialSimTime, initialRhythmEvidence)
       )
       persistence.markDirty()
 
@@ -157,23 +151,22 @@ object MandateRuntime:
       system = Some(
         MandateAgent(
           grid,
-          // The raw MandateCurrent snapshot channel was deleted (S2): nothing
-          // read it, so the actor is handed a no-op sink.
-          _ => (),
-          pendingActions.add(_),
-          publishReadout,
-          links = links,
-          initialSimTime = initialSimTime,
-          defaultFastParam = VoyConfig.current.fastParam,
-          defaultStressParam = VoyConfig.current.stressParam,
+          readoutSink = publishReadout,
+          actionSink = pendingActions.add(_),
           persistSink = snap => {
             persistence.snapshot = Some(snap)
             persistence.markDirty()
             val pending = flushLatch.getAndSet(null)
             if pending != null then pending.countDown()
           },
-          rhythmParam = VoyConfig.current.rhythmParam,
-          initialBeatStats = initialBeatStats
+          config = AgentConfig(
+            links = links,
+            initialSimTime = initialSimTime,
+            defaultFastParam = VoyConfig.current.fastParam,
+            defaultStressParam = VoyConfig.current.stressParam,
+            initialRhythmEvidence = initialRhythmEvidence,
+            rhythmParam = VoyConfig.current.rhythmParam
+          )
         )
       )
   }

@@ -44,8 +44,7 @@ class MandatePersistenceSpec:
         baselineCalming = 0.03,
         impulse = -0.2,
         fastParam = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
-        stressParam =
-          StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
+        stressParam = StressParam.OverworldDefault,
         rhythmEvidence = RhythmEvidence(
           periods = Vector(40.1, 39.8, 40.3),
           lastDuty = 0.05,

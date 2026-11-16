@@ -50,7 +50,10 @@ class MandateAgentSpec:
     track(
       MandateAgent(
         grid,
-        snapshot => { published.set(snapshot); latch.countDown() }
+        readoutSink = readouts => {
+          published.set(readouts.view.mapValues(_.current).toMap)
+          latch.countDown()
+        }
       )
     )
 
@@ -78,7 +81,10 @@ class MandateAgentSpec:
     val published =
       new AtomicReference[Map[CellCoord, MandateCurrent]](Map.empty)
     val agent = track(
-      MandateAgent(singleCellGrid(mkCell(0.08)), published.set(_))
+      MandateAgent(
+        singleCellGrid(mkCell(0.08)),
+        readoutSink = r => published.set(r.view.mapValues(_.current).toMap)
+      )
     )
     agent ! EventMsg.FirePulse(origin, 10.0)
     Thread.sleep(300)
@@ -138,10 +144,9 @@ class MandateAgentSpec:
     val agent = track(
       MandateAgent(
         singleCellGrid(mkCell(0.0)),
-        _ => (),
-        actions.add(_),
-        r => { readouts.set(r); latch.countDown() },
-        regimeDwell = 0.0
+        readoutSink = r => { readouts.set(r); latch.countDown() },
+        actionSink = actions.add(_),
+        config = AgentConfig(regimeDwell = 0.0)
       )
     )
 
@@ -168,10 +173,9 @@ class MandateAgentSpec:
     val agent = track(
       MandateAgent(
         singleCellGrid(mkCell(0.0)),
-        _ => (),
-        actions.add(_),
-        r => { readouts.set(r); latchRef.get().countDown() },
-        regimeDwell = dwell
+        readoutSink = r => { readouts.set(r); latchRef.get().countDown() },
+        actionSink = actions.add(_),
+        config = AgentConfig(regimeDwell = dwell)
       )
     )
 
@@ -210,10 +214,9 @@ class MandateAgentSpec:
     val agent = track(
       MandateAgent(
         singleCellGrid(mkCell(0.0)),
-        _ => (),
-        actions.add(_),
-        r => { readouts.set(r); latch.countDown() },
-        regimeDwell = 1.0
+        readoutSink = r => { readouts.set(r); latch.countDown() },
+        actionSink = actions.add(_),
+        config = AgentConfig(regimeDwell = 1.0)
       )
     )
 
@@ -236,9 +239,7 @@ class MandateAgentSpec:
     val agent = track(
       MandateAgent(
         singleCellGrid(mkCell(0.0)),
-        _ => (),
-        _ => (),
-        r => { readouts.set(r); latchRef.get().countDown() }
+        readoutSink = r => { readouts.set(r); latchRef.get().countDown() }
       )
     )
 
@@ -269,16 +270,14 @@ class MandateAgentSpec:
   private def awaitPhase(latchRef: AtomicReference[CountDownLatch]): Boolean =
     latchRef.get().await(5, TimeUnit.SECONDS)
 
-  @Test def freshCellsPublishWarmingHeartbeat(): Unit =
+  @Test def freshCellsPublishWarmingRhythm(): Unit =
     val readouts =
       new AtomicReference[Map[CellCoord, CellReadout]](Map.empty)
     val latchRef = new AtomicReference[CountDownLatch](new CountDownLatch(1))
     val agent = track(
       MandateAgent(
         singleCellGrid(mkCell(0.0)),
-        _ => (),
-        _ => (),
-        r => { readouts.set(r); latchRef.get().countDown() }
+        readoutSink = r => { readouts.set(r); latchRef.get().countDown() }
       )
     )
     agent ! EventMsg.TickArrived(0.05, 20.0f)
@@ -326,7 +325,7 @@ class MandateAgentSpec:
       Map(origin -> mkCell(0.0), neighbour -> mkCell(0.0)),
       Seq(LatticeEdge(origin, neighbour, diffusion = 0.5))
     )
-    val agent = track(MandateAgent(grid, _ => ()))
+    val agent = track(MandateAgent(grid))
     agent ! EventMsg.RemoveCell(neighbour)
     Thread.sleep(300)
     assertFalse(grid.cells.contains(neighbour), "removed cell must leave the lattice")
@@ -374,9 +373,7 @@ class MandateAgentSpec:
     track(
       MandateAgent(
         grid,
-        _ => (),
-        _ => (),
-        r => { seen.add(r(origin)); latch.countDown() }
+        readoutSink = r => { seen.add(r(origin)); latch.countDown() }
       )
     )
 
@@ -438,7 +435,7 @@ class MandateAgentSpec:
 
   @Test def reRegistrationResetsSustenanceToNative(): Unit =
     val grid = singleCellGrid(mkCell(0.0))
-    val agent = track(MandateAgent(grid, _ => ()))
+    val agent = track(MandateAgent(grid))
     agent ! EventMsg.SetSustenance(origin, 0.0)
     agent ! EventMsg.RegisterCell(origin)
     Thread.sleep(300)
@@ -541,7 +538,6 @@ class MandateAgentSpec:
     val agent = track(
       MandateAgent(
         grid,
-        _ => (),
         persistSink = snap => {
           published.set(snap)
           latch.get.countDown()

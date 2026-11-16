@@ -11,7 +11,7 @@ import moe.chestnut.awa.voy.inner.veins.{
   RhythmParam,
   MandateAgent,
   FastParam,
-  PhaseResponse,
+  Readout,
   StressParam
 }
 
@@ -49,7 +49,7 @@ object LatticeConfig:
     */
   val OscillationOnsetStress: Double =
     val fast = MandateAgent.DefaultFastParam
-    fast.alpha - PhaseResponse.hopfPoint(fast)._2
+    fast.alpha - Readout.hopfPoint(fast)._2
 
   /** derived: `s_onset + 0.25 × (s_acid − s_onset)` ≈ 0.349 — the opening
     * keeps a small "old-era remnant pulse" inside the natural rhythm band
@@ -57,7 +57,7 @@ object LatticeConfig:
     */
   val DefaultInitialStressPeak: Double =
     OscillationOnsetStress +
-      0.25 * (StressParam().sustenanceBurnThreshold - OscillationOnsetStress)
+      0.25 * (StressParam.BareCore.sustenanceBurnThreshold - OscillationOnsetStress)
 
   /** derived: `(peak − s_onset) / 4` — the remnant zone is an 8×8-chunk
     * inscribed circle (in-band radius 4 cells) around the lattice centre.
@@ -74,8 +74,7 @@ final case class VoyConfig(
     tickDt: Double = 0.05,
     lattice: LatticeConfig = LatticeConfig(),
     fastParam: FastParam = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
-    stressParam: StressParam =
-      StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
+    stressParam: StressParam = StressParam.OverworldDefault,
     rhythmParam: RhythmParam = RhythmParam(),
     calmingParam: CalmingParam = CalmingParam()
 )

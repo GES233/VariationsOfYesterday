@@ -429,9 +429,7 @@ object PhaseResponse:
     * the `eps*beta` term. The corrected draft value is 0.4350.
     */
   def hopfPoint(fast: FastParam): (Double, Double) =
-    val vc = -Math.sqrt(1.0 - fast.epsilon * fast.beta)
-    val ac = fast.beta * (vc - Math.pow(vc, 3) / 3.0) - vc
-    (vc, ac)
+    Readout.hopfPoint(fast)
 
   /** Branch root of `v - v^3/3 = w` on the left (`v <= -1`) or right
     * (`v >= 1`) slow branch.

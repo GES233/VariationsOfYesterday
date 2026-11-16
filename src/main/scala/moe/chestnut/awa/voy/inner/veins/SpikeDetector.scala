@@ -21,7 +21,7 @@ final case class DetectedSpike(at: Double, peak: Double)
   * The two consumers disagree only in *when* a candidate is confirmed, not in
   * what a candidate is: `PulseLinkRunner` needs a prompt confirmation (window)
   * and can emit at the bare crossing for the prototype fingerprint;
-  * `PhaseResponse.runSpikes` confirms at the return through zero, and measures
+  * `PhaseResponse.runSpikes` (in `src/test`) confirms at the return through zero, and measures
   * the crossing time at the step end (no interpolation) because the contract's
   * numbers are defined that way. Those differences are explicit options here,
   * so neither side can silently drift into the other's semantics.

@@ -21,8 +21,8 @@ final case class CellReadout(
       */
     lastBellStrikeAt: Double = Double.NaN,
     simTime: Double = 0.0,
-    sustenanceFloor: Double = StressParam().sustenanceFloor,
-    toxicityThreshold: Double = StressParam().sustenanceBurnThreshold
+    sustenanceFloor: Double = StressParam.BareCore.sustenanceFloor,
+    toxicityThreshold: Double = StressParam.BareCore.sustenanceBurnThreshold
 ):
   /** Canonical 3-tier mycelial health of this cell. */
   def mycelium: SustenanceTier = Readout.sustenanceTier(sustenance, sustenanceFloor)

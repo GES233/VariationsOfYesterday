@@ -123,8 +123,8 @@ object MandateChunkSyncPayload:
 
   private val FlagSheltered = 1 << 0
   private val FlagSpiking = 1 << 1
-  private val FlagBurnoutPhase = 1 << 2
-  private val FlagC0Sheltered = 1 << 3
+  private val FlagSilentBlight = 1 << 2
+  private val FlagCalmingStock = 1 << 3
 
   val Codec: PacketCodec[RegistryByteBuf, MandateChunkSyncPayload] =
     new PacketCodec[RegistryByteBuf, MandateChunkSyncPayload]:
@@ -153,8 +153,8 @@ object MandateChunkSyncPayload:
     val flags =
       (if v.isSheltered then FlagSheltered else 0) |
         (if v.isSpiking then FlagSpiking else 0) |
-        (if v.hasSilentBlight then FlagBurnoutPhase else 0) |
-        (if v.hasCalmingStock then FlagC0Sheltered else 0) |
+        (if v.hasSilentBlight then FlagSilentBlight else 0) |
+        (if v.hasCalmingStock then FlagCalmingStock else 0) |
         ((v.rhythmOrdinal & 0x7) << 4)
     buf.writeByte(flags)
     buf.writeByte(v.seepTier.ordinal)
@@ -198,8 +198,8 @@ object MandateChunkSyncPayload:
       mycelium = mycelium,
       isSheltered = (flags & FlagSheltered) != 0,
       isSpiking = (flags & FlagSpiking) != 0,
-      hasSilentBlight = (flags & FlagBurnoutPhase) != 0,
-      hasCalmingStock = (flags & FlagC0Sheltered) != 0,
+      hasSilentBlight = (flags & FlagSilentBlight) != 0,
+      hasCalmingStock = (flags & FlagCalmingStock) != 0,
       seepTier = seepTier,
       dialTick = dialTick,
       phaseLabel = phaseLabel,

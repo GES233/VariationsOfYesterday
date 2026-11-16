@@ -4,6 +4,19 @@ import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.actor.{Actor, ActorRef}
 import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 
+/** Bootstrapping and tuning configuration for [[MandateAgent]]. */
+final case class AgentConfig(
+    links: Seq[PulseLink] = Nil,
+    spikeCriterion: SpikeCriterion = SpikeCriterion.PeakConfirmed,
+    initialSimTime: Double = 0.0,
+    defaultFastParam: FastParam = MandateAgent.DefaultFastParam,
+    defaultStressParam: StressParam = MandateAgent.DefaultStressParam,
+    persistPeriod: Double = 1.0,
+    initialRhythmEvidence: Map[CellCoord, RhythmEvidence] = Map.empty,
+    regimeDwell: Double = 5.0,
+    rhythmParam: RhythmParam = RhythmParam()
+)
+
 /** The mandate engine actor: owns the lattice and integrates it on tick
   * events.
   *
@@ -18,9 +31,10 @@ object MandateAgent:
     FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
 
   /** Dormant sustenance by default: the pure FHN core, as the contract
-    * slice and the fingerprint rigs instantiate it.
+    * slice and isolated core specs instantiate it. Overworld wiring injects
+    * [[StressParam.OverworldDefault]].
     */
-  val DefaultStressParam: StressParam = StressParam()
+  val DefaultStressParam: StressParam = StressParam.BareCore
 
   /** Per-cell runtime bookkeeping consolidated into one slot, eliminating
     * parallel maps that had to be manually synchronized on cell add/remove.
@@ -83,24 +97,15 @@ object MandateAgent:
 
   def apply(
       grid: MandateGrid,
-      snapshotSink: Map[CellCoord, MandateCurrent] => Unit,
-      actionSink: MandateActionProtocol => Unit = (_ => ()),
-      readoutSink: Map[CellCoord, CellReadout] => Unit = (_ => ()),
-      links: Seq[PulseLink] = Nil,
-      spikeCriterion: SpikeCriterion = SpikeCriterion.PeakConfirmed,
-      initialSimTime: Double = 0.0,
-      defaultFastParam: FastParam = DefaultFastParam,
-      defaultStressParam: StressParam = DefaultStressParam,
-      persistSink: MandateSnapshot => Unit = (_ => ()),
-      persistPeriod: Double = 1.0,
-      initialBeatStats: Map[CellCoord, RhythmEvidence] = Map.empty,
-      regimeDwell: Double = 5.0,
-      rhythmParam: RhythmParam = RhythmParam()
+      readoutSink: Map[CellCoord, CellReadout] => Unit = _ => (),
+      actionSink: MandateActionProtocol => Unit = _ => (),
+      persistSink: MandateSnapshot => Unit = _ => (),
+      config: AgentConfig = AgentConfig()
   ): ActorRef[EventDTO] =
     val readoutParam = ReadoutParam()
-    var simTime: Double = initialSimTime
-    var nextPersistAt: Double = initialSimTime
-    val linkRunner = new PulseLinkRunner(links, criterion = spikeCriterion)
+    var simTime: Double = config.initialSimTime
+    var nextPersistAt: Double = config.initialSimTime
+    val linkRunner = new PulseLinkRunner(config.links, criterion = config.spikeCriterion)
 
     def mkSlot(cell: MandateState, stats: RhythmEvidence = RhythmEvidence.zero): CellSlot =
       val tracker = new PhaseTracker(
@@ -109,10 +114,10 @@ object MandateAgent:
         cell.stressParam.coupling,
         cell.stressParam.sustenanceDepth
       )
-      // Restoring beat statistics keeps a reloaded cell's rhythm verdict
+      // Restoring rhythm evidence keeps a reloaded cell's rhythm verdict
       // continuous instead of restarting the Warming grace (note 11 risk 2).
       if stats.periods.nonEmpty || !stats.lastCross.isNaN || !stats.bornAt.isNaN then
-        tracker.restoreBeatStats(stats)
+        tracker.restoreRhythmEvidence(stats)
       new CellSlot(
         tracker = tracker,
         publishedRegime = Readout.regime(cell.getState, readoutParam)
@@ -120,10 +125,10 @@ object MandateAgent:
 
     val slots = scala.collection.mutable.HashMap.empty[CellCoord, CellSlot]
     grid.cells.foreach { case (coord, cell) =>
-      slots(coord) = mkSlot(cell, initialBeatStats.getOrElse(coord, RhythmEvidence.zero))
+      slots(coord) = mkSlot(cell, config.initialRhythmEvidence.getOrElse(coord, RhythmEvidence.zero))
     }
 
-    def currentBeatStats: Map[CellCoord, RhythmEvidence] =
+    def currentRhythmEvidence: Map[CellCoord, RhythmEvidence] =
       slots.iterator.map { case (c, slot) => c -> slot.tracker.rhythmEvidence }.toMap
 
     /** Bell strikes stamp the overdrive guard on living cells (dead land
@@ -149,18 +154,16 @@ object MandateAgent:
       linkRunner
         .duePulses(simTime)
         .foreach { event =>
-          applyEvent(grid, event, defaultFastParam, defaultStressParam)
+          applyEvent(grid, event, config.defaultFastParam, config.defaultStressParam)
         }
       grid.step(dt)
       simTime += dt
       linkRunner.observe(simTime, grid.cells)
 
-      val currentBuilder = Map.newBuilder[CellCoord, MandateCurrent]
       val readoutBuilder = Map.newBuilder[CellCoord, CellReadout]
 
       grid.cells.foreach { case (coord, cell) =>
         val cur = cell.getState
-        currentBuilder += (coord -> cur)
 
         val slot = slots.getOrElseUpdate(coord, mkSlot(cell))
         val phase = slot.tracker.observe(simTime, cur, cell.sustenance)
@@ -173,7 +176,7 @@ object MandateAgent:
           val since = slot.regimeCandidate match
             case Some((cand, t)) if cand == rawRegime => t
             case _                                    => simTime
-          if simTime - since >= regimeDwell then
+          if simTime - since >= config.regimeDwell then
             val oldRegime = slot.publishedRegime
             slot.publishedRegime = rawRegime
             slot.regimeCandidate = None
@@ -197,18 +200,18 @@ object MandateAgent:
           cell.stressParam.coupling,
           cell.stressParam.sustenanceDepth
         )
-        val rawHeartbeat = RhythmVerdict.classify(
+        val rawRhythm = RhythmVerdict.classify(
           slot.tracker.rhythmEvidence,
           simTime,
           selfSustained = Readout.oscillating(aSlow, cell.param),
-          rhythmParam
+          config.rhythmParam
         )
         val (rhythm, badSince) = RhythmVerdict.smooth(
-          rawHeartbeat,
+          rawRhythm,
           slot.rhythm,
           slot.heartbeatBadSince,
           simTime,
-          rhythmParam
+          config.rhythmParam
         )
         slot.rhythm = rhythm
         slot.heartbeatBadSince = badSince
@@ -235,12 +238,11 @@ object MandateAgent:
           slot.inSpike = false
       }
 
-      snapshotSink(currentBuilder.result())
       readoutSink(readoutBuilder.result())
 
       if simTime >= nextPersistAt then
-        persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentBeatStats))
-        nextPersistAt = simTime + persistPeriod
+        persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentRhythmEvidence))
+        nextPersistAt = simTime + config.persistPeriod
 
     def handle(event: EventDTO): Unit =
       event match
@@ -248,22 +250,22 @@ object MandateAgent:
         case EventMsg.AddLink(link) => linkRunner.addLink(link)
         case EventMsg.RemoveLink(src, dst) => linkRunner.removeLink(src, dst)
         case EventMsg.FlushNow =>
-          persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentBeatStats))
-          nextPersistAt = simTime + persistPeriod
+          persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentRhythmEvidence))
+          nextPersistAt = simTime + config.persistPeriod
         case other @ EventMsg.RegisterCell(cell, _, _) =>
-          applyEvent(grid, other, defaultFastParam, defaultStressParam)
+          applyEvent(grid, other, config.defaultFastParam, config.defaultStressParam)
           grid.cells.get(cell).foreach { c =>
             slots(cell) = mkSlot(c)
           }
         case other @ EventMsg.RemoveCell(cell) =>
-          applyEvent(grid, other, defaultFastParam, defaultStressParam)
+          applyEvent(grid, other, config.defaultFastParam, config.defaultStressParam)
           slots.remove(cell)
           linkRunner.forgetCell(cell)
         case other @ EventMsg.FirePulse(cell, area, transmitter) =>
-          applyEvent(grid, other, defaultFastParam, defaultStressParam)
+          applyEvent(grid, other, config.defaultFastParam, config.defaultStressParam)
           // Only actual bell strikes feed the overdrive guard; crystal-link
           // pulses are autonomous physics, not a player cadence.
           if transmitter == PulseTransmitter.Bell then recordBellStrike(cell, area)
-        case other => applyEvent(grid, other, defaultFastParam, defaultStressParam)
+        case other => applyEvent(grid, other, config.defaultFastParam, config.defaultStressParam)
 
     Actor.spawn("mandate")(handle)

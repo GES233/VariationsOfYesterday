@@ -10,7 +10,7 @@ class PhaseTracker(
     param: ReadoutParam = ReadoutParam(),
     fast: FastParam = MandateAgent.DefaultFastParam,
     coupling: Double = 1.0,
-    depth: Double = StressParam().sustenanceDepth
+    depth: Double = StressParam.BareCore.sustenanceDepth
 ):
   private var tPrev = Double.NaN
   private var vPrev = Double.NaN
@@ -56,7 +56,7 @@ class PhaseTracker(
     * crossing list and the excursion counter are not persisted — only the
     * period ring, duty, and the Warming anchors matter downstream.
     */
-  def restoreBeatStats(stats: RhythmEvidence): Unit =
+  def restoreRhythmEvidence(stats: RhythmEvidence): Unit =
     periodHistory = stats.periods.take(PhaseTracker.PeriodHistoryCap)
     lastDutyV = stats.lastDuty
     lastCross = stats.lastCross

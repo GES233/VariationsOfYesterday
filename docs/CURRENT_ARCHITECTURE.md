@@ -29,9 +29,9 @@
 
 ## 3. 工程避坑指南（边界、双默认与刻意保留的旧 Key）
 
-1. **双默认参数陷阱**：
-   - `StressParam()`（`MandateState.scala`）默认 `sustenanceGrowth = 0.0, sustenanceBurn = 0.0`（菌网休眠），专门给裸核测试与回归快照使用；
-   - 运行时必须通过 `VoyConfig`（`1e-3` / `4e-3`）注入生态参数。接线代码切勿直接构造裸 `StressParam()` 当成生产默认。
+1. **预设与双默认参数**：
+   - `StressParam.BareCore`（`StressParam()` 默认，`sustenanceGrowth = 0.0, sustenanceBurn = 0.0`，菌网休眠）：专供裸核测试与数值回归快照；
+   - `StressParam.OverworldDefault`（`1e-3` / `4e-3`）：`VoyConfig` 主世界运行时默认预设；接线代码切勿直接传 `BareCore` 当生产默认。
 2. **冻结的序列化与协议边界（代码变量已改名，wire/save key 刻意保留）**：
    - **存档（`MandatePersistence.scala`）**：`SchemaVersion = 3`（版本或几何尺寸不匹配即整体丢弃重来）；NBT key 仍沿用 `"dissonance"` / `"entrench"` / `"beatPeriods"` / `"beatDuty"`。
    - **配置（`VoyConfig.scala`）**：`config/variations-of-yesterday.json` 中的键名仍用 `"heartbeatParam"`。
@@ -39,8 +39,7 @@
 3. **数值回归快照（`contracts/mandate-slice-v1.json`）**：
    - 已降级为 Scala 内部数值快照（无源码 SHA-256 锁，改注释/重构不报错，改积分行为才报错）。非刻意调方程勿手改；重生成命令为 `./gradlew test -Dvoy.contract.write=true`。
 4. **测试集里的实验室代码**：
-   - `PhaseResponse.scala`（479 行）目前仍在 `src/main`，但生产代码只调用其 `hopfPoint`；其余均为离线 PRC 实验台架，服务于 `src/test`。
-   - `GridBenchmarkSpec` 需设置环境变量 `VOY_BENCH=1` 才运行。
+   - 离线 PRC 实验台架 `PhaseResponse.scala` 已移入 `src/test`（`hopfPoint` 已收入 `Readout`）；`GridBenchmarkSpec` 需设置环境变量 `VOY_BENCH=1` 才运行。
 
 ## 4. 明确尚未实施的规划项（勿把历史文档当成现状）
 

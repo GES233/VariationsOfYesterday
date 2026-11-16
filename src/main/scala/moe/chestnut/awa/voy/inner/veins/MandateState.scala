@@ -51,6 +51,18 @@ case class StressParam(
     // trickle from living neighbours survives and may grow past it
 )
 
+object StressParam:
+  /** Dormant sustenance (`r = 0, c = 0`): measures the bare FHN core at native
+    * `M = 1`, used by the numeric snapshot contract and isolated core specs.
+    */
+  val BareCore: StressParam = StressParam()
+
+  /** Gameplay overworld defaults (design note 06 §7.1): enables mycelial
+    * logistic regrowth and high-stress acid burn.
+    */
+  val OverworldDefault: StressParam =
+    StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
+
 /** Full state of the mandate system.
   *
   * Fast: `excitation` (v), `recovery` (w).

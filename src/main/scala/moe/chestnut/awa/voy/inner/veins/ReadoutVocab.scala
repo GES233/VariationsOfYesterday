@@ -83,7 +83,7 @@ object Readout:
   /** Classify mycelial network health (`M`) into the canonical 3-tier enum. */
   def sustenanceTier(
       sustenance: Double,
-      floor: Double = StressParam().sustenanceFloor
+      floor: Double = StressParam.BareCore.sustenanceFloor
   ): SustenanceTier =
     if sustenance < Math.max(floor, 1e-9) then SustenanceTier.Dead
     else if sustenance < IntactSustenance then SustenanceTier.Damaged
@@ -101,7 +101,7 @@ object Readout:
       stress: Double,
       sustenance: Double = 1.0,
       coupling: Double = 1.0,
-      depth: Double = StressParam().sustenanceDepth
+      depth: Double = StressParam.BareCore.sustenanceDepth
   ): Double =
     fast.alpha - depth * (1.0 - sustenance) - coupling * stress
 
@@ -111,7 +111,7 @@ object Readout:
       sustenance: Double,
       fast: FastParam = MandateAgent.DefaultFastParam,
       coupling: Double = 1.0,
-      depth: Double = StressParam().sustenanceDepth
+      depth: Double = StressParam.BareCore.sustenanceDepth
   ): Boolean =
     slowA(fast, stress, sustenance, coupling, depth) <= burnoutA(fast)
 
@@ -123,15 +123,24 @@ object Readout:
       stress: Double,
       fast: FastParam = MandateAgent.DefaultFastParam,
       coupling: Double = 1.0,
-      depth: Double = StressParam().sustenanceDepth,
-      floor: Double = StressParam().sustenanceFloor
+      depth: Double = StressParam.BareCore.sustenanceDepth,
+      floor: Double = StressParam.BareCore.sustenanceFloor
   ): Boolean =
     sustenanceTier(sustenance, floor).isDead ||
       isSlowOffsetBelowKnee(stress, sustenance, fast, coupling, depth)
 
+  /** Recovery offset at which the fast subsystem loses stability, from the
+    * closed form `trace(J) = 1 - v^2 - eps*beta = 0` together with the fixed
+    * point conditions. Returns `(v_c, a_c)`.
+    */
+  def hopfPoint(fast: FastParam): (Double, Double) =
+    val vc = -Math.sqrt(1.0 - fast.epsilon * fast.beta)
+    val ac = fast.beta * (vc - Math.pow(vc, 3) / 3.0) - vc
+    (vc, ac)
+
   /** Whether a limit cycle exists at this recovery offset. */
   def oscillating(a: Double, fast: FastParam): Boolean =
-    val (_, ac) = PhaseResponse.hopfPoint(fast)
+    val (_, ac) = hopfPoint(fast)
     a < ac && a > burnoutA(fast)
 
   /** Stable left-branch rest point for recovery offset `a`. */

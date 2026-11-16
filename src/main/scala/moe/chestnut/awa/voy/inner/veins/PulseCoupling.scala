@@ -36,7 +36,7 @@ enum PulseTransmitter(val tau: Double):
   *     `tau = 5.0` alpha-shock / bell kernel.
   *
   * The default `area = 0.5` is the measured locking threshold (design note
-  * 06, E2/E3) — a link weaker than that cannot pull a neighbour's phase.
+  * 07, E2) — a link weaker than that cannot pull a neighbour's phase.
   */
 final case class PulseLink(
     src: CellCoord,
@@ -92,8 +92,8 @@ final case class CoupledTrace(
   */
 final class PulseLinkRunner(
     initialLinks: Seq[PulseLink],
-    val section: Double = PhaseResponse.section,
-    val spikeLevel: Double = PhaseResponse.spikeLevel,
+    val section: Double = PhaseDetection.SectionLevel,
+    val spikeLevel: Double = PhaseDetection.SpikeLevel,
     val criterion: SpikeCriterion = SpikeCriterion.PeakConfirmed,
     val confirmWindow: Double = PulseCoupling.SpikeConfirmWindow
 ):
@@ -229,8 +229,8 @@ object PulseCoupling:
       dt: Double,
       tEnd: Double,
       criterion: SpikeCriterion = SpikeCriterion.SectionCrossing,
-      section: Double = PhaseResponse.section,
-      spikeLevel: Double = PhaseResponse.spikeLevel,
+      section: Double = PhaseDetection.SectionLevel,
+      spikeLevel: Double = PhaseDetection.SpikeLevel,
       confirmWindow: Double = PulseCoupling.SpikeConfirmWindow,
       recordStress: Boolean = false
   ): CoupledTrace =

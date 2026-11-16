@@ -57,8 +57,8 @@ object MandateEffects:
     new StagnationEffect(StagnationSpikeId, 0xFF2E2E, Some(-0.91)) // acute rhythm: Fast/Arrhythmic red
   )
 
-  /** 脉冲过载: immediate minor backlash when over-rapid pulses drive a cell into
-    * acute overload lockout (×0.75 break speed, ×0.85 movement speed).
+  /** 脉冲过载: immediate minor backlash when bell strikes land inside the
+    * overdrive guard (×0.75 break speed, ×0.85 movement speed).
     */
   val PulseSaturation: StatusEffect = register(
     PulseSaturationId,
@@ -96,7 +96,7 @@ object MandateEffects:
     /** Stagnation is a continuous, ambient suppression: it does nothing on tick. */
     override def canApplyUpdateEffect(duration: Int, amplifier: Int): Boolean = false
 
-  /** Immediate minor backlash effect for over-pulsing a cell into an acute overload lockout. */
+  /** Immediate minor backlash effect when bell strikes violate the overdrive guard. */
   private final class PulseSaturationEffect(
       id: Identifier,
       color: Int,

@@ -137,7 +137,7 @@ object MandateHud:
       "过缓 Slow (沉滞)",
       "过速 Fast (急性)",
       "失律 Arrhythmic (急性)",
-      "生态死亡 (不可逆)"
+      "生态死亡 (死寂)"
     )
     val legendW = gridPixelSize + 21 + legendLabels.map(textRenderer.getWidth(_)).max
     val textW = Seq(headerText, tel1, tel2, phaseLine).map(textRenderer.getWidth(_)).max

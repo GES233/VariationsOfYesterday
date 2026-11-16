@@ -10,8 +10,7 @@ import org.junit.jupiter.api.Test
   */
 class MandateSnapshotSpec:
   private val fast = FastParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
-  private val mycelial =
-    StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
+  private val mycelial = StressParam.OverworldDefault
 
   private def mkGrid(): MandateGrid =
     MandateGrid.rectangular(
@@ -118,7 +117,7 @@ class MandateSnapshotSpec:
     val stats = RhythmEvidence(Vector(40.1, 39.8), lastDuty = 0.05, lastCross = 120.0, bornAt = 0.0)
     val snap = MandateSnapshot.capture(grid, Nil, simTime = 130.0, Map(coord -> stats))
     assertEquals(stats, snap.cells.find(_.coord == coord).get.rhythmEvidence)
-    val restored = MandateSnapshot.restoreBeatStats(snap)
+    val restored = MandateSnapshot.restoreRhythmEvidence(snap)
     assertEquals(stats, restored(coord))
     assertEquals(
       RhythmEvidence.zero,

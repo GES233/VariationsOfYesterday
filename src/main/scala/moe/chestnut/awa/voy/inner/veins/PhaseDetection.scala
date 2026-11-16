@@ -3,7 +3,7 @@ package moe.chestnut.awa.voy.inner.veins
 /** Shared constants and interpolation for the phase-sensing layer.
   *
   * The runtime readout (`PhaseTracker`), the crystal-link runner
-  * (`PulseLinkRunner`) and the offline PRC harness (`PhaseResponse`) all sense
+  * (`PulseLinkRunner`) and the offline PRC test harness (`PhaseResponse`) all sense
   * the same Poincaré section: `v` crossing [[SectionLevel]] upwards. Before
   * this object existed the three copies carried their own literals and could
   * drift apart (audit B15). Only the *spike* rule differs by layer:
