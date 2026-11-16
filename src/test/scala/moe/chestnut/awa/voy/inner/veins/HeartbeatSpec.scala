@@ -1,0 +1,220 @@
+package moe.chestnut.awa.voy.inner.veins
+
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
+
+/** Judgment table of the heartbeat axis (design note 11 §1.2/§1.3) and the
+  * shelter semantics built on it. Pure classifier cases fabricate
+  * [[BeatStats]] directly; one integration case runs a real cell through
+  * [[PhaseTracker]].
+  */
+class HeartbeatSpec:
+  private val p = HeartbeatParam()
+  // nominalPeriod 39.47 -> periodMin ≈ 29.6, periodMax ≈ 78.9,
+  // stale window = 2.5 × 39.47 ≈ 98.7 s.
+
+  private def stats(
+      periods: Vector[Double],
+      duty: Double = 0.10,
+      lastCross: Double = 90.0,
+      bornAt: Double = 0.0
+  ): BeatStats = BeatStats(periods, duty, lastCross, bornAt)
+
+  private def healthyReadout(heartbeat: Heartbeat): CellReadout =
+    CellReadout(
+      current = MandateCurrent(-1.2, -0.6, 0.05, 0.0),
+      regime = Regime.Calm,
+      phase = PhaseReading.Basin(PhaseLabel.Resting),
+      baselineCalming = 0.03,
+      heartbeat = heartbeat,
+      simTime = 5.0
+    )
+
+  @Test def `a stable 40 s beat at low duty reads Beating`(): Unit =
+    val hb = Heartbeat.classify(stats(Vector(40.0, 40.0, 40.0)), 100.0, selfSustained = true, p)
+    hb match
+      case Heartbeat.Beating(period, duty, source) =>
+        assertEquals(40.0, period, 1e-12)
+        assertEquals(0.10, duty, 1e-12)
+        assertEquals(BeatSource.Intrinsic, source)
+      case other => fail(s"expected Beating, got $other")
+
+  @Test def `a 20 s period reads Fast`(): Unit =
+    val hb = Heartbeat.classify(stats(Vector(20.0, 20.0, 20.0)), 100.0, selfSustained = false, p)
+    hb match
+      case Heartbeat.Fast(period) => assertEquals(20.0, period, 1e-12)
+      case other                  => fail(s"expected Fast, got $other")
+
+  @Test def `a 120 s period reads Slow`(): Unit =
+    val hb = Heartbeat.classify(stats(Vector(120.0, 120.0, 120.0)), 100.0, selfSustained = true, p)
+    hb match
+      case Heartbeat.Slow(period) => assertEquals(120.0, period, 1e-12)
+      case other                  => fail(s"expected Slow, got $other")
+
+  @Test def `period jitter beyond tolerance reads Arrhythmic`(): Unit =
+    // mean 44, CV ≈ 0.257 > 0.20
+    val hb = Heartbeat.classify(stats(Vector(60.0, 36.0, 36.0)), 100.0, selfSustained = true, p)
+    hb match
+      case Heartbeat.Arrhythmic(lastPeriod, _) => assertEquals(44.0, lastPeriod, 1e-9)
+      case other => fail(s"expected Arrhythmic, got $other")
+
+  @Test def `a single-cycle duty above the bound reads Arrhythmic`(): Unit =
+    val hb = Heartbeat.classify(
+      stats(Vector(40.0, 40.0, 40.0), duty = 0.45),
+      100.0,
+      selfSustained = true,
+      p
+    )
+    hb match
+      case Heartbeat.Arrhythmic(_, duty) => assertEquals(0.45, duty, 1e-12)
+      case other => fail(s"expected Arrhythmic, got $other")
+
+  @Test def `no crossing past the grace anchor reads Slow`(): Unit =
+    val hb = Heartbeat.classify(
+      BeatStats(Vector.empty, Double.NaN, Double.NaN, bornAt = 0.0),
+      200.0,
+      selfSustained = false,
+      p
+    )
+    hb match
+      case Heartbeat.Slow(period) => assertTrue(period.isNaN, "no period was ever measured")
+      case other                  => fail(s"expected Slow, got $other")
+
+  @Test def `fewer than minCycles cycles with a live anchor reads Warming and shelters`(): Unit =
+    val hb = Heartbeat.classify(stats(Vector(40.0, 40.0)), 100.0, selfSustained = true, p)
+    assertEquals(Heartbeat.Warming, hb)
+    assertTrue(
+      healthyReadout(Heartbeat.Warming).isShelteredByHeartbeat,
+      "the Warming grace shelters (it replaces the old first-strike window)"
+    )
+
+  @Test def `a fresh cell past the birth grace still warms while it keeps crossing`(): Unit =
+    // v2 anchor rule: born at 0, last crossing at 90, now 110 — 110 > 98.7
+    // since birth, but only 20 since the last crossing: still Warming.
+    val hb = Heartbeat.classify(
+      stats(Vector(40.0, 40.0), lastCross = 90.0, bornAt = 0.0),
+      110.0,
+      selfSustained = true,
+      p
+    )
+    assertEquals(Heartbeat.Warming, hb)
+
+  @Test def `Warming with dead mycelium is not sheltered`(): Unit =
+    val r = healthyReadout(Heartbeat.Warming).copy(sustenance = 0.0)
+    assertFalse(r.isShelteredByHeartbeat, "mycelium and knee still take priority")
+
+  @Test def `a below-knee cell is not sheltered even when Beating`(): Unit =
+    val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
+    val r = healthyReadout(beating).copy(
+      phase = PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee)
+    )
+    assertFalse(r.isShelteredByHeartbeat)
+
+  @Test def `the spike phase does not suspend heartbeat shelter`(): Unit =
+    val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
+    val r = healthyReadout(beating).copy(
+      current = MandateCurrent(1.9, 0.2, 0.6, 0.5),
+      regime = Regime.Oscillating,
+      phase = PhaseReading.Cycle(PhaseLabel.Excitation, 0.05)
+    )
+    assertTrue(r.isSpiking)
+    assertTrue(
+      r.isShelteredByHeartbeat,
+      "the beat's high phase is part of the shelter (design note 11 §1.3)"
+    )
+
+  @Test def `a paced beat shelters alike`(): Unit =
+    val hb = Heartbeat.classify(stats(Vector(40.0, 40.0, 40.0)), 100.0, selfSustained = false, p)
+    hb match
+      case Heartbeat.Beating(_, _, source) => assertEquals(BeatSource.Paced, source)
+      case other                           => fail(s"expected Beating, got $other")
+    assertTrue(healthyReadout(hb).isShelteredByHeartbeat, "Paced counts as shelter (ruling 1)")
+
+  @Test def `a beat gone stale reads Slow`(): Unit =
+    val hb = Heartbeat.classify(
+      stats(Vector(40.0, 40.0, 40.0), lastCross = 0.0),
+      200.0,
+      selfSustained = true,
+      p
+    )
+    hb match
+      case Heartbeat.Slow(period) => assertEquals(40.0, period, 1e-12)
+      case other                  => fail(s"expected Slow, got $other")
+
+  @Test def `A/B benchmark: the two shelter models on the same readouts`(): Unit =
+    val openWindow = PulseStamp(shelterUntil = 40.0, cooldownUntil = 8.0)
+    val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
+
+    val bothWays = healthyReadout(beating).copy(pulseStamp = openWindow)
+    assertTrue(bothWays.sheltered(ShelterModel.Window))
+    assertTrue(bothWays.sheltered(ShelterModel.Heartbeat))
+
+    val windowOnly = healthyReadout(Heartbeat.Slow(Double.NaN)).copy(pulseStamp = openWindow)
+    assertTrue(windowOnly.sheltered(ShelterModel.Window), "the window still shelters")
+    assertFalse(windowOnly.sheltered(ShelterModel.Heartbeat), "a silent heart does not")
+
+    val graceOnly = healthyReadout(Heartbeat.Warming) // PulseStamp.zero by default
+    assertFalse(graceOnly.sheltered(ShelterModel.Window), "no pulse window, no shelter")
+    assertTrue(graceOnly.sheltered(ShelterModel.Heartbeat), "the Warming grace shelters")
+
+  @Test def `exit hysteresis: a bad stretch shorter than two cycles does not leave Beating`(): Unit =
+    val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
+    val arr = Heartbeat.Arrhythmic(44.0, 0.45)
+    val (pub1, since1) = Heartbeat.smooth(arr, beating, Double.NaN, 100.0, p)
+    assertEquals(beating, pub1)
+    assertEquals(100.0, since1, 1e-12)
+    val (pub2, since2) = Heartbeat.smooth(arr, pub1, since1, 100.0 + 1.9 * p.nominalPeriod, p)
+    assertEquals(beating, pub2, "still inside the two-cycle grace")
+    val (pub3, since3) = Heartbeat.smooth(arr, pub2, since2, 100.0 + 2.1 * p.nominalPeriod, p)
+    assertEquals(arr, pub3, "two consecutive bad cycles exit Beating")
+    assertTrue(since3.isNaN)
+
+  @Test def `exit hysteresis: recovery clears the bad stretch`(): Unit =
+    val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
+    val (_, since1) = Heartbeat.smooth(Heartbeat.Fast(20.0), beating, Double.NaN, 100.0, p)
+    val (pub2, since2) = Heartbeat.smooth(beating, beating, since1, 150.0, p)
+    assertEquals(beating, pub2)
+    assertTrue(since2.isNaN)
+
+  @Test def `exit hysteresis never delays transitions out of a non-Beating verdict`(): Unit =
+    val (pub, since) =
+      Heartbeat.smooth(Heartbeat.Slow(Double.NaN), Heartbeat.Warming, Double.NaN, 100.0, p)
+    pub match
+      case Heartbeat.Slow(per) =>
+        assertTrue(per.isNaN, "Warming ends immediately when judged dead")
+      case other => fail(s"expected Slow, got $other")
+    assertTrue(since.isNaN)
+
+  @Test def `a settled natural-band oscillator classifies Beating from live tracker statistics`(): Unit =
+    // s = 0.40 sits mid natural band (§2.1: period ≈ 39.5 s, duty ≈ 4–6%).
+    val fast = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08)
+    val st = MandateState(
+      MandateCurrent(-1.2, -0.6, 0.40, 0.0),
+      fast,
+      StressParam(gamma = 0.0)
+    )
+    val tr = new PhaseTracker(ReadoutParam(), fast)
+    var t = 0.0
+    var hb = Heartbeat.Warming
+    var hbAt50 = Heartbeat.Warming
+    while t < 400.0 do
+      st.step(0.02)
+      t += 0.02
+      tr.observe(t, st.getState, st.sustenance)
+      val selfSustained = Readout.oscillating(
+        Readout.slowA(fast, st.getState.stress, st.sustenance),
+        fast
+      )
+      hb = Heartbeat.classify(tr.beatStats, t, selfSustained, p)
+      if t < 51.0 then hbAt50 = hb
+    assertEquals(
+      Heartbeat.Warming,
+      hbAt50,
+      "collecting minCycles=3 intervals takes ~4 crossings: still Warming at t=50"
+    )
+    hb match
+      case Heartbeat.Beating(period, duty, source) =>
+        assertEquals(BeatSource.Intrinsic, source)
+        assertEquals(39.5, period, 3.0, s"natural-band period, got $period")
+        assertTrue(duty > 0.0 && duty < p.dutyMax, s"healthy duty, got $duty")
+      case other => fail(s"a settled natural-band cell must be Beating, got $other")

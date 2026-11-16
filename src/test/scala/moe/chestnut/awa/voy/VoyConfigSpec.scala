@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
+import moe.chestnut.awa.voy.inner.veins.{HeartbeatParam, ShelterModel}
+
 /** External configuration loading (`config/variations-of-yesterday.json`). */
 class VoyConfigSpec:
   @TempDir var tempDir: Path = uninitialized
@@ -50,3 +52,26 @@ class VoyConfigSpec:
       VoyConfig.loadFrom(configPath),
       "a malformed file must never half-apply"
     )
+
+  @Test def `the shelter A/B switch defaults to window and parses heartbeat`(): Unit =
+    assertEquals(ShelterModel.Window, VoyConfig().shelterModel)
+
+    Files.writeString(
+      configPath,
+      """{
+        |  "shelterModel": "heartbeat",
+        |  "heartbeatParam": { "nominalPeriod": 42.0, "minCycles": 4 }
+        |}""".stripMargin
+    )
+    val cfg = VoyConfig.loadFrom(configPath)
+    assertEquals(ShelterModel.Heartbeat, cfg.shelterModel)
+    assertEquals(42.0, cfg.heartbeatParam.nominalPeriod, 1e-12)
+    assertEquals(4, cfg.heartbeatParam.minCycles)
+    assertEquals(0.75 * 42.0, cfg.heartbeatParam.periodMin, 1e-12, "derived thresholds track")
+    assertEquals(HeartbeatParam().staleCycles, cfg.heartbeatParam.staleCycles, 0.0)
+
+  @Test def `derived lattice defaults are written out and reload identically`(): Unit =
+    val cfg = VoyConfig.loadFrom(configPath)
+    assertEquals(LatticeConfig.DefaultInitialStressPeak, cfg.lattice.initialStressPeak, 1e-12)
+    assertEquals(LatticeConfig.DefaultInitialStressFalloff, cfg.lattice.initialStressFalloff, 1e-12)
+    assertEquals(cfg, VoyConfig.loadFrom(configPath), "the written defaults must reload exactly")

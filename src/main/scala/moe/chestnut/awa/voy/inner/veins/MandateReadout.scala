@@ -169,7 +169,9 @@ end Readout
   *   1. **Dynamics**: `regime`, `phase`, `isSpiking`, `isSlowOffsetBelowKnee`
   *   2. **Mycelium**: `mycelium` (`Intact` / `Damaged` / `Dead`), `isToxicSoil`
   *   3. **Shelter**: `isSheltered` (active `pulseStamp` window on viable,
-  *      non-collapsed, non-spiking ground)
+  *      non-collapsed, non-spiking ground) — legacy window model; the
+  *      heartbeat model (design note 11) is `isShelteredByHeartbeat`, with
+  *      `sheltered(model)` dispatching between them (Step 1 A/B switch)
   */
 final case class CellReadout(
     current: MandateCurrent,
@@ -179,6 +181,7 @@ final case class CellReadout(
     baselineCalming: Double = 0.0,
     pulseDrive: Double = 0.0,
     pulseStamp: PulseStamp = PulseStamp.zero,
+    heartbeat: Heartbeat = Heartbeat.Warming,
     simTime: Double = 0.0,
     sustenanceFloor: Double = StressParam().sustenanceFloor,
     toxicityThreshold: Double = StressParam().sustenanceBurnThreshold
@@ -207,6 +210,24 @@ final case class CellReadout(
       !isSlowOffsetBelowKnee &&
       !isSpiking
 
+  /** Dimension 3 under the heartbeat model (design note 11 §1.3): the beat
+    * itself shelters. `Warming` grace shelters (it replaces the old "first
+    * strike opens a window" immediacy); a spike phase deliberately does NOT
+    * suspend shelter — the beat's high phase is part of it.
+    */
+  def isShelteredByHeartbeat: Boolean =
+    (heartbeat.isBeating || heartbeat.isWarming) &&
+      mycelium.isViable &&
+      !isSlowOffsetBelowKnee
+
+  /** A/B dispatch on the active shelter model (Step 1 switch; the `Window`
+    * branch is deleted in Step 2).
+    */
+  def sheltered(model: ShelterModel): Boolean =
+    model match
+      case ShelterModel.Window    => isSheltered
+      case ShelterModel.Heartbeat => isShelteredByHeartbeat
+
   /** 20-division mountain dial tick (`0..19`) when in a regular cycle. */
   def dialTick: Option[Int] = Readout.dialTick(phase)
 
@@ -234,36 +255,61 @@ class PhaseTracker(
   private var vPrev = Double.NaN
   private var lastCross = Double.NaN
   private var crossTimes: List[Double] = Nil
+  private var excursionCount = 0
 
-  /** Interpolated upcrossing times, newest first. */
+  // Heartbeat statistics (design note 11, Step 0: observed only, no
+  // behavioural effect). `periodHistory` is the bounded ring of recent
+  // inter-upcrossing intervals, newest first; duty accumulates over the
+  // current open cycle with the same rectangle rule as the lab probes.
+  private var bornAtT = Double.NaN
+  private var cycleStart = Double.NaN
+  private var highTime = 0.0
+  private var lastDutyV = Double.NaN
+  private var periodHistory: Vector[Double] = Vector.empty
+
+  /** Interpolated upcrossing times, newest first (bounded to the ring
+    * capacity plus one, enough for every consumer of [[period]]).
+    */
   def crossings: List[Double] = crossTimes
 
   /** Last cycle period estimate, from up to two most recent intervals. */
   def period: Option[Double] =
-    intervals match
-      case a :: b :: _ => Some(0.5 * (a + b))
-      case a :: Nil => Some(a)
-      case Nil => None
+    periodHistory match
+      case v if v.size >= 2 => Some(0.5 * (v(0) + v(1)))
+      case v if v.size == 1 => Some(v(0))
+      case _                => None
 
-  private def intervals: List[Double] =
-    crossTimes match
-      case a :: b :: c :: _ => List(a - b, b - c)
-      case a :: b :: _ => List(a - b)
-      case _ => Nil
+  private def intervals: List[Double] = periodHistory.take(2).toList
 
   /** Number of section upcrossings seen: one per excursion. */
-  def excursions: Int = crossTimes.size
+  def excursions: Int = excursionCount
+
+  /** Immutable rhythm statistics snapshot for the heartbeat classifier
+    * ([[Heartbeat.classify]]); pure data, safe to hand across threads.
+    */
+  def beatStats: BeatStats =
+    BeatStats(periodHistory, lastDutyV, lastCross, bornAtT)
 
   def observe(t: Double, cur: MandateCurrent, sustenance: Double = 1.0): PhaseReading =
     val v = cur.dissonance
+    if bornAtT.isNaN then bornAtT = t
     if !tPrev.isNaN then
+      if v >= param.spikeLevel then highTime += t - tPrev
       val l = param.sectionLevel
       if vPrev <= l && v > l then
         val frac = PhaseDetection.upcrossingFraction(vPrev, v, l)
         val tc = tPrev + frac * (t - tPrev)
         if lastCross.isNaN || tc - lastCross > param.minPeriod then
+          if !cycleStart.isNaN then
+            val cycleLen = tc - cycleStart
+            if cycleLen > 0.0 then lastDutyV = highTime / cycleLen
+            periodHistory =
+              (tc - lastCross) +: periodHistory.take(PhaseTracker.PeriodHistoryCap - 1)
           lastCross = tc
-          crossTimes = tc :: crossTimes
+          cycleStart = tc
+          highTime = 0.0
+          excursionCount += 1
+          crossTimes = (tc :: crossTimes).take(PhaseTracker.PeriodHistoryCap + 1)
     tPrev = t
     vPrev = v
     reading(t, cur, sustenance)
@@ -300,3 +346,9 @@ class PhaseTracker(
         val mean = 0.5 * (i1 + i2)
         mean > 0.0 && Math.abs(i1 - i2) <= param.regularityTol * mean
       case _ => false
+
+object PhaseTracker:
+  /** Ring capacity for recent inter-upcrossing intervals; comfortably covers
+    * `HeartbeatParam.minCycles` with margin for drift inspection.
+    */
+  val PeriodHistoryCap: Int = 8

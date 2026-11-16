@@ -6,7 +6,15 @@ import com.google.gson.{GsonBuilder, JsonObject, JsonParser}
 import net.fabricmc.loader.api.FabricLoader
 import org.slf4j.{Logger, LoggerFactory}
 
-import moe.chestnut.awa.voy.inner.veins.{MandateAgent, MandateParam, PulseParam, StressParam}
+import moe.chestnut.awa.voy.inner.veins.{
+  HeartbeatParam,
+  MandateAgent,
+  MandateParam,
+  PhaseResponse,
+  PulseParam,
+  ShelterModel,
+  StressParam
+}
 
 /** Geometry and tuning of the prototype lattice. Chunk-grained: the lattice
   * spans chunks `[originX, originX + width)` x `[originZ, originZ + height)`.
@@ -22,9 +30,31 @@ final case class LatticeConfig(
     ambientDisturbance: Double = 0.002,
     calmingRadius: Double = 5.0,
     baselineCalming: Double = 0.03,
-    initialStressPeak: Double = 0.18,
-    initialStressFalloff: Double = 0.004
+    initialStressPeak: Double = LatticeConfig.DefaultInitialStressPeak,
+    initialStressFalloff: Double = LatticeConfig.DefaultInitialStressFalloff
 )
+
+object LatticeConfig:
+  /** derived: oscillation onset `s_onset = α − a_c` (Hopf point, closed form;
+    * M = 1, k = 1).
+    */
+  val OscillationOnsetStress: Double =
+    val fast = MandateAgent.DefaultFastParam
+    fast.alpha - PhaseResponse.hopfPoint(fast)._2
+
+  /** derived: `s_onset + 0.25 × (s_acid − s_onset)` ≈ 0.349 — the opening
+    * keeps a small "old-era remnant pulse" inside the natural heartbeat band
+    * `[s_onset, s_acid)` (2026-11-16 ruling, risk 1 of design note 11).
+    */
+  val DefaultInitialStressPeak: Double =
+    OscillationOnsetStress +
+      0.25 * (StressParam().sustenanceBurnThreshold - OscillationOnsetStress)
+
+  /** derived: `(peak − s_onset) / 4` — the remnant zone is an 8×8-chunk
+    * inscribed circle (in-band radius 4 cells) around the lattice centre.
+    */
+  val DefaultInitialStressFalloff: Double =
+    (DefaultInitialStressPeak - OscillationOnsetStress) / 4.0
 
 /** External runtime configuration (`config/variations-of-yesterday.json`).
   *
@@ -37,7 +67,13 @@ final case class VoyConfig(
     fastParam: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
     stressParam: StressParam =
       StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-    pulseParam: PulseParam = PulseParam()
+    pulseParam: PulseParam = PulseParam(),
+    heartbeatParam: HeartbeatParam = HeartbeatParam(),
+    /** Step 1 A/B switch (design note 11): `Window` keeps the legacy
+      * pulse-window shelter semantics; `Heartbeat` switches shelter to the
+      * rhythm axis. Deleted in Step 2 when the window model is removed.
+      */
+    shelterModel: ShelterModel = ShelterModel.Window
 )
 
 object VoyConfig:
@@ -71,7 +107,9 @@ object VoyConfig:
         lattice = latticeFrom(obj(root, "lattice")),
         fastParam = fastFrom(obj(root, "fastParam")),
         stressParam = stressFrom(obj(root, "stressParam")),
-        pulseParam = pulseFrom(obj(root, "pulseParam"))
+        pulseParam = pulseFrom(obj(root, "pulseParam")),
+        heartbeatParam = heartbeatFrom(obj(root, "heartbeatParam")),
+        shelterModel = modelFrom(root)
       )
     catch
       case e: Exception =>
@@ -144,6 +182,25 @@ object VoyConfig:
       overloadPenaltyTicks = int(o, "overloadPenaltyTicks", d.overloadPenaltyTicks)
     )
 
+  private def heartbeatFrom(o: JsonObject): HeartbeatParam =
+    val d = HeartbeatParam()
+    HeartbeatParam(
+      nominalPeriod = dbl(o, "nominalPeriod", d.nominalPeriod),
+      minCycles = int(o, "minCycles", d.minCycles),
+      regularityTol = dbl(o, "regularityTol", d.regularityTol),
+      staleCycles = dbl(o, "staleCycles", d.staleCycles),
+      overdriveGuard = dbl(o, "overdriveGuard", d.overdriveGuard),
+      overloadPenaltyTicks = int(o, "overloadPenaltyTicks", d.overloadPenaltyTicks),
+      exitBadCycles = int(o, "exitBadCycles", d.exitBadCycles)
+    )
+
+  private def modelFrom(root: JsonObject): ShelterModel =
+    if root.has("shelterModel") && root.get("shelterModel").isJsonPrimitive then
+      root.get("shelterModel").getAsString match
+        case "heartbeat" => ShelterModel.Heartbeat
+        case _           => ShelterModel.Window
+    else ShelterModel.Window
+
   private def defaultsJson(cfg: VoyConfig): String =
     val root = JsonObject()
     root.addProperty("tickDt", cfg.tickDt)
@@ -193,5 +250,23 @@ object VoyConfig:
     p.addProperty("minInterval", pp.minInterval)
     p.addProperty("overloadPenaltyTicks", pp.overloadPenaltyTicks)
     root.add("pulseParam", p)
+
+    val hp = cfg.heartbeatParam
+    val h = JsonObject()
+    h.addProperty("nominalPeriod", hp.nominalPeriod)
+    h.addProperty("minCycles", hp.minCycles)
+    h.addProperty("regularityTol", hp.regularityTol)
+    h.addProperty("staleCycles", hp.staleCycles)
+    h.addProperty("overdriveGuard", hp.overdriveGuard)
+    h.addProperty("overloadPenaltyTicks", hp.overloadPenaltyTicks)
+    h.addProperty("exitBadCycles", hp.exitBadCycles)
+    root.add("heartbeatParam", h)
+
+    root.addProperty(
+      "shelterModel",
+      cfg.shelterModel match
+        case ShelterModel.Window    => "window"
+        case ShelterModel.Heartbeat => "heartbeat"
+    )
 
     GsonBuilder().setPrettyPrinting().create().toJson(root)

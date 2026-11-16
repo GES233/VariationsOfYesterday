@@ -263,6 +263,30 @@ class MandateAgentSpec:
   private def awaitPhase(latchRef: AtomicReference[CountDownLatch]): Boolean =
     latchRef.get().await(5, TimeUnit.SECONDS)
 
+  @Test def freshCellsPublishWarmingHeartbeat(): Unit =
+    val readouts =
+      new AtomicReference[Map[CellCoord, CellReadout]](Map.empty)
+    val latchRef = new AtomicReference[CountDownLatch](new CountDownLatch(1))
+    val agent = track(
+      MandateAgent(
+        singleCellGrid(mkCell(0.0)),
+        _ => (),
+        _ => (),
+        r => { readouts.set(r); latchRef.get().countDown() }
+      )
+    )
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(awaitPhase(latchRef))
+    assertEquals(
+      Heartbeat.Warming,
+      readouts.get()(origin).heartbeat,
+      "a freshly observed cell is in the Warming grace (design note 11)"
+    )
+    assertTrue(
+      readouts.get()(origin).isShelteredByHeartbeat,
+      "the Warming grace shelters under the heartbeat model"
+    )
+
   private def mkOscillatingCell(): MandateState =
     val cell = MandateState(
       MandateCurrent(-1.2, -0.6, 1.0, 0.0),

@@ -24,17 +24,51 @@ object MandatePhenomena:
   val EconomyStagnant: EconomyProfile = EconomyProfile(2, 0.5, 0.5, 0.5)
   val EconomySpiking: EconomyProfile = EconomyProfile(5, 0.15, 0.25, 0.25)
 
-  /** 1. Settlement economy tier: sheltered vs stagnant vs acute spiking/burnout. */
-  def classifyEconomy(readout: CellReadout): EconomyProfile =
+  /** 1. Settlement economy tier, dispatched on the active shelter model
+    * (Step 1 A/B switch; the `Window` branch is deleted in Step 2).
+    */
+  def classifyEconomy(
+      readout: CellReadout,
+      model: ShelterModel = ShelterModel.Window
+  ): EconomyProfile =
+    model match
+      case ShelterModel.Window    => classifyEconomyByWindow(readout)
+      case ShelterModel.Heartbeat => classifyEconomyByHeartbeat(readout)
+
+  /** Window model: sheltered vs stagnant vs acute spiking/burnout. */
+  def classifyEconomyByWindow(readout: CellReadout): EconomyProfile =
     if readout.isSheltered then EconomyMaintained
     else if readout.regime == Regime.Burnout || readout.isSpiking then EconomySpiking
     else EconomyStagnant
 
-  /** 2. Player bodily exposure: only acute spiking or saturated burnout on
-    * unsheltered ground affects the player's body.
+  /** Heartbeat economy map (design note 11 §1.4): `Beating`/`Warming` →
+    * Maintained, `Fast`/`Arrhythmic` → Spiking, `Slow` → Stagnant.
+    * Ecological death stays Stagnant regardless of the rhythm verdict.
     */
-  def shouldApplyAcuteBodyStrain(readout: CellReadout): Boolean =
-    !readout.isSheltered && (readout.regime == Regime.Burnout || readout.isSpiking)
+  def classifyEconomyByHeartbeat(readout: CellReadout): EconomyProfile =
+    if !readout.mycelium.isViable || readout.isSlowOffsetBelowKnee then EconomyStagnant
+    else
+      readout.heartbeat match
+        case Heartbeat.Beating(_, _, _) | Heartbeat.Warming => EconomyMaintained
+        case Heartbeat.Fast(_) | Heartbeat.Arrhythmic(_, _) => EconomySpiking
+        case Heartbeat.Slow(_)                              => EconomyStagnant
+
+  /** 2. Player bodily exposure: only acute spiking or saturated burnout on
+    * unsheltered ground affects the player's body. Under the heartbeat model
+    * the acute axis is `Fast`/`Arrhythmic` instead of the instantaneous spike
+    * (the bell-strike `pulse_saturation` backlash stays event-triggered;
+    * this is the ambient strain axis only).
+    */
+  def shouldApplyAcuteBodyStrain(
+      readout: CellReadout,
+      model: ShelterModel = ShelterModel.Window
+  ): Boolean =
+    model match
+      case ShelterModel.Window =>
+        !readout.isSheltered && (readout.regime == Regime.Burnout || readout.isSpiking)
+      case ShelterModel.Heartbeat =>
+        !readout.isShelteredByHeartbeat &&
+          (readout.regime == Regime.Burnout || readout.heartbeat.isAcute)
 
   val ReInoculationSeed: Double = 0.05
   val RichReInoculationSeed: Double = 0.12

@@ -157,6 +157,7 @@ object MandateRuntime:
             if pending != null then pending.countDown()
           },
           pulseParam = VoyConfig.current.pulseParam,
+          heartbeatParam = VoyConfig.current.heartbeatParam,
           initialPulseStamps = initialPulseStamps
         )
       )

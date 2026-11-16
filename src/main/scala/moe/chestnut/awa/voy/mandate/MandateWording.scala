@@ -102,8 +102,18 @@ object MandateWording:
         case _ => ""
       val windowLeft = r.pulseStamp.remainingShelterAt(r.simTime)
       val cdLeft = r.pulseStamp.remainingCooldownAt(r.simTime)
+      // Heartbeat axis observability (design note 11, Step 0/1: output only).
+      val hbText = r.heartbeat match
+        case Heartbeat.Beating(per, duty, src) =>
+          f" hb=Beating($src) per=$per%.1f duty=$duty%.3f"
+        case Heartbeat.Fast(per) => f" hb=Fast per=$per%.1f"
+        case Heartbeat.Slow(per) =>
+          if per.isNaN then " hb=Slow(--)" else f" hb=Slow per=$per%.1f"
+        case Heartbeat.Arrhythmic(per, duty) =>
+          f" hb=Arrhythmic per=$per%.1f duty=$duty%.3f"
+        case Heartbeat.Warming => " hb=Warming"
       base +
-        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.dissonance}%.2f p=${r.pulseDrive}%.2f win=${windowLeft}%.1f cd=${cdLeft}%.1f$fracText]"
+        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.dissonance}%.2f p=${r.pulseDrive}%.2f win=${windowLeft}%.1f cd=${cdLeft}%.1f$fracText$hbText]"
     else base
 
   def regimeWord(regime: Regime): String = regime match

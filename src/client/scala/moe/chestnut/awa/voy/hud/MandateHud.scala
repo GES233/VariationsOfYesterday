@@ -11,7 +11,7 @@ import moe.chestnut.awa.voy.mandate.{
   MandateWording,
   SyncedCellEntry
 }
-import moe.chestnut.awa.voy.inner.veins.{PhaseLabel, PhaseReading, Regime}
+import moe.chestnut.awa.voy.inner.veins.{Heartbeat, PhaseLabel, PhaseReading, Regime}
 
 /** Development HUD overlay that visualises the mandate readout
   * (`Regime`, `PhaseReading`, `MycelialHealth`, `c0` status, and continuous
@@ -86,73 +86,78 @@ object MandateHud:
 
     val gridCount = radius * 2 + 1
     val gridPixelSize = gridCount * tileStep - tileGap
-    val panelWidth = 236
-    val panelHeight = 36 + gridPixelSize + 22
+
+    // Record the player-centred cell into the change tracker (the 1 Hz sync
+    // stream -> human-readable transitions), then measure the content so the
+    // panel fits the longest line instead of clipping it.
+    CellChangeTracker.record(centerX, centerZ, centerEntry)
+    val changes = CellChangeTracker.history
+
+    val centerColor = tileColor(centerEntry.map(_.view))
+    val (headerText, tel1, tel2, phaseLine) = centerEntry match
+      case Some(SyncedCellEntry(view, debugOpt)) =>
+        val shelterTag = if view.isSheltered then "庇护" else "沉滞(STAGNANT)"
+        val (t1, t2) = debugOpt match
+          case Some(d) =>
+            val per = d.beatPeriod.map(x => f"$x%.1f").getOrElse("--")
+            val duty = d.beatDuty.map(x => f"$x%.3f").getOrElse("--")
+            (
+              f"v=${d.dissonance}%+.2f  s=${d.stress}%.3f  q=${d.activity}%.3f  M=${d.sustenance}%.2f  c0=${d.baselineCalming}%.2f",
+              f"p=${d.pulseDrive}%.2f  win=${d.remainingShelter}%.1f  cd=${d.remainingCooldown}%.1f  hb=${Heartbeat.wireName(d.heartbeatOrdinal)}  per=$per  duty=$duty"
+            )
+          case None =>
+            ("debug telemetry withheld (requires dev or OP)", "")
+        val phaseStr = debugOpt
+          .map(d => MandateWording.formatPhaseShort(d.phaseReading(view.phaseLabel)))
+          .getOrElse(view.dialTick.map(t => s"刻度 $t/20").getOrElse("无周期"))
+        (
+          f"VOY Mandate [$centerX%d, $centerZ%d]  [$shelterTag]  菌:${view.mycelium.word}",
+          t1,
+          t2,
+          s"regime=${view.regime}  phase=$phaseStr"
+        )
+      case None =>
+        (
+          f"VOY Mandate [$centerX%d, $centerZ%d]  [域外/未同步]",
+          "outside active mandate lattice",
+          "",
+          "regime=-  phase=-"
+        )
+
+    val legendLabels = Seq(
+      "Calm + 脉冲 (庇护)",
+      "Calm (沉滞无脉冲)",
+      "Strained (承压)",
+      "Oscillating (振荡)",
+      "Spike (尖峰爆发)",
+      "Burnout (饱和失能)"
+    )
+    val legendW = gridPixelSize + 21 + legendLabels.map(textRenderer.getWidth(_)).max
+    val textW = Seq(headerText, tel1, tel2, phaseLine).map(textRenderer.getWidth(_)).max
+    val changesW = if changes.isEmpty then 0 else changes.map(textRenderer.getWidth(_)).max
+    val panelWidth = math.max(236, math.max(math.max(textW, legendW), changesW) + 8)
+
+    // 7x7 uniform square color-block grid
+    val gridX = x0
+    val gridY = y0 + 4 * lineHeight + 3
+    val barY = gridY + gridPixelSize + 6
+    val segH = 6
+    val changesY = barY + segH + 8
+    val contentBottom =
+      if changes.isEmpty then barY + segH
+      else changesY + (changes.size + 1) * lineHeight
+    val panelHeight = contentBottom - y0 + 2
 
     // Backdrop panel & border
     context.fill(x0 - 4, y0 - 4, x0 + panelWidth, y0 + panelHeight, ColPanelBg)
     drawBoxBorder(context, x0 - 4, y0 - 4, panelWidth + 4, panelHeight + 4, ColPanelBorder)
 
     // Header & telemetry lines
-    val centerColor = tileColor(centerEntry.map(_.view))
-    centerEntry match
-      case Some(SyncedCellEntry(view, debugOpt)) =>
-        val shelterTag = if view.isSheltered then "庇护" else "沉滞(STAGNANT)"
-        context.drawTextWithShadow(
-          textRenderer,
-          f"VOY Mandate [$centerX%d, $centerZ%d]  [$shelterTag]  菌:${view.mycelium.word}",
-          x0,
-          y0,
-          centerColor
-        )
-        val telemetryLine = debugOpt match
-          case Some(d) =>
-            f"v=${d.dissonance}%+.2f  s=${d.stress}%.3f  q=${d.activity}%.3f  M=${d.sustenance}%.2f  c0=${d.baselineCalming}%.2f  p=${d.pulseDrive}%.2f  win=${d.remainingShelter}%.1f  cd=${d.remainingCooldown}%.1f"
-          case None =>
-            "debug telemetry withheld (requires dev or OP)"
-        context.drawTextWithShadow(
-          textRenderer,
-          telemetryLine,
-          x0,
-          y0 + lineHeight,
-          0xFFE2E6EC
-        )
-        val phaseText = debugOpt
-          .map(d => MandateWording.formatPhaseShort(d.phaseReading(view.phaseLabel)))
-          .getOrElse(view.dialTick.map(t => s"刻度 $t/20").getOrElse("无周期"))
-        context.drawTextWithShadow(
-          textRenderer,
-          s"regime=${view.regime}  phase=$phaseText",
-          x0,
-          y0 + 2 * lineHeight,
-          centerColor
-        )
-      case None =>
-        context.drawTextWithShadow(
-          textRenderer,
-          f"VOY Mandate [$centerX%d, $centerZ%d]  [域外/未同步]",
-          x0,
-          y0,
-          ColOutside
-        )
-        context.drawTextWithShadow(
-          textRenderer,
-          "outside active mandate lattice",
-          x0,
-          y0 + lineHeight,
-          0xFF9AA3B2
-        )
-        context.drawTextWithShadow(
-          textRenderer,
-          "regime=-  phase=-",
-          x0,
-          y0 + 2 * lineHeight,
-          0xFF9AA3B2
-        )
-
-    // 7x7 uniform square color-block grid
-    val gridX = x0
-    val gridY = y0 + 3 * lineHeight + 3
+    context.drawTextWithShadow(textRenderer, headerText, x0, y0, centerColor)
+    context.drawTextWithShadow(textRenderer, tel1, x0, y0 + lineHeight, 0xFFE2E6EC)
+    if tel2.nonEmpty then
+      context.drawTextWithShadow(textRenderer, tel2, x0, y0 + 2 * lineHeight, 0xFFE2E6EC)
+    context.drawTextWithShadow(textRenderer, phaseLine, x0, y0 + 3 * lineHeight, centerColor)
 
     for
       dz <- -radius to radius
@@ -177,25 +182,16 @@ object MandateHud:
 
     // Color swatch legend beside the 7x7 grid
     val legendX = gridX + gridPixelSize + 10
-    val legendItems = Seq(
-      (ColCalmMaintained, "Calm + 脉冲 (庇护)"),
-      (ColCalmStagnant, "Calm (沉滞无脉冲)"),
-      (ColStrained, "Strained (承压)"),
-      (ColOscillating, "Oscillating (振荡)"),
-      (ColSpike, "Spike (尖峰爆发)"),
-      (ColBurnout, "Burnout (饱和失能)")
-    )
-    legendItems.zipWithIndex.foreach { case ((col, label), idx) =>
+    val legendColors = Seq(ColCalmMaintained, ColCalmStagnant, ColStrained, ColOscillating, ColSpike, ColBurnout)
+    legendColors.lazyZip(legendLabels).zipWithIndex.foreach { case ((col, label), idx) =>
       val ly = gridY + idx * 12
       context.fill(legendX, ly + 1, legendX + 7, ly + 8, col)
       context.drawTextWithShadow(textRenderer, label, legendX + 11, ly, 0xFFD0D5DD)
     }
 
     // 20-division phase dial bar below the grid
-    val barY = gridY + gridPixelSize + 6
     val activeTick = centerEntry.flatMap(_.view.dialTick)
     val segW = 6
-    val segH = 6
     val segGap = 2
     for tick <- 0 until 20 do
       val sx = gridX + tick * (segW + segGap)
@@ -217,6 +213,19 @@ object MandateHud:
       barY - 1,
       0xFFB8C0CC
     )
+
+    // Recent change history of the player-centred cell, below the dial
+    if changes.nonEmpty then
+      context.drawTextWithShadow(textRenderer, "近期变化", gridX, changesY, 0xFF8A93A3)
+      changes.zipWithIndex.foreach { case (line, idx) =>
+        context.drawTextWithShadow(
+          textRenderer,
+          line,
+          gridX,
+          changesY + (idx + 1) * lineHeight,
+          0xFFC8CFDA
+        )
+      }
 
   private def tileColor(viewOpt: Option[ClientCellView]): Int =
     viewOpt match

@@ -30,7 +30,9 @@ object MandateAgent:
       var pulseStamp: PulseStamp,
       var publishedRegime: Regime,
       var regimeCandidate: Option[(Regime, Double)] = None,
-      var inSpike: Boolean = false
+      var inSpike: Boolean = false,
+      var heartbeat: Heartbeat = Heartbeat.Warming,
+      var heartbeatBadSince: Double = Double.NaN
   )
 
   /** Apply one channel or topology event to the lattice. */
@@ -89,7 +91,8 @@ object MandateAgent:
       persistPeriod: Double = 1.0,
       pulseParam: PulseParam = PulseParam(),
       initialPulseStamps: Map[CellCoord, PulseStamp] = Map.empty,
-      regimeDwell: Double = 5.0
+      regimeDwell: Double = 5.0,
+      heartbeatParam: HeartbeatParam = HeartbeatParam()
   ): ActorRef[EventDTO] =
     val readoutParam = ReadoutParam()
     var simTime: Double = initialSimTime
@@ -174,6 +177,33 @@ object MandateAgent:
         val regime = slot.publishedRegime
         val pDrive = cell.impulse + cell.synapseOutput
 
+        // Heartbeat axis (design note 11): classify the tracker's rhythm
+        // statistics, then publish through exit hysteresis so a single noisy
+        // cycle cannot flicker the shelter. `selfSustained` only records
+        // BeatSource, never gates.
+        val aSlow = Readout.slowA(
+          cell.param,
+          cur.stress,
+          cell.sustenance,
+          cell.stressParam.coupling,
+          cell.stressParam.sustenanceDepth
+        )
+        val rawHeartbeat = Heartbeat.classify(
+          slot.tracker.beatStats,
+          simTime,
+          selfSustained = Readout.oscillating(aSlow, cell.param),
+          heartbeatParam
+        )
+        val (heartbeat, badSince) = Heartbeat.smooth(
+          rawHeartbeat,
+          slot.heartbeat,
+          slot.heartbeatBadSince,
+          simTime,
+          heartbeatParam
+        )
+        slot.heartbeat = heartbeat
+        slot.heartbeatBadSince = badSince
+
         readoutBuilder += (coord -> CellReadout(
           current = cur,
           regime = regime,
@@ -182,6 +212,7 @@ object MandateAgent:
           baselineCalming = cell.baselineCalming,
           pulseDrive = pDrive,
           pulseStamp = slot.pulseStamp,
+          heartbeat = heartbeat,
           simTime = simTime,
           sustenanceFloor = cell.stressParam.sustenanceFloor,
           toxicityThreshold = cell.stressParam.sustenanceBurnThreshold

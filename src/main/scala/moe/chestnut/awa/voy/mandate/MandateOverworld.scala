@@ -439,7 +439,8 @@ object MandateOverworld:
     val chunkX = player.getChunkPos.x
     val chunkZ = player.getChunkPos.z
     val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-    val sheltered = readout.isSheltered
+    val model = VoyConfig.current.shelterModel
+    val sheltered = readout.sheltered(model)
 
     announceShelterChange(player, sheltered)
 
@@ -447,7 +448,7 @@ object MandateOverworld:
       player.removeStatusEffect(MandateEffects.StagnationEntry)
       player.removeStatusEffect(MandateEffects.StagnationSpikeEntry)
     else
-      val acuteBodyStrain = MandatePhenomena.shouldApplyAcuteBodyStrain(readout)
+      val acuteBodyStrain = MandatePhenomena.shouldApplyAcuteBodyStrain(readout, model)
       if acuteBodyStrain then
         player.addStatusEffect(
           new StatusEffectInstance(

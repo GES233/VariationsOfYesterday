@@ -23,6 +23,7 @@ class MandatePhenomenaSpec:
       c0: Double = 0.03,
       sustenance: Double = 1.0,
       pulseStamp: PulseStamp = PulseStamp.zero,
+      heartbeat: Heartbeat = Heartbeat.Warming,
       simTime: Double = 0.0
   ): CellReadout =
     CellReadout(
@@ -32,6 +33,7 @@ class MandatePhenomenaSpec:
       baselineCalming = c0,
       sustenance = sustenance,
       pulseStamp = pulseStamp,
+      heartbeat = heartbeat,
       simTime = simTime
     )
 
@@ -130,6 +132,72 @@ class MandatePhenomenaSpec:
     )
     assertEquals(MandatePhenomena.EconomyStagnant, MandatePhenomena.classifyEconomy(CellReadout.zero))
     assertEquals(MandatePhenomena.EconomyStagnant, MandatePhenomena.classifyEconomy(readout(v = -1.9)))
+
+  @Test def `heartbeat economy map: rhythm decides the tier (design note 11 section 1 point 4)`(): Unit =
+    val beating = readout(heartbeat = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic))
+    assertEquals(
+      MandatePhenomena.EconomyMaintained,
+      MandatePhenomena.classifyEconomy(beating, ShelterModel.Heartbeat)
+    )
+    assertEquals(
+      MandatePhenomena.EconomyMaintained,
+      MandatePhenomena.classifyEconomy(readout(), ShelterModel.Heartbeat),
+      "Warming counts as maintained"
+    )
+    assertEquals(
+      MandatePhenomena.EconomySpiking,
+      MandatePhenomena.classifyEconomy(readout(heartbeat = Heartbeat.Fast(20.0)), ShelterModel.Heartbeat)
+    )
+    assertEquals(
+      MandatePhenomena.EconomySpiking,
+      MandatePhenomena.classifyEconomy(
+        readout(heartbeat = Heartbeat.Arrhythmic(44.0, 0.45)),
+        ShelterModel.Heartbeat
+      )
+    )
+    assertEquals(
+      MandatePhenomena.EconomyStagnant,
+      MandatePhenomena.classifyEconomy(
+        readout(heartbeat = Heartbeat.Slow(Double.NaN)),
+        ShelterModel.Heartbeat
+      )
+    )
+    assertEquals(
+      MandatePhenomena.EconomyStagnant,
+      MandatePhenomena.classifyEconomy(beating.copy(sustenance = 0.0), ShelterModel.Heartbeat),
+      "ecological death stays stagnant regardless of the rhythm verdict"
+    )
+    assertEquals(
+      MandatePhenomena.EconomyStagnant,
+      MandatePhenomena.classifyEconomy(
+        beating.copy(phase = PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee)),
+        ShelterModel.Heartbeat
+      ),
+      "a below-knee cell stays stagnant regardless of the rhythm verdict"
+    )
+
+  @Test def `heartbeat bodily strain: acute means Fast or Arrhythmic, never Slow`(): Unit =
+    val fast = readout(heartbeat = Heartbeat.Fast(20.0))
+    assertTrue(MandatePhenomena.shouldApplyAcuteBodyStrain(fast, ShelterModel.Heartbeat))
+    assertTrue(
+      MandatePhenomena.shouldApplyAcuteBodyStrain(
+        readout(heartbeat = Heartbeat.Arrhythmic(44.0, 0.45)),
+        ShelterModel.Heartbeat
+      )
+    )
+    assertFalse(
+      MandatePhenomena.shouldApplyAcuteBodyStrain(
+        readout(heartbeat = Heartbeat.Slow(Double.NaN)),
+        ShelterModel.Heartbeat
+      ),
+      "stagnation only presses the economy, never the body"
+    )
+    assertFalse(
+      MandatePhenomena.shouldApplyAcuteBodyStrain(
+        readout(heartbeat = Heartbeat.Beating(40.0, 0.10, BeatSource.Paced)),
+        ShelterModel.Heartbeat
+      )
+    )
 
   @Test def `sustenance word stays qualitative`(): Unit =
     assertEquals("枯绝", MandatePhenomena.sustenanceWord(0.0))

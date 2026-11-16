@@ -29,7 +29,12 @@ final case class ClientCellView(
 )
 
 object ClientCellView:
-  def fromReadout(chunkX: Int, chunkZ: Int, readout: CellReadout): ClientCellView =
+  def fromReadout(
+      chunkX: Int,
+      chunkZ: Int,
+      readout: CellReadout,
+      model: ShelterModel = ShelterModel.Window
+  ): ClientCellView =
     val phaseLabel = readout.phase match
       case PhaseReading.Cycle(lbl, _) => Some(lbl)
       case PhaseReading.Basin(lbl)    => Some(lbl)
@@ -39,7 +44,7 @@ object ClientCellView:
       chunkZ = chunkZ,
       regime = readout.regime,
       mycelium = readout.mycelium,
-      isSheltered = readout.isSheltered,
+      isSheltered = readout.sheltered(model),
       isSpiking = readout.isSpiking,
       isBurnoutPhase = MandatePhenomena.hasSilentBlight(readout),
       c0Sheltered = readout.baselineCalming >= MandatePhenomena.C0ShelterLevel,
@@ -61,7 +66,13 @@ final case class DebugCellTelemetry(
     simTime: Double,
     phaseKind: Byte,
     phaseFraction: Double,
-    undefinedReason: Option[UndefinedReason]
+    undefinedReason: Option[UndefinedReason],
+    // Heartbeat axis observability (design note 11, Step 0/1: additive;
+    // remainingShelter/remainingCooldown are removed in Step 2). Options, not
+    // NaN sentinels: IEEE NaN != NaN would break payload equality.
+    heartbeatOrdinal: Int = 0,
+    beatPeriod: Option[Double] = None,
+    beatDuty: Option[Double] = None
 ):
   def phaseReading(label: Option[PhaseLabel]): PhaseReading =
     phaseKind match
@@ -87,7 +98,10 @@ object DebugCellTelemetry:
       simTime = readout.simTime,
       phaseKind = kind,
       phaseFraction = frac,
-      undefinedReason = reason
+      undefinedReason = reason,
+      heartbeatOrdinal = Heartbeat.wireOrdinal(readout.heartbeat),
+      beatPeriod = Heartbeat.periodOf(readout.heartbeat),
+      beatDuty = Heartbeat.dutyOf(readout.heartbeat)
     )
 
 final case class SyncedCellEntry(
@@ -164,6 +178,11 @@ object MandateChunkSyncPayload:
         buf.writeByte(d.phaseKind)
         buf.writeDouble(d.phaseFraction)
         buf.writeByte(d.undefinedReason.map(_.ordinal).getOrElse(-1))
+        buf.writeByte(d.heartbeatOrdinal)
+        buf.writeBoolean(d.beatPeriod.isDefined)
+        d.beatPeriod.foreach(buf.writeDouble)
+        buf.writeBoolean(d.beatDuty.isDefined)
+        d.beatDuty.foreach(buf.writeDouble)
 
   private def decodeEntry(buf: RegistryByteBuf): SyncedCellEntry =
     val chunkX = buf.readInt()
@@ -207,6 +226,9 @@ object MandateChunkSyncPayload:
         val rawReason = buf.readByte().toInt
         val undefinedReason =
           if rawReason < 0 then None else Some(UndefinedReason.fromOrdinal(rawReason))
+        val heartbeatOrdinal = buf.readByte() & 0xff
+        val beatPeriod = if buf.readBoolean() then Some(buf.readDouble()) else None
+        val beatDuty = if buf.readBoolean() then Some(buf.readDouble()) else None
         Some(
           DebugCellTelemetry(
             dissonance = dissonance,
@@ -220,7 +242,10 @@ object MandateChunkSyncPayload:
             simTime = simTime,
             phaseKind = phaseKind,
             phaseFraction = phaseFraction,
-            undefinedReason = undefinedReason
+            undefinedReason = undefinedReason,
+            heartbeatOrdinal = heartbeatOrdinal,
+            beatPeriod = beatPeriod,
+            beatDuty = beatDuty
           )
         )
     SyncedCellEntry(view, debug)

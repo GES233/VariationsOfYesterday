@@ -23,7 +23,8 @@ classes/
 bin/
 .classpath
 .project
-# vsc's scala extension)
+
+# vsc's scala extension
 .metals/
 .bloop/
 
@@ -43,8 +44,12 @@ replay_*.log
 *.jfr
 
 # Gradle/Minecraft runtime logs at repo root
+
 /logs/
 
 # local machine notes (per-device, not tracked)
 
 ref/
+
+# Dump results within `tools_world/voy_world`
+erl_crash.dump
