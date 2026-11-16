@@ -329,6 +329,31 @@ S2C 现在每格最多 31 次 `buf.write`、12+12 字段手写对称、5 处 `.o
 
 **顺序理由**：S1 让"敲钟"先自洽（用户新想法的直接落点）；S2 是纯改名、零行为变化、先把词稳住；S3 才动边界（有 S2 的词做地基）；S4 借已有的契约窗口，不额外开闸；S5 是叙事增强，可随时砍。
 
+### 7.1 S3 施工单（开工照此执行）
+
+**目标**：敲钟不再由边界外的纯函数读全局视图判定，改成 **世界发命令 → 引擎（状态所有者）判定 → 回一条事实**。现状是"全局单例供给 + 纯函数外表"：`BellStrike` 调 `MandateRuntime.readoutAt` 偷视图，而判定需要的 `lastBellStrikeAt`/`simTime` 因此被塞进跨界 DTO。
+
+| # | 文件 | 动作 |
+| :--: | :--- | :--- |
+| 1 | `inner/action/ActionMsg.scala` | 新增出向事实 `BellStruck(cell, strikeId, outcome)` |
+| 2 | `inner/event/EventMsg.scala` | 新增入向命令 `StrikeBell(cell)`（与 tick 同信箱全序） |
+| 3 | `inner/veins/MandateAgent.scala` | 信箱内处理：判定 → 发射脉冲 → 记 c0 剂量 → 发 `BellStruck` |
+| 4 | `mandate/BellRitual.scala` | 判定逻辑改由引擎调用，输入从 `CellReadout` 换成引擎侧状态 |
+| 5 | `mandate/overworld/BellStrike.scala` | 改成"发命令 + 等回执"；粒子/音效/麻手/文案全部由回执驱动 |
+
+连带：`MandateWording.formatBellPulse` 改签名；`MandateReadoutSpec` 的敲钟 4 例迁到新 spec。
+**不在范围**：c0 库存机制、`CellReadout` 其余字段（S3b）、S2C 广播、存档 schema、`MandateAgent` 的 13 参签名（P2-1）、v2b 回声（S5）。
+
+**不变量（破坏即失败）**：① 三态语义不变；② 脉冲无条件进方程、`Struck` 无条件锚 c0 + 注册源；③ 过密守卫是**格**的属性、麻手是**玩家**的属性；④ 命令与 tick 同信箱全序，同事件流 → 同轨迹；⑤ 169 例全绿 + `contracts/` 逐字节不变；⑥ **敲钟行为链 ≤ 3 文件**。
+
+**Done**：`BellRitual` 不再接 `CellReadout`（`grep` 证明）；判定路径不再读 `lastBellStrikeAt`/`simTime`；新增"命令→回执（活/死/过密）+ 同一 `strikeId` 幂等"用例；`./gradlew test` + `runClient` 三态音画可辨。
+
+**已知坑**：① `handle` 要同步返回 `ActionResult`，命令是异步的 → **返回 `PASS` 认领点击，反馈走回执，别同步等待**；② 复用现成的 `actionSink`，别扩 13 参签名；③ 敲钟用例住在 `inner/veins` 包里（本就错位），迁移注意 class 级 fixture；④ **c0 剂量必须在引擎做**（c0 是引擎状态），源注册登记留在 wiring——界线 = 是否需要引擎私有状态；⑤ 回执晚 1 tick（50 ms），可接受。
+
+**开工前问用户的 2 件事**：① 回执粒度：只给敲钟者，还是广播给附近玩家？② 文案：保留三条，还是借机合并？
+
+**提交切法**：① `feat(inner)` 接收命令并在 actor 内裁决 → ② `feat(mandate)` 回执驱动反馈 → ③ `test(inner)` 命令路径 + 幂等 + 三态 → ④ `docs` 更新本表。
+
 ---
 
 ## 8. 需要你拍板的 3 点（已按推荐值写成默认）
