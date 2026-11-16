@@ -94,7 +94,7 @@ object DebugCellTelemetry:
       sustenance = readout.sustenance,
       baselineCalming = readout.baselineCalming,
       pulseDrive = readout.pulseDrive,
-      simTime = readout.simTime,
+      simTime = 0.0,
       phaseKind = kind,
       phaseFraction = frac,
       undefinedReason = reason,

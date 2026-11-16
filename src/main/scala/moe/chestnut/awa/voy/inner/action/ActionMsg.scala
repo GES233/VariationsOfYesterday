@@ -1,6 +1,8 @@
 package moe.chestnut.awa.voy.inner.action
 
-import moe.chestnut.awa.voy.inner.veins.{CellCoord, MandateCurrent, Regime}
+import java.util.UUID
+
+import moe.chestnut.awa.voy.inner.veins.{BellOutcome, CellCoord, MandateCurrent, Regime}
 
 sealed trait MandateActionProtocol
 
@@ -25,5 +27,15 @@ object ActionMsgPool:
       cell: CellCoord,
       from: Regime,
       to: Regime
+  ) extends MandateActionProtocol
+
+  /** Receipt emitted by the engine when processing `EventMsg.StrikeBell`. */
+  final case class BellStruck(
+      cell: CellCoord,
+      outcome: BellOutcome,
+      blockX: Int,
+      blockY: Int,
+      blockZ: Int,
+      strikerId: Option[UUID]
   ) extends MandateActionProtocol
 

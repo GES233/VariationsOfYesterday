@@ -22,11 +22,11 @@ Minecraft 世界                         引擎（单线程 actor）            
 破坏方块 ──StressInject──┐
 右键手势 ──SetCalming───┤  ┌──▶ MandateAgent 信箱（全序）
          ──SetSustenance┤  │      └─ 格阵 step（RK4 + M + c0）
-         ──FirePulse────┘  │      └─ 分类（regime / 节律 / 尖峰）
+         ──StrikeBell───┘  │      └─ 分类（regime / 节律 / 尖峰 / 敲钟回执）
 60 s 重平衡 ─SetBaselineCalming┘      └─ 每 tick 发布 readout（@volatile）
                                                          │
                         ┌────────────────────────────────┘
-                        ├─▶ ActionFeedback（地鸣 / 示警，服务端线程）
+                        ├─▶ ActionFeedback（地鸣 / 示警 / BellStruck，服务端线程）
                         └─▶ StagnationRunner（效果 / 感官 / 60 s 重平衡）
 
 游戏线程：只投事件、只读 readout 快照、下一 tick 消费动作队列。不阻塞、不反向写。
@@ -41,7 +41,7 @@ Minecraft 世界                         引擎（单线程 actor）            
 
 | 你要改的 | 打开这些 | 注意 |
 | :--- | :--- | :--- |
-| 敲钟怎么判、说什么 | `mandate/BellRitual.scala` → `overworld/BellStrike.scala` → `mandate/MandateWording.scala` | 相位不参与判定（裁决⑯） |
+| 敲钟怎么判、说什么 | `inner/veins/BellRitual.scala` → `overworld/BellStrike.scala` → `mandate/MandateWording.scala` | 相位不参与判定（裁决⑯）；命令 `StrikeBell` → 回执 `BellStruck` |
 | 一个数值 / 阈值 | `VoyConfig.scala`（42 个 knob） | 被契约钉住的见「红线」 |
 | 菌塘 / 接种判定 | `mandate/MandatePhenomena.scala`（纯函数） | 调用方 `blocks/BedActions.scala`、`overworld/FieldInoculation.scala` |
 | 感官现象（黄水/菌光/死寂） | `overworld/StagnationRunner.scala`（`emitPhenomena`） | 判定在 `MandatePhenomena`，这里只管呈现 |
@@ -69,10 +69,10 @@ Minecraft 世界                         引擎（单线程 actor）            
 `src/main/scala/moe/chestnut/awa/voy/`：
 
 - `VariationsOfYesterday.scala` — 模组入口（生命周期、tick、主世界监听）；`VoyConfig.scala` — 外部运行时配置（`config/variations-of-yesterday.json`，只注入接线层，不触契约锚）。
-- `mandate/` — Mandate 游戏侧接线层：`MandateRuntime`（Minecraft ↔ Mandate 桥接）、`MandateOverworld`（主世界门面，委托 `overworld/` 下按通道拆分的无状态模块）、`BellRitual`（敲钟裁决纯函数）、`MandateCalming`（c0 安抚源注册表）、`MandateWording`（玩家可见文案）、`MandatePhenomena`（感官签名/经济档/再接种纯映射）、`MandateEconomy`（mixin 桥接）、`MandateEffects`（自定义状态效果）、`MandateSyncProtocol` + `MandateNetworking`（S2C 同步）、`MandatePersistence`（维度级持久化）、`VoyDebug`（`/voy` 开发命令门，不是通道，故不在 `overworld/`）。
+- `mandate/` — Mandate 游戏侧接线层：`MandateRuntime`（Minecraft ↔ Mandate 桥接）、`MandateOverworld`（主世界门面，委托 `overworld/` 下按通道拆分的无状态模块）、`MandateCalming`（c0 安抚源注册表）、`MandateWording`（玩家可见文案）、`MandatePhenomena`（感官签名/经济档/再接种纯映射）、`MandateEconomy`（mixin 桥接）、`MandateEffects`（自定义状态效果）、`MandateSyncProtocol` + `MandateNetworking`（S2C 同步）、`MandatePersistence`（维度级持久化）、`VoyDebug`（`/voy` 开发命令门，不是通道，故不在 `overworld/`）。
 - `mandate/overworld/` — 7 个世界侧模块：`BlockBreakListener`、`UseBlockRouter`（含钟/罗盘读数分支）、`FieldInoculation`、`BellStrike`、`StagnationRunner`（含感官层）、`ActionFeedback`、`OverworldVocabulary`。
 - `blocks/` — 菌塘与设施方块（`VoyBlocks` 注册、`GastrodiaBedBlock` 及 `BedCompat` / `BedFx` / `BedActions`）。
-- `inner/veins/` — 纯模拟核心（「地脉」）：状态与网格、`MandateAgent`、读数词表、心跳节律与相位、c0 库存、快照、尖峰/相位检测；无 Minecraft 依赖，可单测与回放。
+- `inner/veins/` — 纯模拟核心（「地脉」）：状态与网格、`MandateAgent`、`BellRitual`（敲钟裁决）、读数词表、心跳节律与相位、c0 库存、快照、尖峰/相位检测；无 Minecraft 依赖，可单测与回放。
 - `inner/{actor,event,action,plant}/` — actor 内核、入向 `EventDTO` / 出向 `MandateActionProtocol`、植物纯值词表；`helpers/ODESolver` — RK4 / Euler。
 
 其余：

@@ -16,11 +16,6 @@ final case class CellReadout(
     baselineCalming: Double = 0.0,
     pulseDrive: Double = 0.0,
     rhythm: RhythmVerdict = RhythmVerdict.Warming,
-    /** simTime of the last bell strike on this cell; NaN = none. Drives the
-      * bell's overdrive guard (design note 11 §1.5, `overdriveGuard`).
-      */
-    lastBellStrikeAt: Double = Double.NaN,
-    simTime: Double = 0.0,
     sustenanceFloor: Double = StressParam.BareCore.sustenanceFloor,
     toxicityThreshold: Double = StressParam.BareCore.sustenanceBurnThreshold
 ):

@@ -31,9 +31,7 @@ class MandateNetworkingSpec:
       pulseDrive = 0.1,
       rhythm =
         if sheltered then RhythmVerdict.Beating(40.0, 0.08, RhythmSource.Intrinsic)
-        else RhythmVerdict.Slow(Double.NaN),
-      lastBellStrikeAt = 4.0,
-      simTime = 12.0
+        else RhythmVerdict.Slow(Double.NaN)
     )
 
   @Test

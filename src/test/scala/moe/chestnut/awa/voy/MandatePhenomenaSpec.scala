@@ -22,9 +22,7 @@ class MandatePhenomenaSpec:
       phase: PhaseReading = PhaseReading.Basin(PhaseLabel.Resting),
       c0: Double = 0.03,
       sustenance: Double = 1.0,
-      rhythm: RhythmVerdict = RhythmVerdict.Warming,
-      lastBellStrikeAt: Double = Double.NaN,
-      simTime: Double = 0.0
+      rhythm: RhythmVerdict = RhythmVerdict.Warming
   ): CellReadout =
     CellReadout(
       current = MandateCurrent(v, -0.6, s, q),
@@ -32,9 +30,7 @@ class MandatePhenomenaSpec:
       phase = phase,
       baselineCalming = c0,
       sustenance = sustenance,
-      rhythm = rhythm,
-      lastBellStrikeAt = lastBellStrikeAt,
-      simTime = simTime
+      rhythm = rhythm
     )
 
   @Test def `silent blight binds to ecological incapacitation, never to pulse cooldown or saturated oscillation`(): Unit =
@@ -51,15 +47,6 @@ class MandatePhenomenaSpec:
       isNight = true
     )
     assertTrue(deadNetwork.silentBlight, "dead mycelium is silent blight")
-
-    val inOverdriveGuard = MandatePhenomena.classifyPhenomena(
-      readout(lastBellStrikeAt = 2.0, simTime = 5.0),
-      isNight = true
-    )
-    assertFalse(
-      inOverdriveGuard.silentBlight,
-      "a recent bell strike is NOT ecological death and must not trigger silent blight"
-    )
 
     val saturated = MandatePhenomena.classifyPhenomena(
       readout(
@@ -183,13 +170,6 @@ class MandatePhenomenaSpec:
     val healthy = readout(s = 0.20, regime = Regime.Calm, sustenance = 0.85)
     assertEquals(GastrodiaBedVerdict.Growing, MandatePhenomena.evaluateGastrodiaBed(healthy))
     assertTrue(MandatePhenomena.canInoculateTimberInField(healthy))
-
-    val inGuard = healthy.copy(lastBellStrikeAt = 2.0, simTime = 5.0)
-    assertEquals(
-      GastrodiaBedVerdict.Growing,
-      MandatePhenomena.evaluateGastrodiaBed(inGuard),
-      "the bell overdrive guard is a strike rule and does not stall healthy mycelial beds"
-    )
 
     val strained = readout(s = 0.45, regime = Regime.Strained, sustenance = 1.0)
     assertEquals(GastrodiaBedVerdict.Stalled, MandatePhenomena.evaluateGastrodiaBed(strained))

@@ -235,30 +235,31 @@ class MandateAgentSpec:
   @Test def reRegisteringCellClearsBellGuardAndRhythm(): Unit =
     val readouts =
       new AtomicReference[Map[CellCoord, CellReadout]](Map.empty)
+    val actions = new java.util.concurrent.ConcurrentLinkedQueue[MandateActionProtocol]()
     val latchRef = new AtomicReference[CountDownLatch](new CountDownLatch(1))
     val agent = track(
       MandateAgent(
         singleCellGrid(mkCell(0.0)),
-        readoutSink = r => { readouts.set(r); latchRef.get().countDown() }
+        readoutSink = r => { readouts.set(r); latchRef.get().countDown() },
+        actionSink = actions.add(_)
       )
     )
 
-    agent ! EventMsg.FirePulse(origin, 25.0)
+    agent ! EventMsg.StrikeBell(origin)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(awaitPhase(latchRef))
-    assertEquals(
-      0.0,
-      readouts.get()(origin).lastBellStrikeAt,
-      1e-12,
-      "a bell strike stamps the overdrive guard at the event's own simTime (before the tick)"
-    )
+    val firstOutcome = actions.asScala.collect { case ActionMsgPool.BellStruck(_, o, _, _, _, _) => o }
+    assertEquals(List(BellOutcome.Struck), firstOutcome.toList)
 
     latchRef.set(new CountDownLatch(1))
     agent ! EventMsg.RegisterCell(origin)
+    agent ! EventMsg.StrikeBell(origin)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(awaitPhase(latchRef))
-    assertTrue(
-      readouts.get()(origin).lastBellStrikeAt.isNaN,
+    val outcomes = actions.asScala.collect { case ActionMsgPool.BellStruck(_, o, _, _, _, _) => o }
+    assertEquals(
+      List(BellOutcome.Struck, BellOutcome.Struck),
+      outcomes.toList,
       "re-registration resets the dynamics, and the guard stamp goes with it"
     )
     assertEquals(
@@ -441,67 +442,124 @@ class MandateAgentSpec:
     Thread.sleep(300)
     assertEquals(1.0, grid.cells(origin).sustenance, 1e-12)
 
-  @Test def bellStrikeStampsTheGuardAndKeepsWarmingShelter(): Unit =
+  @Test def strikeBellAdjudicatesGuardDosesC0AndKeepsWarmingShelter(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
-    val latch = new CountDownLatch(2)
+    val actions = new java.util.concurrent.ConcurrentLinkedQueue[MandateActionProtocol]()
+    val latchRef = new AtomicReference[CountDownLatch](new CountDownLatch(2))
     val grid = singleCellGrid(mkCell(0.0))
-    val agent = spawnReadoutLog(grid, seen, latch)
+    val striker = Some(java.util.UUID.randomUUID())
+    val agent = track(
+      MandateAgent(
+        grid,
+        readoutSink = r => { seen.add(r(origin)); latchRef.get().countDown() },
+        actionSink = actions.add(_)
+      )
+    )
     agent ! EventMsg.TickArrived(0.05, 20.0f)
-    agent ! EventMsg.FirePulse(origin, 12.0)
+    agent ! EventMsg.StrikeBell(origin, 12, 64, -7, striker)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
-    assertTrue(latch.await(5, TimeUnit.SECONDS))
+    assertTrue(awaitPhase(latchRef))
 
     val stages = seen.toArray(Array.empty[CellReadout]).toSeq
     assertTrue(stages.head.isSheltered, "a fresh cell rests in the Warming grace")
-    assertTrue(stages.head.lastBellStrikeAt.isNaN, "no strike yet -> no guard stamp")
-    assertEquals(0.05, stages.last.lastBellStrikeAt, 1e-12, "the strike stamps the guard at its own simTime")
+    assertEquals(0.0, stages.head.baselineCalming, 1e-12)
+    assertEquals(
+      CalmingParam().dose,
+      stages.last.baselineCalming,
+      1e-12,
+      "Struck doses c0 atomically inside the mailbox"
+    )
     assertTrue(stages.last.pulseDrive > 0.0, "the pulse enters the equations")
     assertTrue(stages.last.isSheltered, "Warming shelter is not a strike reward")
 
-  @Test def linkPulsesDoNotStampTheOverdriveGuard(): Unit =
+    val struck = actions.asScala.collect { case b: ActionMsgPool.BellStruck => b }.toList
+    assertEquals(
+      List(ActionMsgPool.BellStruck(origin, BellOutcome.Struck, 12, 64, -7, striker)),
+      struck
+    )
+
+  @Test def firePulseNeverStampsTheOverdriveGuardOrDosesC0(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    val actions = new java.util.concurrent.ConcurrentLinkedQueue[MandateActionProtocol]()
     val latch = new CountDownLatch(2)
     val grid = singleCellGrid(mkCell(0.0))
-    val agent = spawnReadoutLog(grid, seen, latch)
+    val agent = track(
+      MandateAgent(
+        grid,
+        readoutSink = r => { seen.add(r(origin)); latch.countDown() },
+        actionSink = actions.add(_)
+      )
+    )
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     agent ! EventMsg.FirePulse(origin, 0.5, PulseTransmitter.CrystalLink)
+    agent ! EventMsg.StrikeBell(origin)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
     val stages = seen.toArray(Array.empty[CellReadout]).toSeq
-    assertTrue(stages.last.lastBellStrikeAt.isNaN, "link pulses are autonomous physics, no guard")
     assertTrue(stages.last.pulseDrive > 0.0)
+    val struck = actions.asScala.collect { case b: ActionMsgPool.BellStruck => b.outcome }.toList
+    assertEquals(List(BellOutcome.Struck), struck, "crystal link pulse must not trigger overdrive guard")
 
-  @Test def rapidStrikesKeepTheGuardFreshWithoutEngineSidePunishment(): Unit =
+  @Test def rapidBellStrikesReturnOverdrivenAndRefreshGuard(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    val actions = new java.util.concurrent.ConcurrentLinkedQueue[MandateActionProtocol]()
     val latch = new CountDownLatch(1)
     val grid = singleCellGrid(mkCell(0.0))
-    val agent = spawnReadoutLog(grid, seen, latch)
-    agent ! EventMsg.FirePulse(origin, 12.0)
-    agent ! EventMsg.FirePulse(origin, 12.0)
+    val agent = track(
+      MandateAgent(
+        grid,
+        readoutSink = r => { seen.add(r(origin)); latch.countDown() },
+        actionSink = actions.add(_)
+      )
+    )
+    agent ! EventMsg.StrikeBell(origin)
+    agent ! EventMsg.StrikeBell(origin)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
     val r = seen.toArray(Array.empty[CellReadout]).last
-    assertEquals(0.0, r.lastBellStrikeAt, 1e-12, "every strike refreshes the guard stamp (pre-tick simTime)")
-    assertTrue(r.isSheltered, "overdrive punishment is the wiring layer's verdict, not the engine's")
-
-  @Test def deadMyceliumIgnoresPulsesEntirely(): Unit =
-    val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
-    val latch = new CountDownLatch(1)
-    val grid = singleCellGrid(mkCell(0.0))
-    val agent = spawnReadoutLog(grid, seen, latch)
-    agent ! EventMsg.SetSustenance(origin, 0.0)
-    agent ! EventMsg.FirePulse(origin, 12.0)
-    agent ! EventMsg.TickArrived(0.05, 20.0f)
-    assertTrue(latch.await(5, TimeUnit.SECONDS))
-
-    val r = seen.toArray(Array.empty[CellReadout]).last
-    assertTrue(r.lastBellStrikeAt.isNaN, "dead land is not guarded: dead meat gives no echo")
-    assertFalse(r.isSheltered)
     assertEquals(
-      PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee),
-      r.phase
+      CalmingParam().dose,
+      r.baselineCalming,
+      1e-12,
+      "only the first Struck doses c0; Overdriven skips the c0 dose"
+    )
+    assertTrue(r.isSheltered, "overdrive recoil is the wiring layer's penalty, not loss of shelter")
+    val outcomes = actions.asScala.collect { case b: ActionMsgPool.BellStruck => b.outcome }.toList
+    assertEquals(List(BellOutcome.Struck, BellOutcome.Overdriven), outcomes)
+
+  @Test def deadMyceliumAnswersNothingToBellStrikesAndSkipsGuard(): Unit =
+    val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
+    val actions = new java.util.concurrent.ConcurrentLinkedQueue[MandateActionProtocol]()
+    val latch = new CountDownLatch(2)
+    val grid = singleCellGrid(mkCell(0.0))
+    val agent = track(
+      MandateAgent(
+        grid,
+        readoutSink = r => { seen.add(r(origin)); latch.countDown() },
+        actionSink = actions.add(_)
+      )
+    )
+    agent ! EventMsg.SetSustenance(origin, 0.0)
+    agent ! EventMsg.StrikeBell(origin)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    // Re-inoculate immediately; because the dead strike was not guarded, the next strike succeeds.
+    agent ! EventMsg.SetSustenance(origin, 1.0)
+    agent ! EventMsg.StrikeBell(origin)
+    agent ! EventMsg.TickArrived(0.05, 20.0f)
+    assertTrue(latch.await(5, TimeUnit.SECONDS))
+
+    val first = seen.toArray(Array.empty[CellReadout]).head
+    assertFalse(first.isSheltered)
+    assertEquals(0.0, first.baselineCalming, 1e-12)
+    assertEquals(PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee), first.phase)
+
+    val outcomes = actions.asScala.collect { case b: ActionMsgPool.BellStruck => b.outcome }.toList
+    assertEquals(
+      List(BellOutcome.NoAnswer, BellOutcome.Struck),
+      outcomes,
+      "dead land is not guarded: dead meat gives no echo"
     )
 
   @Test def registerCellUsesTheInjectedDefaultParameters(): Unit =

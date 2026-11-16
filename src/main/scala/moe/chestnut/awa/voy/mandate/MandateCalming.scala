@@ -95,10 +95,6 @@ object MandateCalming:
       cz += 1
     if changed then persist()
 
-  /** Discrete ritual dose on an anchored strike (see [[CalmingStock.dose]]). */
-  def dose(c0: Double): Double =
-    CalmingStock.dose(c0, VoyConfig.current.calmingParam)
-
   /** One rebalance pass: scan the world truth, then step every lattice cell's
     * stock toward its source-driven equilibrium (leak included).
     */

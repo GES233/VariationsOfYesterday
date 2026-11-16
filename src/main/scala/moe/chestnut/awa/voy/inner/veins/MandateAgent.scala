@@ -14,7 +14,8 @@ final case class AgentConfig(
     persistPeriod: Double = 1.0,
     initialRhythmEvidence: Map[CellCoord, RhythmEvidence] = Map.empty,
     regimeDwell: Double = 5.0,
-    rhythmParam: RhythmParam = RhythmParam()
+    rhythmParam: RhythmParam = RhythmParam(),
+    calmingParam: CalmingParam = CalmingParam()
 )
 
 /** The mandate engine actor: owns the lattice and integrates it on tick
@@ -93,6 +94,7 @@ object MandateAgent:
           grid.upsertEdge(edge)
       case EventMsg.RemoveEdge(from, to) => grid.removeEdge(from, to)
       case EventMsg.AddLink(_) | EventMsg.RemoveLink(_, _) => ()
+      case EventMsg.StrikeBell(_, _, _, _, _, _) => ()
       case EventMsg.FlushNow => ()
 
   def apply(
@@ -130,25 +132,6 @@ object MandateAgent:
 
     def currentRhythmEvidence: Map[CellCoord, RhythmEvidence] =
       slots.iterator.map { case (c, slot) => c -> slot.tracker.rhythmEvidence }.toMap
-
-    /** Bell strikes stamp the overdrive guard on living cells (dead land
-      * answers nothing and is not guarded — design note 11 §1.5 row 1).
-      */
-    def recordBellStrike(coord: CellCoord, area: Double): Unit =
-      if area > 0.0 then
-        grid.cells.get(coord).foreach { state =>
-          val cur = state.getState
-          val ecoDead = Readout.isEcologicallyDead(
-            state.sustenance,
-            cur.stress,
-            state.getParam,
-            state.stressParam.coupling,
-            state.stressParam.sustenanceDepth,
-            state.stressParam.sustenanceFloor
-          )
-          if !ecoDead then
-            slots.getOrElseUpdate(coord, mkSlot(state)).lastBellStrikeAt = simTime
-        }
 
     def integrate(dt: Double): Unit =
       linkRunner
@@ -224,8 +207,6 @@ object MandateAgent:
           baselineCalming = cell.baselineCalming,
           pulseDrive = pDrive,
           rhythm = rhythm,
-          lastBellStrikeAt = slot.lastBellStrikeAt,
-          simTime = simTime,
           sustenanceFloor = cell.stressParam.sustenanceFloor,
           toxicityThreshold = cell.stressParam.sustenanceBurnThreshold
         ))
@@ -261,11 +242,27 @@ object MandateAgent:
           applyEvent(grid, other, config.defaultFastParam, config.defaultStressParam)
           slots.remove(cell)
           linkRunner.forgetCell(cell)
-        case other @ EventMsg.FirePulse(cell, area, transmitter) =>
-          applyEvent(grid, other, config.defaultFastParam, config.defaultStressParam)
-          // Only actual bell strikes feed the overdrive guard; crystal-link
-          // pulses are autonomous physics, not a player cadence.
-          if transmitter == PulseTransmitter.Bell then recordBellStrike(cell, area)
+        case EventMsg.StrikeBell(cell, bx, by, bz, strikerId, area) =>
+          grid.cells.get(cell).foreach { state =>
+            val cur = state.getState
+            val ecoDead = Readout.isEcologicallyDead(
+              state.sustenance,
+              cur.stress,
+              state.getParam,
+              state.stressParam.coupling,
+              state.stressParam.sustenanceDepth,
+              state.stressParam.sustenanceFloor
+            )
+            val slot = slots.getOrElseUpdate(cell, mkSlot(state))
+            val outcome =
+              BellRitual.evaluate(ecoDead, slot.lastBellStrikeAt, simTime, config.rhythmParam)
+            state.synapseTau = PulseTransmitter.Bell.tau
+            state.firePulse(area)
+            if !ecoDead && area > 0.0 then slot.lastBellStrikeAt = simTime
+            if outcome.anchorsC0 then
+              state.baselineCalming = CalmingStock.dose(state.baselineCalming, config.calmingParam)
+            actionSink(ActionMsgPool.BellStruck(cell, outcome, bx, by, bz, strikerId))
+          }
         case other => applyEvent(grid, other, config.defaultFastParam, config.defaultStressParam)
 
     Actor.spawn("mandate")(handle)

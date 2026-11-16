@@ -2,7 +2,6 @@ package moe.chestnut.awa.voy.mandate
 
 import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
 import moe.chestnut.awa.voy.inner.veins.*
-import moe.chestnut.awa.voy.mandate.BellRitual.BellOutcome
 
 /** All player-facing wording of the mandate wiring layer.
   *

@@ -1,6 +1,9 @@
 package moe.chestnut.awa.voy.inner.event
 
+import java.util.UUID
+
 import moe.chestnut.awa.voy.inner.veins.{
+  BellRitual,
   CellCoord,
   LatticeEdge,
   MandateCurrent,
@@ -31,11 +34,7 @@ import moe.chestnut.awa.voy.inner.veins.{
   */
 sealed trait EventDTO
 
-/** Design note 11 (rhythm-as-shelter): the discrete pulse ledger
-  * (`PulseBookkeeping`, `PulseStamp`) is gone. A pulse is only physics now;
-  * shelter comes from the rhythm rhythm axis, and the bell's overdrive
-  * guard is tracked per cell from `FirePulse.transmitter == Bell`.
-  */
+/** Inbound commands and channel events delivered to the mandate engine mailbox. */
 object EventMsg:
   // ==== Timer ==== //
 
@@ -80,18 +79,26 @@ object EventMsg:
     * what makes a coupled replay deterministic — while giving emitters no
     * numeric knob to reshape the kernel. Applying the event sets the
     * cell's `synapseTau` to the transmitter's constant before firing,
-    * exactly as the prototype does.
-    *
-    * Every pulse enters the equations (the bell always sounds). The
-    * `transmitter` axis is what lets downstream mechanisms tell a bell
-    * strike from an endogenous/link arrival: bell strikes stamp the cell's
-    * overdrive guard (`lastBellStrikeAt`), crystal-link pulses do not
-    * (design note 11 §1.5).
+    * without touching the bell overdrive guard or `c0`.
     */
   final case class FirePulse(
       cell: CellCoord,
       area: Double,
       transmitter: PulseTransmitter = PulseTransmitter.Bell
+  ) extends EventDTO
+
+  /** Command: strike a bell / resonance vessel on `cell`. The engine owns
+    * `lastBellStrikeAt` and `c0`, adjudicates `NoAnswer` / `Overdriven` /
+    * `Struck` inside the mailbox, fires the `Bell` pulse, doses `c0` on
+    * `Struck`, and emits `ActionMsgPool.BellStruck` as the receipt.
+    */
+  final case class StrikeBell(
+      cell: CellCoord,
+      blockX: Int = 0,
+      blockY: Int = 0,
+      blockZ: Int = 0,
+      strikerId: Option[UUID] = None,
+      area: Double = BellRitual.BellPulseArea
   ) extends EventDTO
 
   /** Set the sustenance level `M ∈ [0, 1]` of a cell — the endogenous

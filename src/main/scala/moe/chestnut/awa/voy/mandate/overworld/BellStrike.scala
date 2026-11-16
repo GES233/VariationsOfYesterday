@@ -1,5 +1,7 @@
 package moe.chestnut.awa.voy.mandate.overworld
 
+import java.util.UUID
+
 import net.minecraft.block.{BlockState, Blocks}
 import net.minecraft.entity.effect.StatusEffectInstance
 import net.minecraft.entity.player.PlayerEntity
@@ -18,11 +20,10 @@ import moe.chestnut.awa.voy.mandate.*
   * *doses* the chunk's calming stock (design note 11 §1.5, ruling 11; note 12 §4,
   * ruling 16).
   *
-  * The three outcomes come from the pure [[BellRitual]] adjudicator; this module
-  * only spends their consequences and renders them. Every outcome is
-  * distinguishable without reading chat: amber + notes = the strike landed, rust
-  * burst = overdrive, dead ash = no answer. No outcome depends on the cycle's
-  * phase any more — the bell is a pacemaker, not a phase sniper.
+  * World -> engine sends `StrikeBell` (`handle`); engine adjudicates
+  * `NoAnswer` / `Overdriven` / `Struck` against its private guard and doses
+  * `c0` atomically, then emits `BellStruck` back to `onBellStruck` for world
+  * source registration, particles, sound, striker recoil, and chat wording.
   */
 object BellStrike:
   /** Warm amber ring: the strike landed in the rhythm (bell-palette copper). */
@@ -39,30 +40,32 @@ object BellStrike:
       chunkX: Int,
       chunkZ: Int
   ): Option[ActionResult] =
-    if state.isOf(Blocks.BELL) then
-      val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-      val outcome = BellRitual.evaluateBellStrike(readout, VoyConfig.current.rhythmParam)
-      if outcome.anchorsC0 then
-        // The strike is a DOSE into the chunk's calming stock, and the
-        // bell itself is registered as a source so its trickle starts
-        // immediately (design note 11 ruling 11).
-        MandateCalming.register(
-          MandateSource(MandateSourceKind.Bell, pos.getX, pos.getY, pos.getZ)
-        )
-        MandateRuntime.setBaselineCalmingAt(
-          chunkX,
-          chunkZ,
-          MandateCalming.dose(readout.baselineCalming)
-        )
-      // Physics always applies (the bell always sounds); the guard stamp
-      // is recorded engine-side from the Bell transmitter (note 11 §1.5).
-      MandateRuntime.firePulseAt(chunkX, chunkZ, BellRitual.BellPulseArea)
-      // Three outcomes must be distinguishable without reading chat
-      // (design note 12 §4.2): particles + layered sounds per outcome.
-      feedback(world, pos, outcome)
-      // Acute overdrive backlash (design note 11 §1.5 row 2): striking
-      // inside the guard recoils on the striker immediately.
-      if outcome.triggersOverloadPenalty then
+    if state.isOf(Blocks.BELL) && MandateRuntime.isLiveChunk(chunkX, chunkZ) then
+      MandateRuntime.strikeBellAt(chunkX, chunkZ, pos.getX, pos.getY, pos.getZ, player.getUuid)
+      Some(ActionResult.PASS)
+    else None
+
+  /** Apply the engine's `BellStruck` receipt on the server thread. */
+  def onBellStruck(
+      world: ServerWorld,
+      pos: BlockPos,
+      chunkX: Int,
+      chunkZ: Int,
+      outcome: BellOutcome,
+      strikerId: Option[UUID]
+  ): Unit =
+    if outcome.anchorsC0 then
+      // The engine already dosed `c0` atomically in the mailbox; register the
+      // physical bell so its 45-min trickle stays backed by the world truth.
+      MandateCalming.register(
+        MandateSource(MandateSourceKind.Bell, pos.getX, pos.getY, pos.getZ)
+      )
+
+    feedback(world, pos, outcome)
+
+    val striker = strikerId.flatMap(id => Option(world.getPlayerByUuid(id)))
+    if outcome.triggersOverloadPenalty then
+      striker.foreach { player =>
         player.addStatusEffect(
           new StatusEffectInstance(
             MandateEffects.PulseSaturationEntry,
@@ -73,57 +76,54 @@ object BellStrike:
             true
           )
         )
-        world.playSound(
-          null,
-          pos,
-          SoundEvents.BLOCK_BELL_RESONATE,
-          SoundCategory.BLOCKS,
-          1.0f,
-          0.3f
-        )
-        world.spawnParticles(
-          ParticleTypes.ASH,
-          pos.getX + 0.5,
-          pos.getY + 0.8,
-          pos.getZ + 0.5,
-          10,
-          0.4,
-          0.4,
-          0.4,
-          0.02
-        )
+      }
+      world.playSound(
+        null,
+        pos,
+        SoundEvents.BLOCK_BELL_RESONATE,
+        SoundCategory.BLOCKS,
+        1.0f,
+        0.3f
+      )
+      world.spawnParticles(
+        ParticleTypes.ASH,
+        pos.getX + 0.5,
+        pos.getY + 0.8,
+        pos.getZ + 0.5,
+        10,
+        0.4,
+        0.4,
+        0.4,
+        0.02
+      )
+
+    striker.foreach { player =>
       player.sendMessage(
         Text.literal(MandateWording.formatBellPulse(chunkX, chunkZ, outcome)),
         true
       )
-      Some(ActionResult.PASS)
-    else None
+    }
 
   /** Per-outcome bell feedback (design note 12 §4.2). The vanilla bell keeps its
     * own sound (the interaction stays PASS), and these layers make the three
     * outcomes readable at a glance.
-    *
-    * The old "phase-corrected" variant (amethyst chime) is gone with the phase
-    * gate: the bell no longer claims to know where the cycle was.
     */
   private def feedback(
       world: ServerWorld,
       pos: BlockPos,
-      outcome: BellRitual.BellOutcome
+      outcome: BellOutcome
   ): Unit =
     val x = pos.getX + 0.5
     val y = pos.getY + 0.8
     val z = pos.getZ + 0.5
     outcome match
-      case BellRitual.BellOutcome.Struck =>
+      case BellOutcome.Struck =>
         world.spawnParticles(StrikeAmber, x, y, z, 10, 0.35, 0.25, 0.35, 0.01)
         world.spawnParticles(ParticleTypes.NOTE, x, y + 0.4, z, 6, 0.4, 0.3, 0.4, 0.05)
 
-      case BellRitual.BellOutcome.NoAnswer =>
+      case BellOutcome.NoAnswer =>
         // Dead meat gives no echo — but "no echo" must still be *legible* as a
-        // distinct outcome, not as a missed click. A muffled candle-out (the cue
-        // freed by the collapsed `SpikeSwallowed` state) plus a thin drift of
-        // ash: the bell did ring, and died instantly.
+        // distinct outcome, not as a missed click.
         world.playSound(
           null,
           pos,
@@ -135,6 +135,6 @@ object BellStrike:
         world.spawnParticles(ParticleTypes.ASH, x, y, z, 8, 0.35, 0.25, 0.35, 0.01)
         world.spawnParticles(ParticleTypes.ASH, x, y - 0.3, z, 4, 0.4, 0.15, 0.4, 0.005)
 
-      case BellRitual.BellOutcome.Overdriven =>
+      case BellOutcome.Overdriven =>
         world.spawnParticles(StrikeRust, x, y, z, 14, 0.5, 0.4, 0.5, 0.02)
 end BellStrike

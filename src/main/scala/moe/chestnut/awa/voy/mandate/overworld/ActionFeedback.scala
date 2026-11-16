@@ -6,6 +6,7 @@ import net.minecraft.particle.ParticleTypes
 import net.minecraft.server.MinecraftServer
 import net.minecraft.sound.{SoundCategory, SoundEvents}
 import net.minecraft.text.Text
+import net.minecraft.util.math.BlockPos
 
 import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.veins.Regime
@@ -73,4 +74,8 @@ object ActionFeedback:
                   true
                 )
           }
+
+      case ActionMsgPool.BellStruck(cell, outcome, bx, by, bz, strikerId) =>
+        val (chunkX, chunkZ) = MandateRuntime.gridToWorld(cell)
+        BellStrike.onBellStruck(overworld, new BlockPos(bx, by, bz), chunkX, chunkZ, outcome, strikerId)
 end ActionFeedback

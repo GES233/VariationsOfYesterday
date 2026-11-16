@@ -26,8 +26,7 @@ class RhythmSpec:
       regime = Regime.Calm,
       phase = PhaseReading.Basin(PhaseLabel.Resting),
       baselineCalming = 0.03,
-      rhythm = rhythm,
-      simTime = 5.0
+      rhythm = rhythm
     )
 
   @Test def `a stable 40 s beat at low duty reads Beating`(): Unit =

@@ -3,8 +3,7 @@ package moe.chestnut.awa.voy.inner.veins
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-import moe.chestnut.awa.voy.mandate.{BellRitual, MandatePhenomena}
-import moe.chestnut.awa.voy.mandate.BellRitual.BellOutcome
+import moe.chestnut.awa.voy.mandate.MandatePhenomena
 
 /** Defined-domain behaviour of the 3-axis readout and bell strike adjudication. */
 class MandateReadoutSpec:
@@ -163,107 +162,34 @@ class MandateReadoutSpec:
     assertEquals(Some(5), refractoryCycle.dialTick, "0.25 of 20 divisions is tick 5")
     assertEquals(None, calmMaintained.dialTick, "resting basin has no cycle dial tick")
 
-  @Test def `bell strike anchors on every living cell regardless of phase`(): Unit =
-    val calmUnanchored = CellReadout(
-      MandateCurrent(-1.2, -0.6, 0.05, 0.0),
-      Regime.Calm,
-      PhaseReading.Basin(PhaseLabel.Resting),
-      baselineCalming = 0.0
-    )
-    val calmOutcome = BellRitual.evaluateBellStrike(calmUnanchored)
-    assertEquals(BellOutcome.Struck, calmOutcome)
-    assertTrue(calmOutcome.anchorsC0)
-
-    // Ruling 16 (note 12 §4): the old `SpikeSwallowed` phase gate is gone. A
-    // strike during Excitation anchors like any other living cell — the bell
-    // paces the rhythm, it does not snipe the phase.
-    val oscExcitationUnanchored = CellReadout(
-      MandateCurrent(1.9, 0.2, 0.65, 0.55),
-      Regime.Oscillating,
-      PhaseReading.Cycle(PhaseLabel.Excitation, 0.05),
-      baselineCalming = 0.0
-    )
-    val spikeOutcome = BellRitual.evaluateBellStrike(oscExcitationUnanchored)
-    assertEquals(BellOutcome.Struck, spikeOutcome)
-    assertTrue(
-      spikeOutcome.anchorsC0,
-      "striking during Excitation anchors: no phase gate (ruling 16)"
-    )
-
-    val oscRefractoryUnanchored = CellReadout(
-      MandateCurrent(0.4, 0.8, 0.65, 0.55),
-      Regime.Oscillating,
-      PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory, 0.25),
-      baselineCalming = 0.0
-    )
-    val reanchorOutcome = BellRitual.evaluateBellStrike(oscRefractoryUnanchored)
-    assertEquals(BellOutcome.Struck, reanchorOutcome)
-    assertTrue(reanchorOutcome.anchorsC0)
-
-    val burnoutCell = CellReadout(
-      MandateCurrent(1.1, 0.4, 0.98, 0.0),
-      Regime.Burnout,
-      PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory, 0.25),
-      baselineCalming = 0.0
-    )
-    val burnoutOutcome = BellRitual.evaluateBellStrike(burnoutCell)
-    assertEquals(BellOutcome.Struck, burnoutOutcome)
-    assertTrue(
-      burnoutOutcome.anchorsC0,
-      "saturated but living cells anchor: re-anchoring is part of the rescue chain (ruling 13)"
-    )
-
-  @Test def `the strike outcome ignores the c0 stock level`(): Unit =
-    // Regression guard for ruling 16: reintroducing a c0 (or phase) gate into
-    // the bell verdict makes this test fail.
-    val lowStock = CellReadout(
-      MandateCurrent(1.9, 0.2, 0.65, 0.55),
-      Regime.Oscillating,
-      PhaseReading.Cycle(PhaseLabel.Excitation, 0.05),
-      baselineCalming = 0.0
-    )
-    val stocked = lowStock.copy(baselineCalming = MandatePhenomena.C0ShelterLevel + 0.005)
-    assertEquals(BellOutcome.Struck, BellRitual.evaluateBellStrike(lowStock))
-    assertEquals(BellOutcome.Struck, BellRitual.evaluateBellStrike(stocked))
-    assertEquals(
-      BellRitual.evaluateBellStrike(lowStock),
-      BellRitual.evaluateBellStrike(stocked),
-      "the calming stock must not change a bell verdict (ruling 16)"
-    )
-
-  @Test def `bell strike on dead mycelium answers nothing`(): Unit =
-    val deadCell = CellReadout(
-      MandateCurrent(-1.2, -0.6, 0.3, 0.0),
-      Regime.Strained,
-      PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee),
-      baselineCalming = 0.0,
-      sustenance = 0.0
-    )
-    val outcome = BellRitual.evaluateBellStrike(deadCell)
-    assertEquals(BellOutcome.NoAnswer, outcome)
-    assertFalse(outcome.anchorsC0)
-    assertFalse(outcome.triggersOverloadPenalty)
-
-  @Test def `striking inside the overdrive guard triggers overload backlash`(): Unit =
-    val inGuard = CellReadout(
-      MandateCurrent(-1.2, -0.6, 0.05, 0.0),
-      Regime.Calm,
-      PhaseReading.Basin(PhaseLabel.Resting),
-      baselineCalming = 0.03,
-      lastBellStrikeAt = 2.0,
-      simTime = 6.0
-    )
-    val outcome = BellRitual.evaluateBellStrike(inGuard)
-    assertEquals(BellOutcome.Overdriven, outcome)
-    assertFalse(outcome.anchorsC0)
-    assertTrue(outcome.triggersOverloadPenalty)
-
-    val guardExpired = inGuard.copy(simTime = 11.0) // 9 s later > 8 s guard
-    assertEquals(BellOutcome.Struck, BellRitual.evaluateBellStrike(guardExpired))
-
-    val neverStruck = inGuard.copy(lastBellStrikeAt = Double.NaN)
+  @Test def `bell ritual adjudicates strictly on ecological death and overdrive guard`(): Unit =
     assertEquals(
       BellOutcome.Struck,
-      BellRitual.evaluateBellStrike(neverStruck),
-      "a fresh cell has no guard history"
+      BellRitual.evaluate(ecologicallyDead = false, lastBellStrikeAt = Double.NaN, simTime = 0.0)
+    )
+    assertTrue(BellOutcome.Struck.anchorsC0)
+    assertFalse(BellOutcome.Struck.triggersOverloadPenalty)
+
+    val deadOutcome =
+      BellRitual.evaluate(ecologicallyDead = true, lastBellStrikeAt = Double.NaN, simTime = 0.0)
+    assertEquals(BellOutcome.NoAnswer, deadOutcome)
+    assertFalse(deadOutcome.anchorsC0)
+    assertFalse(deadOutcome.triggersOverloadPenalty)
+
+    // Ecological death wins even if a prior strike timestamp would fall inside the guard.
+    assertEquals(
+      BellOutcome.NoAnswer,
+      BellRitual.evaluate(ecologicallyDead = true, lastBellStrikeAt = 2.0, simTime = 6.0)
+    )
+
+    val overdriven =
+      BellRitual.evaluate(ecologicallyDead = false, lastBellStrikeAt = 2.0, simTime = 6.0)
+    assertEquals(BellOutcome.Overdriven, overdriven)
+    assertFalse(overdriven.anchorsC0)
+    assertTrue(overdriven.triggersOverloadPenalty)
+
+    assertEquals(
+      BellOutcome.Struck,
+      BellRitual.evaluate(ecologicallyDead = false, lastBellStrikeAt = 2.0, simTime = 11.0),
+      "9 s later > 8 s guard -> Struck"
     )

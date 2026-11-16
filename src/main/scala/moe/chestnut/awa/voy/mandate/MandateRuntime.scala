@@ -53,12 +53,23 @@ object MandateRuntime:
   def injectStressAt(chunkX: Int, chunkZ: Int, amount: Double): Unit =
     tell(EventMsg.StressInject(worldToGrid(chunkX, chunkZ), amount))
 
-  def firePulseAt(
+  def strikeBellAt(
       chunkX: Int,
       chunkZ: Int,
-      area: Double
+      blockX: Int,
+      blockY: Int,
+      blockZ: Int,
+      strikerId: java.util.UUID
   ): Unit =
-    tell(EventMsg.FirePulse(worldToGrid(chunkX, chunkZ), area))
+    tell(
+      EventMsg.StrikeBell(
+        worldToGrid(chunkX, chunkZ),
+        blockX,
+        blockY,
+        blockZ,
+        Some(strikerId)
+      )
+    )
 
   def setBaselineCalmingAt(chunkX: Int, chunkZ: Int, level: Double): Unit =
     tell(EventMsg.SetBaselineCalming(worldToGrid(chunkX, chunkZ), level))
@@ -165,7 +176,8 @@ object MandateRuntime:
             defaultFastParam = VoyConfig.current.fastParam,
             defaultStressParam = VoyConfig.current.stressParam,
             initialRhythmEvidence = initialRhythmEvidence,
-            rhythmParam = VoyConfig.current.rhythmParam
+            rhythmParam = VoyConfig.current.rhythmParam,
+            calmingParam = VoyConfig.current.calmingParam
           )
         )
       )
