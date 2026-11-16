@@ -175,11 +175,6 @@ class MandatePhenomenaSpec:
       )
     )
 
-  @Test def `sustenance word stays qualitative`(): Unit =
-    assertEquals("枯绝", MandatePhenomena.sustenanceWord(0.0))
-    assertEquals("受损", MandatePhenomena.sustenanceWord(0.3))
-    assertEquals("完好", MandatePhenomena.sustenanceWord(1.0))
-
   @Test def `gastrodia bed grows under calm stress and intact mycelial network, independent of pulse cooldown`(): Unit =
     val healthy = readout(s = 0.20, regime = Regime.Calm, sustenance = 0.85)
     assertEquals(GastrodiaBedVerdict.Growing, MandatePhenomena.evaluateGastrodiaBed(healthy))

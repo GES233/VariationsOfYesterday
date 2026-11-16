@@ -177,7 +177,7 @@ object MandateAgent:
             val oldRegime = slot.publishedRegime
             slot.publishedRegime = rawRegime
             slot.regimeCandidate = None
-            actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, rawRegime, phase))
+            actionSink(ActionMsgPool.RegimeTransitioned(coord, oldRegime, rawRegime))
           else
             slot.regimeCandidate = Some((rawRegime, since))
 

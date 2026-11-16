@@ -14,8 +14,14 @@ import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 import moe.chestnut.awa.voy.inner.veins.*
 
 /** Game-side bridge between Minecraft and the mandate engine actor: owns the
-  * engine actor lifecycle, the tick gate, snapshot publication, and the action
+  * engine actor lifecycle, the tick gate, readout publication, and the action
   * drain.
+  *
+  * There is exactly one published channel (`readoutSnapshot`, consumed by the
+  * wiring layer) plus the action stream. A second `Map[CellCoord,
+  * MandateCurrent]` snapshot used to be republished here every tick; it had no
+  * reader and was deleted in the S2 subtraction pass, so the "two publish
+  * channels" model it implied is gone.
   */
 object MandateRuntime:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
@@ -29,8 +35,6 @@ object MandateRuntime:
   private def TickDt = VoyConfig.current.tickDt
 
   @volatile private var system: Option[ActorRef[EventDTO]] = None
-  @volatile private var snapshot: Map[(Int, Int), MandateCurrent] =
-    Map.empty
   @volatile private var readoutSnapshot: Map[(Int, Int), CellReadout] =
     Map.empty
   private var lastTickRate: Float = 20.0f
@@ -153,7 +157,9 @@ object MandateRuntime:
       system = Some(
         MandateAgent(
           grid,
-          publishSnapshot,
+          // The raw MandateCurrent snapshot channel was deleted (S2): nothing
+          // read it, so the actor is handed a no-op sink.
+          _ => (),
           pendingActions.add(_),
           publishReadout,
           links = links,
@@ -206,7 +212,6 @@ object MandateRuntime:
   def stop(): Unit = synchronized {
     system.foreach(_.stop())
     system = None
-    snapshot = Map.empty
     readoutSnapshot = Map.empty
     pendingActions.clear()
     MandateNetworking.clearAll()
@@ -241,11 +246,6 @@ object MandateRuntime:
 
   def readoutAt(chunkX: Int, chunkZ: Int): CellReadout =
     readoutSnapshot.getOrElse((chunkX, chunkZ), CellReadout.zero)
-
-  private def publishSnapshot(cells: Map[CellCoord, MandateCurrent]): Unit =
-    snapshot = cells.iterator.map { case (coord, state) =>
-      (coord.x + originX, coord.z + originZ) -> state
-    }.toMap
 
   private def publishReadout(cells: Map[CellCoord, CellReadout]): Unit =
     readoutSnapshot = cells.iterator.map { case (coord, readout) =>

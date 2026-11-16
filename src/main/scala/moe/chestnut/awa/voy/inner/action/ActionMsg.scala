@@ -1,6 +1,6 @@
 package moe.chestnut.awa.voy.inner.action
 
-import moe.chestnut.awa.voy.inner.veins.{CellCoord, MandateCurrent, PhaseReading, Regime}
+import moe.chestnut.awa.voy.inner.veins.{CellCoord, MandateCurrent, Regime}
 
 sealed trait MandateActionProtocol
 
@@ -15,11 +15,15 @@ object ActionMsgPool:
       regime: Regime
   ) extends MandateActionProtocol
 
-  /** Emitted when a cell's slow-variable regime changes between ticks. */
+  /** Emitted when a cell's slow-variable regime changes between ticks.
+    *
+    * `phase` used to ride along and was never read (the consumer discarded it
+    * with `_`), so the payload now carries only what a consumer can act on.
+    * Dropping `from` is a note-12 §5.2 item for the atomisation step.
+    */
   final case class RegimeTransitioned(
       cell: CellCoord,
       from: Regime,
-      to: Regime,
-      phase: PhaseReading
+      to: Regime
   ) extends MandateActionProtocol
 

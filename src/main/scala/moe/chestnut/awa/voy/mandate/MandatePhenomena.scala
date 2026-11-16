@@ -112,13 +112,6 @@ object MandatePhenomena:
       precursorSpore = precursorSpore
     )
 
-  /** Qualitative 3-tier word for mycelial network integrity (`M`). */
-  def sustenanceWord(
-      sustenance: Double,
-      floor: Double = StressParam().sustenanceFloor
-  ): String =
-    Readout.mycelialHealth(sustenance, floor).word
-
   /** 4a. Pure decision rule for mycelial re-inoculation into soil. */
   def evaluateReInoculation(readout: CellReadout): ReInoculationOutcome =
     if readout.sustenance >= ReInoculationMaxSustenance then

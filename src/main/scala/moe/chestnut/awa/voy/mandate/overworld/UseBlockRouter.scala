@@ -3,11 +3,14 @@ package moe.chestnut.awa.voy.mandate.overworld
 import net.fabricmc.fabric.api.event.player.UseBlockCallback
 import net.minecraft.block.BlockState
 import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.item.ItemStack
+import net.minecraft.item.{ItemStack, Items}
 import net.minecraft.server.world.ServerWorld
+import net.minecraft.text.Text
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.{ActionResult, Hand}
 import net.minecraft.world.World
+
+import moe.chestnut.awa.voy.mandate.{MandateRuntime, MandateWording, VoyDebug}
 
 /** Ordered dispatch for right-click gestures (design draft §1.2, §3.2).
   *
@@ -45,9 +48,32 @@ object UseBlockRouter:
       chunkX: Int,
       chunkZ: Int
   ): ActionResult =
-    Inspection.handle(player, held, chunkX, chunkZ)
+    inspect(player, held, chunkX, chunkZ)
       .orElse(FieldInoculation.timber(player, world, pos, state, held, chunkX, chunkZ))
       .orElse(FieldInoculation.soil(player, world, pos, state, held, chunkX, chunkZ))
       .orElse(BellStrike.handle(player, world, pos, state, chunkX, chunkZ))
       .getOrElse(ActionResult.PASS)
+
+  /** Diegetic readout: right-clicking a block while holding a Clock or a
+    * Compass reads out the chunk's `Regime`, its `PhaseReading` (with the
+    * 20-division mountain dial tick) and shelter status. The held item is the
+    * instrument; nothing is consumed and the world is not touched.
+    *
+    * Folded in from the former `Inspection` object in the S2 subtraction pass:
+    * it was one `if` that existed only as a branch of this chain.
+    */
+  private def inspect(
+      player: PlayerEntity,
+      held: ItemStack,
+      chunkX: Int,
+      chunkZ: Int
+  ): Option[ActionResult] =
+    if held.isOf(Items.CLOCK) || held.isOf(Items.COMPASS) then
+      val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
+      player.sendMessage(
+        Text.literal(MandateWording.formatInspection(chunkX, chunkZ, readout, VoyDebug.numbers)),
+        true
+      )
+      Some(ActionResult.PASS)
+    else None
 end UseBlockRouter

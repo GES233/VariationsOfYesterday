@@ -1,17 +1,20 @@
-package moe.chestnut.awa.voy.mandate.overworld
+package moe.chestnut.awa.voy.mandate
 
 import com.mojang.brigadier.context.CommandContext
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.minecraft.server.command.{CommandManager, ServerCommandSource}
 import net.minecraft.text.Text
 
-import moe.chestnut.awa.voy.mandate.MandateRuntime
-
 /** Raw `v` / `s` / `c0` numbers are diagnostics, not player-facing text.
   *
-  * Off by default; `/voy debug on` in-game turns them back on. The toggle is
-  * a development tool only (design note 06 §1 constraint 5): a release build
-  * never registers the command, so the numbers are unreachable there.
+  * Off by default; `/voy debug on` in-game turns them back on. Development
+  * tools only (design note 06 §1 constraint 5): a release build never registers
+  * these nodes, so neither the numbers nor the verification commands are
+  * reachable there.
+  *
+  * Lives in `mandate/` rather than `mandate/overworld/` on purpose: it is not a
+  * channel. The `overworld/` package is the world-facing side of the engine
+  * (one module per input/output channel); the debug gate is not one of them.
   */
 object VoyDebug:
   @volatile var numbers: Boolean = false

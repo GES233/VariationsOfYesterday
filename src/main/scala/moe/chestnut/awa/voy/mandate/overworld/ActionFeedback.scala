@@ -9,7 +9,7 @@ import net.minecraft.text.Text
 
 import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.veins.Regime
-import moe.chestnut.awa.voy.mandate.{MandateRuntime, MandateWording}
+import moe.chestnut.awa.voy.mandate.{MandateRuntime, MandateWording, VoyDebug}
 
 /** Mandate -> Overworld, action replay channel (design draft §3.2): outbound
   * `CellSpikeTriggered` and `RegimeTransitioned` actions become audible
@@ -59,7 +59,7 @@ object ActionFeedback:
               )
         }
 
-      case ActionMsgPool.RegimeTransitioned(cell, from, to, _) =>
+      case ActionMsgPool.RegimeTransitioned(cell, from, to) =>
         val (chunkX, chunkZ) = MandateRuntime.gridToWorld(cell)
         if to != Regime.Calm then
           overworld.getPlayers.asScala.foreach { player =>
