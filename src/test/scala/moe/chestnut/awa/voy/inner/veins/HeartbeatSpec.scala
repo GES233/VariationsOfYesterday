@@ -152,21 +152,52 @@ class HeartbeatSpec:
       "arrhythmia is not shelter"
     )
 
-  @Test def `exit hysteresis: a bad stretch shorter than two cycles does not leave Beating`(): Unit =
-    val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
+  @Test def `arrhythmia is held for two of the cell's own periods`(): Unit =
+    val beating = Heartbeat.Beating(44.0, 0.10, BeatSource.Intrinsic)
     val arr = Heartbeat.Arrhythmic(44.0, 0.45)
     val (pub1, since1) = Heartbeat.smooth(arr, beating, Double.NaN, 100.0, p)
     assertEquals(beating, pub1)
     assertEquals(100.0, since1, 1e-12)
-    val (pub2, since2) = Heartbeat.smooth(arr, pub1, since1, 100.0 + 1.9 * p.nominalPeriod, p)
-    assertEquals(beating, pub2, "still inside the two-cycle grace")
-    val (pub3, since3) = Heartbeat.smooth(arr, pub2, since2, 100.0 + 2.1 * p.nominalPeriod, p)
-    assertEquals(arr, pub3, "two consecutive bad cycles exit Beating")
+    val (pub2, since2) = Heartbeat.smooth(arr, pub1, since1, 100.0 + 1.9 * 44.0, p)
+    assertEquals(beating, pub2, "still inside the two-own-period grace (83.6 s < 88 s)")
+    val (pub3, since3) = Heartbeat.smooth(arr, pub2, since2, 100.0 + 2.1 * 44.0, p)
+    assertEquals(arr, pub3, "two of its own bad periods exit Beating (92.4 s > 88 s)")
     assertTrue(since3.isNaN)
 
-  @Test def `exit hysteresis: recovery clears the bad stretch`(): Unit =
+  @Test def `arrhythmia hysteresis uses the raw verdict's period, not the nominal one`(): Unit =
+    // 2 x 60 s = 120 s; the old 2 x nominalPeriod rule would have flipped at 79 s.
+    val beating = Heartbeat.Beating(60.0, 0.10, BeatSource.Intrinsic)
+    val arr = Heartbeat.Arrhythmic(60.0, 0.45)
+    val (pub1, since1) = Heartbeat.smooth(arr, beating, Double.NaN, 0.0, p)
+    val (pub2, since2) = Heartbeat.smooth(arr, pub1, since1, 100.0, p)
+    assertEquals(beating, pub2, "100 s < 2 x 60 s: still held")
+    val (pub3, _) = Heartbeat.smooth(arr, pub2, since2, 130.0, p)
+    assertEquals(arr, pub3, "130 s > 2 x 60 s: released")
+
+  @Test def `an acute overdrive verdict leaves Beating immediately`(): Unit =
     val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
-    val (_, since1) = Heartbeat.smooth(Heartbeat.Fast(20.0), beating, Double.NaN, 100.0, p)
+    val (pub, since) = Heartbeat.smooth(Heartbeat.Fast(20.0), beating, Double.NaN, 100.0, p)
+    assertEquals(
+      Heartbeat.Fast(20.0),
+      pub,
+      "Fast is already averaged over minCycles intervals: no extra hold"
+    )
+    assertTrue(since.isNaN)
+
+  @Test def `silence leaves Beating immediately (no double wait)`(): Unit =
+    val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
+    val (pub, since) = Heartbeat.smooth(Heartbeat.Slow(40.0), beating, Double.NaN, 100.0, p)
+    assertEquals(
+      Heartbeat.Slow(40.0),
+      pub,
+      "Slow already waited staleCycles: the exit hold would double the wait"
+    )
+    assertTrue(since.isNaN)
+
+  @Test def `arrhythmia recovery clears the bad stretch`(): Unit =
+    val beating = Heartbeat.Beating(44.0, 0.10, BeatSource.Intrinsic)
+    val arr = Heartbeat.Arrhythmic(44.0, 0.45)
+    val (_, since1) = Heartbeat.smooth(arr, beating, Double.NaN, 100.0, p)
     val (pub2, since2) = Heartbeat.smooth(beating, beating, since1, 150.0, p)
     assertEquals(beating, pub2)
     assertTrue(since2.isNaN)

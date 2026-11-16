@@ -27,7 +27,11 @@ class HeartbeatParamSpec:
     assertEquals(1.6 * PulseTransmitter.Bell.tau, p.overdriveGuard, 1e-12)
 
   @Test def `the exit hysteresis is the ruled two bad cycles`(): Unit =
-    assertEquals(2, p.exitBadCycles, "design note 11 risks 2-3: two consecutive bad cycles exit Beating")
+    assertEquals(
+      2,
+      p.exitBadCycles,
+      "design note 11 §1.3 rev.: two of the cell's OWN arrhythmic periods (acute and silence publish immediately)"
+    )
 
   @Test def `the nominal period stays anchored to the contract measurement`(): Unit =
     assertEquals(39.47, p.nominalPeriod, 1e-12, "measured: mandate-slice-v1 settled_period")

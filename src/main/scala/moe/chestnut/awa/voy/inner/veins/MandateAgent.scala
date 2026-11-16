@@ -185,9 +185,11 @@ object MandateAgent:
         val pDrive = cell.impulse + cell.synapseOutput
 
         // Heartbeat axis (design note 11): classify the tracker's rhythm
-        // statistics, then publish through exit hysteresis so a single noisy
-        // cycle cannot flicker the shelter. `selfSustained` only records
-        // BeatSource, never gates.
+        // statistics, then publish through the exit rule: arrhythmia is held
+        // for two of its own periods (single-cycle flicker guard), while
+        // over-pacing and silence publish immediately — their evidence is
+        // already averaged / waited. `selfSustained` only records
+        // `BeatSource`, never gates.
         val aSlow = Readout.slowA(
           cell.param,
           cur.stress,

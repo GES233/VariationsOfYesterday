@@ -54,7 +54,7 @@ enum BeatSource:
 
 **锚规则的意义**：40 s 健康周期凑够 `minCycles = 3` 个间隔需要 ~120 s，而 `staleCycles × nominalPeriod ≈ 99 s`；若以出生时刻为锚，健康新格会在 99–120 s 间出现判定空窗。改为以**最近一次穿越**为锚（无穿越时退回出生时刻），语义不变、空窗消除。
 
-**退出滞回**（风险 3 对策，`Heartbeat.smooth`）：离开 `Beating` 需**连续 2 个不合格周期**的**时间**（`exitBadCycles × nominalPeriod ≈ 79 s`），不是 2 个 tick——一个坏判定会持续数百 tick；进入 `Beating` 即时。
+**退出规则**（风险 3 对策，`Heartbeat.smooth`；2026-11-16 晚修订）：只有**失律**（`Arrhythmic`）需要抖动保护——它是唯一能被单个周期翻掉的判定（单周期占空比超限，或周期窗里一个离群值）。离开 `Beating` 需连续 `exitBadCycles = 2` 个**本格自己的周期**（`2 × periodOf(raw)`，而非 `2 × nominalPeriod`：旧口径对 `Fast` 是 4 个坏拍、对 `Slow` 还不到 1 拍，从不是「两个坏拍」）。`Fast`（过速）与 `Slow`（静默）**即时发布**：前者已过 `minCycles` 均值，后者已等满 `staleCycles`，再加一段滞回就是把同一段等待算两遍（旧口径下令停跳的格子继续报 `Beating` 约 178 s = 99 s 陈旧 + 79 s 滞回）。进入 `Beating` 与一切非 `Beating` 之间的转移仍然即时。
 
 ### 1.3 庇护定义
 
@@ -91,7 +91,7 @@ def isSheltered: Boolean =
 - 钟的视觉/听觉反馈四态可分：起搏＝琥珀铜尘 + 音符；校拍＝紫水晶清音 + 音符；失锚＝蜡烛闷熄 + 灰；过密＝锈红爆散 + 低音共鸣；无应＝几缕死灰。
 - 40 s 从代码常数降级为文案/指引常数（`nominalPeriod`）。
 
-### 1.6 世界观众理：「镇死 = 沉滞」
+### 1.6 世界观公理：「镇死 = 沉滞」
 
 `c0` 是山的**镇静剂**：它把应力压出自然带下沿 → 停跳 → `Slow` → 沉滞。老寨的「镇山」范式（安抚到静止）是待超越的旧范式，新范式是「养心跳」（起搏 / 校拍 / 晶链）。`c0` 的抗酸蚀救命角色与菌光/前兆签名角色不变；契约锚值 0.03 一字不动。
 
@@ -161,7 +161,7 @@ def isSheltered: Boolean =
 | `minCycles` | 3 | **推导**：2 个间隔 + 当前一拍 |
 | `regularityTol` / `staleCycles` | 0.20 / 2.5 | 沿用 `ReadoutParam` |
 | `overdriveGuard` | `1.6 × τ_bell = 8.0 s` | **推导 + 实测互证**（8 s 阻滞） |
-| `exitBadCycles` | 2 | 风险 2/3 滞回裁定 |
+| `exitBadCycles` | 2 | 风险 3 滞回裁定：仅 `Arrhythmic`，单位＝**本格周期** |
 | `overloadPenaltyTicks` | 120 | `TODO(calibrate)`：唯一纯手感常数 |
 | `τ_c0` / 漏失 | 45 min | **推导**：局时尺度记忆 |
 | `tricklePerWeight` | `0.03 / 2700` | **推导**：1 权重平衡 = 契约 `c0Intact` |
@@ -216,7 +216,7 @@ def isSheltered: Boolean =
 
 ## 5. 测试
 
-- **新增**：`HeartbeatSpec`（分类表 14 例 + 真实轨迹积分 + 滞回）、`HeartbeatParamSpec`（8 条关系式断言）、`CalmingStockSpec`（6 例，含「拆两钟之一不归零」回归）。
+- **新增**：`HeartbeatSpec`（分类表 + 真实轨迹积分 + 退出规则共 21 例）、`HeartbeatParamSpec`（8 条关系式断言）、`CalmingStockSpec`（6 例，含「拆两钟之一不归零」回归）。
 - **改写**：`MandateReadoutSpec`（庇护/四裁决/守卫/阈值）、`MandateAgentSpec`（守卫戳/晶链不戳/死格不戳/ Warming）、`MandatePhenomenaSpec`（心跳经济/肉体/菌塘）、`MandatePersistenceSpec`（BeatStats + 源注册表 + schema）、`MandateSnapshotSpec`（BeatStats 往返）、`MandateNetworkingSpec`、`VoyConfigSpec`。
 - **删除**：`PulseLedgerSpec`。
 - **不动**：`SliceContractSpec`、`SliceReplaySpec`、`PhaseResponseSpec`、`PulseCouplingSpec`。
@@ -230,20 +230,22 @@ def isSheltered: Boolean =
 |---|---|---|
 | 1 | 开局全山停滞 | 已解：余脉初始场（导出式）+ `Warming` 宽限 |
 | 2 | 读档后全场 Warming 悬崖 | 已解：schema 3 快照携带 `BeatStats` |
-| 3 | 心跳抖动导致沉滞闪烁 | 已解：时间基退出滞回（2 × 周期） |
+| 3 | 心跳抖动导致沉滞闪烁 | 已解：失律专用退出滞回（2 × 本格周期）；`Fast`/`Slow` 即时发布（2026-11-16 晚修订） |
 | 4 | 玩家不知道窗没了该做什么 | 已解：HUD 拍子可视化 + 近期变化 + 四态钟反馈；开局教学文案待 Step 3/4 后续调优 |
 | 5 | 旧档不可迁移 | `SchemaVersion = 3`，按既有逻辑丢弃重生成（0.1 阶段无外部用户） |
 | 6 | 删代码不可开关回退 | Step 1 已在真存档验证；Step 2 独立 commit |
 
 ---
 
-## 7. 裁决（2026-11-16，14 条）
+## 7. 裁决（2026-11-16，14 条 + 晚间 1 条修订）
 
 **基础五条**：① `Paced` 算庇护、`BeatSource` 只记录；② 8 s 改名 `overdriveGuard`（1.6 τ_bell）；③ `Warming` 不设时长常数；④ 旧档直接丢弃（schema 3）；⑤ `PulseBookkeeping` 整个删除。
 
 **三项后续**：⑥ 心跳模块无出处字面量纪律 + `HeartbeatParamSpec` 关系式断言；⑦ 初始应力峰值/衰减改导出式（8×8 余脉区、带内半径 4 格）；⑧ `regime` 轴不动（HUD/文案以心跳为准）。
 
-**余脉与 c0（第二轮）**：⑨ 余脉寿命 = 局时尺度 30–60 min，不追求永久稳态（自然带全在恢复驼峰下降支、自激为正反馈，稳定不动点不存在于冻结方程）；⑩ 「镇死 = 沉滞」为世界观众理；⑪ c0 解耦 L2 库存化（源注册表通用化 `Chunk ↔ List[Source(kind,pos)]`，L3 方程化排入契约窗口）；⑫ 余脉弧线 = U 形三幕（压着 → 曲终回稳 → 冲向酸蚀）；⑬ 热点核必须可救（`u_core` 封顶在锚定可压制水平）；⑭ 空间分布结论：不可救死地只在热点核，山谷永远自愈；AMD 泄压设施单独立项（排在迁移之后，教学主题「镇（泄压）/养（起搏）」双手套）。
+**余脉与 c0（第二轮）**：⑨ 余脉寿命 = 局时尺度 30–60 min，不追求永久稳态（自然带全在恢复驼峰下降支、自激为正反馈，稳定不动点不存在于冻结方程）；⑩ 「镇死 = 沉滞」为世界观公理；⑪ c0 解耦 L2 库存化（源注册表通用化 `Chunk ↔ List[Source(kind,pos)]`，L3 方程化排入契约窗口）；⑫ 余脉弧线 = U 形三幕（压着 → 曲终回稳 → 冲向酸蚀）；⑬ 热点核必须可救（`u_core` 封顶在锚定可压制水平）；⑭ 空间分布结论：不可救死地只在热点核，山谷永远自愈；AMD 泄压设施单独立项（排在迁移之后，教学主题「镇（泄压）/养（起搏）」双手套）。
+
+**晚间修订（滞回语义）**：⑮ 退出滞回只保护 `Arrhythmic`，单位改为**本格周期**（`2 × periodOf(raw)`）；`Fast`/`Slow` 即时发布。依据：旧口径 `2 × nominalPeriod` 对所有非 `Beating` 生效，使过速延迟 ~79 s（叠加 3 间隔均值后 ~154 s）、停跳延迟 ~178 s（99 s 陈旧 + 79 s 滞回），既是「同一段等待算两遍」，也与「急性」语义相反。
 
 ---
 

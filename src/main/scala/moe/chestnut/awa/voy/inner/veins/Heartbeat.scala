@@ -51,6 +51,12 @@ enum Heartbeat:
     case Heartbeat.Fast(_) | Heartbeat.Arrhythmic(_, _) => true
     case _                                              => false
 
+  /** Whether this verdict is arrhythmia: the only verdict a single cycle can
+    * flip (one oversized duty cycle, or one outlier in the period window),
+    * and therefore the only one the exit hysteresis guards.
+    */
+  def isArrhythmic: Boolean = this.isInstanceOf[Heartbeat.Arrhythmic]
+
 object Heartbeat:
   /** Stable wire ordinal for the heartbeat category (debug telemetry). */
   def wireOrdinal(h: Heartbeat): Int = h match
@@ -125,12 +131,28 @@ object Heartbeat:
     if mean <= 0.0 then Double.NaN
     else Math.sqrt(xs.map(x => (x - mean) * (x - mean)).sum / xs.size) / mean
 
-  /** Exit hysteresis on the published verdict (design note 11 risks 2–3:
-    * leaving `Beating` takes `exitBadCycles × nominalPeriod` of CONTINUOUS
-    * bad raw verdicts — a single noisy cycle must not flicker the shelter.
+  /** Exit rule on the published verdict (design note 11 §1.3, revised
+    * 2026-11-16 evening).
+    *
+    * **Only `Arrhythmic` is held.** It is the one verdict a single cycle can
+    * flip (one duty cycle above the bound, or one outlier in the period
+    * window), so it needs a flicker guard. The hold is
+    * `exitBadCycles` of the CELL'S OWN periods — `2 × periodOf(raw)`, not
+    * `2 × nominalPeriod`. The nominal clock was wrong in both directions:
+    * for a `Fast` cell it was four bad beats, for a `Slow` cell less than
+    * one, so "two consecutive bad cycles" was never literally true.
+    *
+    * **`Fast` and `Slow` publish immediately.** `Fast` only exists after
+    * `minCycles` short intervals, i.e. the classifier has already averaged;
+    * holding it would delay the acute signal by another two beats. `Slow`
+    * only exists after `staleCycles` (2.5) periods of silence or `minCycles`
+    * long intervals; adding the exit hold counts the same wait twice (the
+    * old rule published a silently stopped cell as `Beating` for ~178 s:
+    * 99 s of staleness plus 79 s of hold).
+    *
     * Entering `Beating` and every transition out of a non-`Beating` verdict
-    * are immediate. Time-based, not tick-based: one bad cycle spans hundreds
-    * of ticks.
+    * are immediate, as before. Time-based, not tick-based: one bad cycle
+    * spans hundreds of ticks.
     *
     * @param badSince simTime when the current bad stretch started (NaN = not
     *   in a bad stretch)
@@ -144,11 +166,13 @@ object Heartbeat:
       p: HeartbeatParam = HeartbeatParam()
   ): (Heartbeat, Double) =
     if raw.isBeating then (raw, Double.NaN)
-    else if published.isBeating then
+    else if !published.isBeating then (raw, Double.NaN)
+    else if !raw.isArrhythmic then (raw, Double.NaN)
+    else
       val since = if badSince.isNaN then simTime else badSince
-      if simTime - since < p.exitBadCycles * p.nominalPeriod then (published, since)
+      val period = periodOf(raw).filter(_ > 0.0).getOrElse(p.nominalPeriod)
+      if simTime - since < p.exitBadCycles * period then (published, since)
       else (raw, Double.NaN)
-    else (raw, Double.NaN)
 
 /** Immutable per-cell rhythm statistics exported by `PhaseTracker` once per
   * tick and handed to the pure classifier ([[Heartbeat.classify]]), keeping
@@ -211,8 +235,12 @@ final case class HeartbeatParam(
     overdriveGuard: Double = 1.6 * PulseTransmitter.Bell.tau,
     /** TODO(calibrate): pure feel constant; Step 3 calibrates in 60–200 ticks. */
     overloadPenaltyTicks: Int = 120,
-    /** derived: design note 11 risks 2–3 — leaving `Beating` takes two
-      * consecutive bad cycles (hysteresis against rhythm flicker).
+    /** derived: design note 11 §1.3 (rev. 2026-11-16) — the flicker guard for
+      * `Arrhythmic` only (the one verdict a single cycle can flip): leaving
+      * `Beating` takes this many of the CELL'S OWN periods. `Fast` and `Slow`
+      * publish immediately; their evidence is already averaged/waited, so an
+      * extra hold would only delay an acute signal or count the same wait
+      * twice.
       */
     exitBadCycles: Int = 2
 ):
