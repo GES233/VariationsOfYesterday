@@ -69,7 +69,12 @@ object MandateHud:
         .executes(_ => forward("voy debug"))
         .`then`(ClientCommandManager.literal("on").executes(_ => forward("voy debug on")))
         .`then`(ClientCommandManager.literal("off").executes(_ => forward("voy debug off")))
-      dispatcher.register(ClientCommandManager.literal("voy").`then`(hud).`then`(debug))
+      // Fabric's ClientCommandInternals swallows the whole `/voy` root once
+      // registered client-side, so every server subcommand in VoyDebug needs
+      // a forwarding branch here too.
+      val decay = ClientCommandManager.literal("decay")
+        .executes(_ => forward("voy decay"))
+      dispatcher.register(ClientCommandManager.literal("voy").`then`(hud).`then`(debug).`then`(decay))
     }
 
   private def render(context: DrawContext): Unit =
