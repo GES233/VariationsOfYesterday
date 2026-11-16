@@ -1,6 +1,5 @@
 plugins {
 	id 'fabric-loom' version '1.10-SNAPSHOT'
-	id 'maven-publish'
 	id 'scala'
 }
 
@@ -12,11 +11,6 @@ base {
 }
 
 repositories {
-	// Add repositories to retrieve artifacts from in here.
-	// You should only use this when depending on other mods because
-	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
-	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
-	// for more information about repositories.
 	maven {
 		name = "Main"
 		url = uri("https://maven.kotori316.com")
@@ -55,26 +49,17 @@ sourceSets {
 	}
 }
 
-fabricApi {
-	configureDataGeneration {
-		client = true
-	}
-}
-
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "net.minecraft:minecraft:${project.minecraft_version}"
 	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-	// modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
 	modImplementation "com.kotori316:scalable-cats-force-fabric:${kotori_scala_version}:dev"
 
 	// Scala Support
 	implementation "org.scala-lang:scala3-library_3:${project.scala_version}"
-	// Cat
 	implementation "org.typelevel:cats-core_3:${project.cats_version}"
 	implementation "org.typelevel:cats-kernel_3:${project.cats_version}"
 
@@ -103,9 +88,6 @@ tasks.withType(ScalaCompile).configureEach {
 }
 
 java {
-	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-	// if it is present.
-	// If you remove this line, sources will not be generated.
 	withSourcesJar()
 
 	sourceCompatibility = JavaVersion.VERSION_21
@@ -122,24 +104,6 @@ jar {
 	}
 	from("LICENSE-CONTENT") {
 		rename { "${it}_${inputs.properties.archivesName}"}
-	}
-}
-
-// configure the maven publication
-publishing {
-	publications {
-		create("mavenJava", MavenPublication) {
-			artifactId = project.archives_base_name
-			from components.java
-		}
-	}
-
-	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
-	repositories {
-		// Add repositories to publish to here.
-		// Notice: This block does NOT have the same function as the block in the top level.
-		// The repositories here will be used for publishing your artifact, not for
-		// retrieving dependencies.
 	}
 }
 

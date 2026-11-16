@@ -1,6 +1,5 @@
 package moe.chestnut.awa.voy.mandate
 
-import moe.chestnut.awa.voy.VoyConfig
 import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
 import moe.chestnut.awa.voy.inner.veins.*
 import moe.chestnut.awa.voy.mandate.BellRitual.{BellBaselineCalming, BellStrikeOutcome}

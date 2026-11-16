@@ -22,11 +22,3 @@ enum GastrodiaBedVerdict(val wire: String):
     * withers until refurbished with fresh inoculated timber.
     */
   case Withered extends GastrodiaBedVerdict("withered")
-
-/** Snapshot of a Gastrodia bed's discrete state for pure rules and tests. */
-final case class PlantDTO(
-    age: Int = 0,
-    verdict: GastrodiaBedVerdict = GastrodiaBedVerdict.Growing,
-    hasCompanionTimber: Boolean = false
-)
-

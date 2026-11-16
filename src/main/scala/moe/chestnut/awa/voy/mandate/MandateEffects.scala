@@ -41,7 +41,7 @@ object MandateEffects:
   val StagnationSpikeId: Identifier = Identifier.of(Namespace, "stagnation_spike")
   val PulseSaturationId: Identifier = Identifier.of(Namespace, "pulse_saturation")
 
-  /** 沉滞: marker tier — this ground has had no fresh pulse; the economy
+  /** 沉滞: marker tier — this ground has no living heartbeat; the economy
     * sags, the player's hands are spared.
     */
   val Stagnation: StatusEffect = register(

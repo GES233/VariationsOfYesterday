@@ -10,8 +10,6 @@ import scala.collection.mutable.ArrayBuffer
   * three-times-larger one, and the difference is observable.
   */
 final case class PulseShape(area: Double, tau: Double, taps: Int = 1, gap: Double = 0.0):
-  def totalArea: Double = area * taps
-
   /** Peak drive of one tap: `area / (e * tau)` (the kernel's closed form). */
   def peak: Double = area / (Math.E * tau)
 

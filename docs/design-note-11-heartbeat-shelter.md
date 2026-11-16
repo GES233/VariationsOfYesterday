@@ -3,7 +3,7 @@
 > 状态：**已定稿落地**（2026-11-16；Step 0–4 全流程完成）。
 > 取代：[札记 08（脉冲语义）](design-note-08-fast-variable-and-stagnation.md)。
 > 前置阅读：[札记 06（菌网与 AMD）](design-note-06-mycelial-grounding.md)、[草案 01](design-draft-01-living-world.md)、[札记 07（脉冲耦合）](design-note-07-pulse-coupling.md)。
-> 裁定来源：2026-11-16「心跳是震荡，窗不再具备庇护；心跳带来庇护」。工作稿（含 14 条裁决的完整讨论）见 `ref/迁移计划-心跳即庇护-2026-11-16.md`。
+> 裁定来源：2026-11-16「心跳是震荡，窗不再具备庇护；心跳带来庇护」。工作稿存档（含 14 条裁决的完整讨论与代码核实补丁）见 [docs/reference/heartbeat-shelter-migration-plan-2026-11-16.md](reference/heartbeat-shelter-migration-plan-2026-11-16.md)。
 
 ---
 
@@ -14,8 +14,7 @@
 | 变更性质 | **语义层重构 + 净删子系统 + c0 库存化解耦**；不动四维 RK4 方程、不动 `contracts/mandate-slice-v1.json`、不动 actor 内核、不动经济 mixin 与方块层 |
 | 核心动作 | 删除 `PulseStamp` / `PulseLedger` / `PulseBookkeeping`（庇护窗 + 记账），新增 `Heartbeat` 节律轴；`c0` 从「瞬时锚定」改为「源驱动的泄漏库存」 |
 | 存档 | `MandatePersistence.SchemaVersion` 2 → 3：每格携带 `BeatStats`（节奏记忆），另新增可选字段「安抚源注册表」 |
-| 分步 | Step 0 观测 → Step 1 加轴 + A/B → Step 2 切默认 + 删窗 → Step 2.5 c0 库存化 → Step 3 标定 → Step 4 文档 |
-| 现状 | 全部落地；测试全绿；三幕弧标定记录见附录 C |
+| 现状 | 全部落地；测试全绿；分步记录见 §4，三幕弧标定记录见附录 C |
 
 ---
 
@@ -89,7 +88,6 @@ def isSheltered: Boolean =
 
 - **饱和但菌活的格子可以锚 c0**（旧 `SaturatedNoAnchor` 删除）——重锚是失能救赎链的一环（札记 06 §7 成本路径）。
 - 钟的视觉/听觉反馈四态可分：起搏＝琥珀铜尘 + 音符；校拍＝紫水晶清音 + 音符；失锚＝蜡烛闷熄 + 灰；过密＝锈红爆散 + 低音共鸣；无应＝几缕死灰。
-- 40 s 从代码常数降级为文案/指引常数（`nominalPeriod`）。
 
 ### 1.6 世界观公理：「镇死 = 沉滞」
 
@@ -102,7 +100,7 @@ def isSheltered: Boolean =
 - 方程：`c0' = c0 + (平衡 − c0)·(1 − e^(−Δt/τ))`，平衡 = `0.03 × 源权重`，`τ = 45 min`，封顶 `0.04`；剂量：有效敲击 +0.008。
 - 源模型：世界是 `Chunk ↔ List[Source(kind, pos)]` 注册表（`MandateSourceKind` 目前只有 `Bell`；AMD/古堰等后续加权重即可）；注册表随存档持久化，每 60 s 重平衡时对**已加载区块**按世界真值重建（顺带自愈爆炸/活塞破坏），未加载区块沿用持久化副本。
 - 拆钟 = 移除一个源，**涓流减半不归零**；worldgen 安抚环没有源方块，按模型 ~45 min 漏失——「旧安魂曲无源则散」。
-- 引擎零改动：重平衡事件走信箱全序，回放确定。L3（`dc0/dt` 进 ODE）排入下一个契约重生成窗口（与札记 07 突触解耦搭车）。
+- 引擎零改动：重平衡事件走信箱全序，回放确定。
 
 ### 1.8 颜色语言（HUD / 聊天 / 效果图标统一）
 
@@ -203,14 +201,7 @@ def isSheltered: Boolean =
 
 ## 4. 分步实施记录
 
-| 步 | 内容 | 结果 |
-|---|---|---|
-| Step 0 | 探针固化 `tools/lab/`；`PhaseTracker` 加周期/duty 统计（只输出） | 完成；对照 §2 三现象 |
-| Step 1 | 心跳轴 + `shelterModel` A/B 开关 + 滞回；HUD 观测 + 近期变化；初始应力场导出式 | 完成（commit `3302f25`）；实机验证发现两问题（读档悬崖、余脉枯竭），引出第二轮讨论 |
-| Step 2 | 切默认、删窗（`PulseLedger`/`PulseBookkeeping`）、schema 3 + `BeatStats`、四裁决、同步/HUD/文案/配色收束 | 完成（commit `8d4167b`） |
-| Step 2.5 | c0 库存化：源注册表 + 涓流/漏失/剂量 + 60 s 重平衡 | 完成（commit `13f0603`） |
-| Step 3 | 慢系统探针 `fhn_slow.py`；三层扰动场 + 救赎窗标定 | 完成（见附录 C） |
-| Step 4 | 本文档定稿；札记 08 标注被取代；目录与 AGENTS 同步 | 完成 |
+Step 0 探针与统计（`tools/lab/`、`PhaseTracker`）→ Step 1 加轴 + A/B（commit `3302f25`；实机验证暴露读档悬崖与余脉枯竭，引出第二轮讨论）→ Step 2 切默认删窗 + schema 3（`8d4167b`）→ Step 2.5 c0 库存化与源注册表（`13f0603`）→ Step 3 慢系统标定（附录 C）→ Step 4 文档收口（札记 08 标注被取代、目录同步）。各步细节已并入 §1–§3 与 §7。
 
 ---
 
@@ -220,7 +211,6 @@ def isSheltered: Boolean =
 - **改写**：`MandateReadoutSpec`（庇护/四裁决/守卫/阈值）、`MandateAgentSpec`（守卫戳/晶链不戳/死格不戳/ Warming）、`MandatePhenomenaSpec`（心跳经济/肉体/菌塘）、`MandatePersistenceSpec`（BeatStats + 源注册表 + schema）、`MandateSnapshotSpec`（BeatStats 往返）、`MandateNetworkingSpec`、`VoyConfigSpec`。
 - **删除**：`PulseLedgerSpec`。
 - **不动**：`SliceContractSpec`、`SliceReplaySpec`、`PhaseResponseSpec`、`PulseCouplingSpec`。
-- 全量 `./gradlew test` 绿。
 
 ---
 
@@ -231,7 +221,7 @@ def isSheltered: Boolean =
 | 1 | 开局全山停滞 | 已解：余脉初始场（导出式）+ `Warming` 宽限 |
 | 2 | 读档后全场 Warming 悬崖 | 已解：schema 3 快照携带 `BeatStats` |
 | 3 | 心跳抖动导致沉滞闪烁 | 已解：失律专用退出滞回（2 × 本格周期）；`Fast`/`Slow` 即时发布（2026-11-16 晚修订） |
-| 4 | 玩家不知道窗没了该做什么 | 已解：HUD 拍子可视化 + 近期变化 + 四态钟反馈；开局教学文案待 Step 3/4 后续调优 |
+| 4 | 玩家不知道窗没了该做什么 | 已解：HUD 拍子可视化 + 近期变化 + 四态钟反馈；开局教学见「后续工作 4」 |
 | 5 | 旧档不可迁移 | `SchemaVersion = 3`，按既有逻辑丢弃重生成（0.1 阶段无外部用户） |
 | 6 | 删代码不可开关回退 | Step 1 已在真存档验证；Step 2 独立 commit |
 

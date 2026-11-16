@@ -21,7 +21,7 @@ _Go and see for yourself. Follow the water upstream, and find out what really ha
 
 **In development · 0.1 · single-player** ｜ Minecraft 1.21.2 (Fabric / Scala 3)
 
-Design notes live in [`docs/`](docs/) (in Chinese). Build & test: `./gradlew test`. (The Elixir relational sandbox was moved out of this repository on 2026-11-16; see the archive note at the end of [`AGENTS.md`](AGENTS.md).)
+Design notes live in [`docs/`](docs/) (in Chinese). Build & test: `./gradlew test`.
 
 ## Series Context
 
@@ -31,8 +31,8 @@ This is the first act of the thematic *Three Dreams* trilogy. The three works sh
 
 Code is licensed under the [Mozilla Public License 2.0](LICENSE).
 
-Narrative content and visual assets — design notes, the dossier corpus, prose
-in the language files, textures, the icon — are licensed
+Narrative content and visual assets — design notes, prose in the language files,
+textures, the icon — are licensed
 [CC BY-NC-SA 4.0](LICENSE-CONTENT): quote, translate, remix and ship them in
 modpacks or videos with credit, but not commercially, and derivatives stay
 under the same terms.

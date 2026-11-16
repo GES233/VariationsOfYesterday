@@ -47,7 +47,6 @@ object MandatePhenomena:
 
   val ReInoculationSeed: Double = 0.05
   val RichReInoculationSeed: Double = 0.12
-  val GastrodiaHealthySustenance: Double = Readout.IntactSustenance
   val ReInoculationMaxSustenance: Double = 0.20
   val C0ShelterLevel: Double = 0.01
 

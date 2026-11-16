@@ -2,9 +2,9 @@
 
 > 状态：**实施规格（WO-1/3/4 已落地，WO-2 待排期）**。本文档面向实现者（含编码代理）：第 1–4 节是不可违背的设计约束与映射，第 5 节是分阶段工单（WO-1…WO-4），第 6 节是考据与证据分级。
 >
-> 前置阅读：[设计草案 01](design-draft-01-living-world.md) §1（动力学层）、[设计札记 07](design-note-07-pulse-coupling.md)（脉冲耦合链路）。历史与外置参考：[验证报告 01](archive/verification-report-01-mandate-slice.md)；设计札记 02（关系世界模型）与札记 05（五跳卷宗）已随 Elixir 工具链外迁（见 [`AGENTS.md`](../AGENTS.md) 文末存档记录）；制式验山盘见 [札记 09](incubator/design-note-09-mountain-dial.md)（挂起，第一阶段不实现）。
+> 前置阅读：[设计草案 01](design-draft-01-living-world.md) §1（动力学层）、[设计札记 07](design-note-07-pulse-coupling.md)（脉冲耦合链路）。历史与外置参考：[验证报告 01](archive/verification-report-01-mandate-slice.md)；设计札记 02（关系世界模型）与札记 05（五跳卷宗）已随 Elixir 工具链外迁（见 [docs/README](../README.md)「已外迁」）；制式验山盘见 [札记 09](incubator/design-note-09-mountain-dial.md)（挂起，第一阶段不实现）。
 >
-> **2026-11-13 名实订正**：读数层已精简为三条正交轴——`UndefinedReason.SlowOffsetBelowKnee`（`a(s, M) <= burnoutA`）、`MycelialHealth ∈ {Intact, Damaged, Dead}` 与 `PulseStamp(shelterUntil, cooldownUntil)`；静默枯败签名（`hasSilentBlight`）绑定 `!mycelium.isViable || isSlowOffsetBelowKnee`。本文 §2–§5 的实现描述已按现行词表同步；§7 中带日期的历史裁定保留原词作历史对照。
+> **2026-11-13 名实订正**：读数层已精简为三条正交轴——`UndefinedReason.SlowOffsetBelowKnee`（`a(s, M) <= burnoutA`）、`MycelialHealth ∈ {Intact, Damaged, Dead}` 与 `PulseStamp(shelterUntil, cooldownUntil)`；静默枯败签名（`hasSilentBlight`）绑定 `!mycelium.isViable || isSlowOffsetBelowKnee`。本文 §2–§5 的实现描述已按该词表同步（庇护轴于 2026-11-16 改由札记 11 节律轴驱动）；§7 中带日期的历史裁定保留原词作历史对照。
 
 ---
 
@@ -142,14 +142,13 @@
 - 验收：签名与菌塘裁决金样测试见 `MandatePhenomenaSpec`（全量测试数见 `AGENTS.md` 构建与测试）；服务器侧无渲染引用；专用服务器可用。
 
 ### WO-4 回归与金样（已完成）
-- ~~为 §3 签名映射加金样测试~~ **已完成**：`MandatePhenomenaSpec` 构造 `CellReadout` 断言签名档位与语言键集；
-- `./gradlew test` 全量 126 项（含 1 项默认跳过的 benchmark）通过，确认数值指纹测试（`SliceContractSpec` 等）未受影响。
-- 验收：CI（`.github/workflows/build.yml`）通过。
+- 金样：`MandatePhenomenaSpec` 构造 `CellReadout` 断言签名档位与语言键集；
+- `./gradlew test` 全量通过（WO-4 验收时点 126 项，含 1 项默认跳过的 benchmark），数值指纹测试（`SliceContractSpec` 等）未受影响；CI（`.github/workflows/build.yml`）通过。
 
 ### 明确不做（本工单范围外）
 - 水晶/红石脉冲链路：已有札记 07 与事件层实现，不在本工单；
 - 晶盘/微网格：札记 09；
-- `tools/voy_world` 卷宗内容的菌网化改写（待内容管线排期）；
+- `tools/voy_world` 卷宗内容的菌网化改写（随 Elixir 工具链外迁挂起）；
 - 任何 `inner/veins` 数值改动。
 
 ## 6. 考据与证据分级
@@ -187,5 +186,5 @@
 2. 伏根经济的数值（产量、交易价）需与礼物经济（§3.1）统一校准；
 3. 菌光粒子的亮度上限：不能变成免费的数值读表（违反 §1 约束 5）；
 4. ~~烧毁的「不可逆」需要游戏层锁存（`burnoutLatched`）~~ **已裁定（2026-11-07）**：不引入锁存。机制层只有「失能」没有「死」——饱和失能（`Regime.Burnout`）的恢复走成本路径（按 §4.1 的泄压量级持续泄压后重锚 `c₀`，见札记 07 E4b）；深度失能（`BurnoutNoCycle`）可由叙事通道抽走维持源触发，也可由 M 的酸蚀项在持续高应力下耗尽触发（见 §7 开放问题 1 实测）；恢复靠再接种（菌网「再接种」）或叙事干预。「死」只作为叙事层的既定失败布景（如上游先例节点），不进入机制语义；
-5. ~~状态持久化~~ **已落地（2026-11-07）**：维度级 `PersistentState`（`MandatePersistence`，存 `data/voy_mandate.dat`）承载整格快照——每格全状态（`v/w/s/q`、`M`、四通道电平、双参数集）、输运边、水晶链路与 `simTime`；`MandateSnapshot`（纯数据，`inner/` 无 MC 类型）负责 capture/restore，actor 以 1 sim 秒节拍发布、存档时刻序列化，启动时按几何指纹（origin/宽/高）校验后恢复，不匹配则丢弃重来。裁定结果：**粒度取整格**（Node 聚合结算属未来的离线抽稀问题，不在存储层做）；**快变量存**（成本可忽略，且保证重启后相位读数连续）；**突触内核与链路待投递队列不存**（τ≤5 s 即衰减、一周期内重建，丢失无可感知影响）。仍开放：`CalmingBus` 注册表与装甲化落盘（方块实体 NBT，随设施工单同行）；「离线按 Node 聚合结算」已由草案 01 §1.3 的「常驻 + 粗步进」设计取代（不做离线加速风化）；**存档时刻 flush（2026-11-07）**：`BEFORE_SAVE` 让 actor 立即发布并阻塞至多 2 s（超时只 warn，不阻断保存），优雅关服不再丢最后一个 persist 周期；**已知边界**：schema 不匹配（`schemaVersion` 不等）仍静默丢弃并覆盖原文件（`.bak` 备份与迁移留到 payload 真正变更时再做），崩溃/`kill -9` 仍最多丢一个 persist 周期；
+5. ~~状态持久化~~ **已落地（2026-11-07）**：维度级 `PersistentState`（`MandatePersistence`，存 `data/voy_mandate.dat`）承载整格快照——每格全状态（`v/w/s/q`、`M`、四通道电平、双参数集）、输运边、水晶链路与 `simTime`；`MandateSnapshot`（纯数据，`inner/` 无 MC 类型）负责 capture/restore，actor 以 1 sim 秒节拍发布、存档时刻序列化，启动时按几何指纹（origin/宽/高）校验后恢复，不匹配则丢弃重来。裁定结果：**粒度取整格**（Node 聚合结算属未来的离线抽稀问题，不在存储层做）；**快变量存**（成本可忽略，且保证重启后相位读数连续）；**突触内核与链路待投递队列不存**（τ≤5 s 即衰减、一周期内重建，丢失无可感知影响）。仍开放：`CalmingBus` 注册表与装甲化落盘（方块实体 NBT，随设施工单同行）；**存档时刻 flush（2026-11-07）**：`BEFORE_SAVE` 让 actor 立即发布并阻塞至多 2 s（超时只 warn，不阻断保存），优雅关服不再丢最后一个 persist 周期；**已知边界**：schema 不匹配（`schemaVersion` 不等）仍静默丢弃并覆盖原文件（`.bak` 备份与迁移留到 payload 真正变更时再做），崩溃/`kill -9` 仍最多丢一个 persist 周期；
 6. ~~`Regime` / `PhaseReading` 枚举线级名中文化~~ **已裁定（2026-11-07）**：不改线级枚举名——它们锚定契约金样 JSON 与 Elixir 侧 `Voy.World.Profile`，改名需破契约重生成；中文化只做显示层（`MandateOverworld.regimeWord` / `formatPhaseDial`，开发 HUD 与调试输出保留英文调试词表）。

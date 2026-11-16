@@ -29,8 +29,8 @@ import moe.chestnut.awa.voy.mandate.{MandateCalming, MandateEffects, MandatePhen
   */
 object StagnationRunner:
   /** Stagnation bookkeeping cadence and effect duration in server ticks
-    * (design draft §3.2: reapply outside the pulse window, short enough that
-    * a fresh window clears it immediately).
+    * (design draft §3.2: reapply outside heartbeat shelter, short enough that
+    * a restored beat clears it immediately).
     */
   private val StagnationReapplyTicks = 20
   private val StagnationEffectTicks = 55

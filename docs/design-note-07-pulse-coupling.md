@@ -98,11 +98,9 @@ FirePulse(dst, area, transmitter)   // 先设 dst.synapseTau = transmitter.tau�
 
 六条原则均由 §1–§3 覆盖，契约指纹未动：
 
-- **只加通道**：只经 `FirePulse`，`SliceContractSpec` 不受影响；
-- **不传应力**：`PulseLink` 无应力参数，各格仍按自身 `ds/dt` 演化；
-- **用成本而非禁令**：阈值面积 0.5 给出「水晶品质」刻度；
-- **不给自动锁相**：E4/E4b 证明固定延迟链路在漂移中必然失守；
-- **同步不写作文案**、**黑箱配额**：锁相/滑移在场可见；本札记不引入新叙事物件（叙事层决定）。
+- **只加通道、不传应力**：只经 `FirePulse`（`SliceContractSpec` 不受影响），`PulseLink` 无应力参数，各格仍按自身 `ds/dt` 演化；
+- **用成本而非禁令、不给自动锁相**：阈值面积 0.5 给出「水晶品质」刻度；E4/E4b 证明固定延迟链路在漂移中必然失守；
+- **同步不写作文案、黑箱配额**：锁相/滑移在场可见；本札记不引入新叙事物件（叙事层决定）。
 
 ---
 
@@ -120,7 +118,7 @@ FirePulse(dst, area, transmitter)   // 先设 dst.synapseTau = transmitter.tau�
 - `MandateAgent.apply(..., links: Seq[PulseLink], spikeCriterion)`：链路投递在每步**之前**（`duePulses`），尖峰检测在每步**之后**（`observe`），与离线原型同序。运行器常驻；构造期 `links` 只是初始布线，运行期经拓扑事件 `AddLink` / `RemoveLink` 增删（2026-11-07，为晶盘/微网格与 worldgen 接线预留）。
 - `PulseCoupling.runCoupled(...)`：离线复跑入口，格子无扩散边（链路是事件层），用于复刻实验。
 - `MandateRuntime` 暂不注册链路：水晶元件与微网格尚未落地，等制式验山盘（[札记 09](incubator/design-note-09-mountain-dial.md)，挂起，第一阶段不实现）的方块交互定型后再经 `AddLink` 接入。链路已随 `MandateSnapshot` 持久化并在启动时恢复；目前只是还没有游戏侧发起 `AddLink` 的方块。
-- **心跳簿记（2026-11-08，札记 08）**：链路投递的正脉冲与敲钟同等计入所在细胞的心跳抵消窗与耐受簿记（`MandateAgent.recordPulse`）。锁相链路周期 ≈ 39.5 s 远大于最小安全间隔（8 s），单条链路恰好能自动维持一个区块的沉滞庇护——「自动化心跳」由此涌现；多条链路汇聚同一细胞则有过密过载的风险，属保留观察的涌现特性。
+- **心跳簿记（2026-11-16 起按札记 11）**：链路脉冲只进方程、不写庇护簿记；链路若把目标格 Pace 成 `Beating(Paced)`，该格即获得与钟同权的庇护（`BeatSource` 只记录来源、不参与判定）。锁相链路周期 ≈ 39.5 s 落在自然节律带内，单条链路即可自动维持庇护——「自动化心跳」以起搏形态涌现；多条链路汇聚同一细胞仍有过密/失律风险，属保留观察的涌现特性。
 - **突触解耦（既定方向，未实施）**：目前每格只有一个突触内核实例（`MandateState.synapseTau/Z/P`），`FirePulse` 到达时按发射器覆写 `synapseTau`——τ 不同的在途内核会互相改写衰减率（铃 5.0 与链路 2.0 叠加时），回放仍确定（发射器记录在事件里），但物理上不干净。方向是把内核状态移出 `MandateState`、挂到发射器/链路实体上（链路自有内核，铃击在 Agent 侧按 `PulseTransmitter` 分桶），格子只留一个 `synapseInput` 注入口，与 `stressFlux` 的接线模式一致；τ 随之彻底成为发射器/链路创建期配置。因必须改动契约哈希锚 `MandateState.scala`（金样需 `-Dvoy.contract.write=true` 重新生成并跨栈复核），原本与持久化搭车；持久化已于 2026-11-07 先行落地（未触契约锚），突触解耦仍待契约重生成窗口，不单独破契约。
 
 ---

@@ -4,15 +4,13 @@
 >
 > 方程组结构、通道语义、格子场架构、加载不变性原则、相位调制与 α 突触脉冲结构保持稳定，实现期间只调参数。
 >
-> **2026-11-13 名实订正**：读数层（`MandateReadout`）已精简为三条正交轴——**动力学轴**（`Regime` + `PhaseReading`，无周期原因 `UndefinedReason` 回归纯动力学 `SlowOffsetBelowKnee` / `TransientNoCycle` / `NoCycleReference`）、**菌网健康轴**（`MycelialHealth ∈ {Intact, Damaged, Dead}`）与**庇护轴**（`isSheltered`，由 `PulseStamp(shelterUntil, cooldownUntil)` 驱动）；`FirePulse.bookkeeping: PulseBookkeeping`（`Counted` / `PhysicsOnly`）区分记账脉冲与纯物理脉冲。本文正文已按此同步；方程结构、数值与设计意图未变。
+> **2026-11-13 名实订正**：读数层（`MandateReadout`）已精简为三条正交轴——**动力学轴**（`Regime` + `PhaseReading`，无周期原因 `UndefinedReason` 回归纯动力学 `SlowOffsetBelowKnee` / `TransientNoCycle` / `NoCycleReference`）、**菌网健康轴**（`MycelialHealth ∈ {Intact, Damaged, Dead}`）与**庇护轴**（`isSheltered`；2026-11-16 起改由札记 11 的心跳节律驱动，`PulseStamp` 与 `PulseBookkeeping` 已删除）。本文正文已按此同步；方程结构、数值与设计意图未变。
 >
-> **2026-11-13 文档边界重划**：Elixir 关系世界模型与五跳卷宗规范（原札记 02 / 05）已迁入独立 Elixir 工具链的 `docs/`。模组运行时只运行连续动力学（§1–§3），不再由关系求解器锁死未来结局；§4 ARG 双模型主线与 §6 早期民俗参考书目保留为 0.1 冻结期历史记录。
->
-> **2026-11-16 外迁**：该 Elixir 工具链（含札记 02 / 05 与图集）已整体移出仓库，存档记录见 [`AGENTS.md`](../AGENTS.md) 文末。
+> **文档边界重划（2026-11-13；2026-11-16 外迁）**：Elixir 关系世界模型与五跳卷宗规范（原札记 02 / 05）已随独立工具链移出仓库，存档记录见 [docs/README](README.md)「已外迁」。模组运行时只运行连续动力学（§1–§3），不再由关系求解器锁死未来结局；§4 ARG-style 双模型主线与 §6 早期民俗参考书目保留为 0.1 冻结期历史记录。
 
 ## 0. 定位与创作原则
 
-- **类型**：民俗恐怖**氛围** + 生态模拟 + ARG 碎片化叙事；恐怖只活在氛围层与钩子层，不进机制层（裁定见[札记 10](design-note-10-meta-trilogy-and-drift.md) §5）。世界本身是一个「活着的」动力学系统。
+- **类型**：民俗恐怖**氛围** + 生态模拟 + ARG 风格碎片化叙事；恐怖只活在氛围层与钩子层，不进机制层（裁定见[札记 10](design-note-10-meta-trilogy-and-drift.md) §5）。世界本身是一个「活着的」动力学系统。
 - **主题**：「实事求是 vs 盲目征服」——人类理性的狂妄在复杂生态系统面前遭受反噬。不做现实政治指涉。
 - **虚构原则**：地名、民族、机构、仪式、物种全部原创虚构；不指涉任何真实地域或真实民族，时间线模糊为上世纪末。
 - **玩家角色**：「调制者」——监测、理解并安抚这片土地；跨越阵营口径，联合动力学读数与关系因果推演，在既定历史和动力学约束内辨认可达未来并顺势而为（§4）。
@@ -69,7 +67,7 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
 
 ### 1.3 空间离散：Node、区块格子场与休眠调度
 
-> 状态：**设计已定（2026-11-07），实现待排期**——当前运行时仍是固定 32×32 平铺格子，Node 分组与调度事件尚未落地；方程与数值层不受本节影响。
+> 状态：**设计已定（2026-11-07），实现待排期**——当前仍为固定 32×32 平铺格子，见 §7 待完成项 1；方程与数值层不受本节影响。
 
 - **Node ↔ Grid/Cell 分层**：Node 是生成期的稀疏容器锚点（一条支沟 / 一个聚落群的格子集合），不持有独立动力学状态；每个 Cell 持有一份 `MandateState`（四维 RK4 状态 + 显式积分的维持度 `M`）。
 - **Node 拓扑**：世界生成时落若干组 Node；Node 内部由输运边（对称扩散 + 沿地势梯度的单向平流）连成局部格子场。Node 可以相邻并共享局地输运边（边界格互相影响），也可以远隔——远隔 Node 之间没有输运边，只走水晶 / 红石脉络（札记 07 的 `PulseLink`，事件层 `p` 通道脉冲；只传相位，不传应力；红石只在边界读写原版信号，札记 06 §2.3）。相邻 Node 的活动档位各自独立，因此允许出现「一侧细步、一侧粗步」的边界，按 1.3.4 的容差耦合处理。
@@ -127,8 +125,8 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
 - **读数投影层（`MandateReadout`）**：呈现层不直接读取裸浮点数，统一通过 `ReadoutParam` 映射为三条正交轴：
   - **慢变量分级（`Regime`）**：`Calm` / `Strained` / `Oscillating` / `Burnout`；
   - **快变量相位读数（`PhaseReading`）**：周期轨道 `Cycle(label, fraction)`（四相标签 `Excitation` / `AbsoluteRefractory` / `RelativeRefractory` / `Resting` 及 20 格刻度 `dialTick`）、静息域 `Basin(Resting)`、无周期 `Undefined(reason)`，`reason ∈ {SlowOffsetBelowKnee, TransientNoCycle, NoCycleReference}`；
-  - **菌网健康与脉冲庇护**：`MycelialHealth ∈ {Intact, Damaged, Dead}` 与 `isSheltered`（`PulseStamp`）。
-- **Tick 事件驱动调度**：`END_SERVER_TICK` 投递固定步长 `TickArrived(dt = 0.05, tickRate)` 进入引擎单线程 actor（`inner/actor` 内核上的 `MandateAgent`），与通道事件（`StressInject` / `SetDisturbance` / `SetCalming` / `SetBaselineCalming` / `HoldImpulse` / `FirePulse` / `SetSustenance`）、拓扑事件（`RegisterCell` / `RemoveCell` / `UpsertEdge` / `RemoveEdge` / `AddLink` / `RemoveLink`）及持久化控制 `FlushNow` 同信箱全序处理，仿真时间恒等于游戏时间。无玩家在线时不投递 tick。游戏线程只读 `@volatile` 快照（`MandateRuntime`）并在下一 tick 消费动作回包（`MandateOverworld`）。
+  - **菌网健康与庇护**：`MycelialHealth ∈ {Intact, Damaged, Dead}` 与 `isSheltered`（心跳节律，札记 11 §1.3）。
+- **Tick 事件驱动调度**：`END_SERVER_TICK` 投递固定步长 `TickArrived(dt = 0.05, tickRate)` 进入引擎单线程 actor（`inner/actor` 内核上的 `MandateAgent`），与通道/拓扑事件及持久化控制 `FlushNow` 同信箱全序处理（清单见 §1.3.2），仿真时间恒等于游戏时间。无玩家在线时不投递 tick。游戏线程只读 `@volatile` 快照（`MandateRuntime`）并在下一 tick 消费动作回包（`MandateOverworld`）。
 
 ## 2. 地势与谷地：因果的方向
 
@@ -146,13 +144,12 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
 ### 3.2 沉滞（Stagnation）与心跳维持闭环
 > 2026-11-08 按札记 08 定稿修订：沉滞来源由「无 $c_0$」改为「无脉冲保鲜窗」，$c_0$ 与沉滞解耦。
 > 2026-11-09 再裁定：沉滞的咬合面从玩家身体回归 2026-09-28 定稿的**原版经济**（动机闭环），玩家身体只在尖峰/过载时承担。
-- **沉滞的来源是「太久没有脉冲」**：一次有效正脉冲（敲钟 / 水晶链路；尖峰吞没的 `SpikeSwallowed` 一击只进方程、不进账本，即 `bookkeeping = PhysicsOnly`）为区块开启固定时长庇护窗（`shelterWindow`，默认约一个自然振荡周期 ≈40 s）；窗内主动解除 `voy:stagnation`，窗外每 20 tick 重新评估。
+> 2026-11-16 再修订：庇护语义改为心跳节律（札记 11 §1.3–§1.5）——沉滞判据即 `Slow` / `Arrhythmic` / 生态死亡，敲钟从「开窗」变为「起搏 / 校拍」，过密敲击由 `overdriveGuard`（8 s）守卫。
 - **沉滞压在原版经济上**：无庇护区块内交易加价（special price +2，尖峰期 +5）、村民繁殖/铁傀儡召唤/作物随机刻生长按 keep 概率被吞（基线 0.5 / 尖峰 0.25 量级，数值见 `MandatePhenomena.EconomyProfile`，钩子走 mixin 层 `VillagerEntityMixin` / `CropBlockMixin`）；村民以 `voy:stagnation` 标记 + 环境粒子显形。**格子场外的休眠区按 `CellReadout.zero` 判为沉滞**——「谷外安全但贫瘠」由修辞落地为字面机制。
 - **玩家身体只在急性档承担**：基础档不碰玩家（标记只给村民显形，「这块地没有庇护」由经济与村民状态表达）；尖峰爆发/饱和失能期玩家才吃 `voy:stagnation_spike`（挖掘 ×0.09）与缓慢、灰烬粒子（见 `MandateEffects` / `MandateOverworld`）。
-- **冷却窗内过密敲钟即受反噬**：间隔小于冷却窗（`minInterval`，默认 8 s）的敲钟被 `PulseStamp` 拒绝（不刷新庇护窗），敲钟者即刻吃 `voy:pulse_saturation`（挖掘 ×0.75、移速 ×0.85）。
 - $c_0$ 退居慢变量安抚通道（`-ρc₀` 项）与感官签名庇护条件（菌光/前兆孢子，札记 06 §3），不再提供沉滞免疫。维持生存 = 维持地脉的心跳节律与菌网健康；盲目采掘击穿宽容区 → 酸蚀耗菌 → 慢性菌竭烧毁（`M → 0`），届时敲钟毫无回音，只能泄压后再接种。
 
-## 4. ARG 叙事与双模型主线
+## 4. ARG 风格叙事与双模型主线
 
 - **叙事知识 = 机制优势**：档案中的实测推迟刻度、器物编号与流转批号由世界种子在生成时填入（`Voy.World.Witness`），对抗 Wiki 剧透。
 - **五跳局部证据链**：故事不写进任何单张全知摘要，而是拆分为五份局部单据（旧志先例 $\rightarrow$ 收缴/代管单 $\rightarrow$ 车间配料卡 $\rightarrow$ 野外观测手簿 $\rightarrow$ 现行条规）加两份同车间干扰单据，靠共享桥接元组合一还原（详见札记 05）。
@@ -178,13 +175,13 @@ s 截断于 0 ≤ s ≤ s_max (s_max=1.0)
 > 本文及代码注释中的 `§7.x` 均指本节第 x 项（如 `§7.3` = 待完成项 3）。
 
 ### 待完成项
-1. ~~**维度持久化**~~ **已落地（2026-11-07）**：`PersistentState`（`MandatePersistence` + `MandateSnapshot`）按维度保存整格快照（状态、`M`、通道、参数、边、链路、`simTime`），1 sim 秒节拍发布、随存档落盘，几何指纹不匹配则丢弃重启。**Node 调度**：设计已定（§1.3：Node 内同速、静息 $K\cdot dt$ 粗步进、事件先追平再唤醒；相邻 Node 共享局地输运边并按 §1.3.4 容差耦合，远隔 Node 只走脉冲链路；不做离线加速风化）；**实现待排期**——当前运行时仍为固定 32×32 平铺格子，Node 分组与调度事件尚未落地。
+1. ~~**维度持久化**~~ **已落地（2026-11-07）**：`PersistentState`（`MandatePersistence` + `MandateSnapshot`）按维度保存整格快照（状态、`M`、通道、参数、边、链路、`simTime`），1 sim 秒节拍发布、随存档落盘，几何指纹不匹配则丢弃重启。**Node 调度**：设计已定（§1.3），**实现待排期**——当前仍为固定 32×32 平铺格子，Node 分组与调度事件尚未落地。
 2. **地势 D8 推导与结构生成**：从高度图生成有向边，配合路线 A+ 结构集落地「一条沟、三座寨」。
 3. **时间尺度校准与多人规则**：按「首次灾变 3–5 小时」校准 $\gamma$ 等时间常数；明确多人共享应力场的归因与保护规则。
    - **对表（2026-11-07 实测/估算）**：`TickDt = 0.05`、20 tick/s，即 **1 模拟时间单位 = 1 秒**。当前特征时间：饱和地鸣周期 $T \approx 39.5$（≈40 s，体感节奏合适，**不动**）；近临界起振周期 $\approx 43.7$；铃核 $\tau=5$ s / 链路核 $\tau=2$ s / 链路延迟 1 s；E4b 漂移实验窗 1500–9000（25 min–2.5 h）。**缺口在慢变量**：持续满载采掘（$u=0.05$，无 $c_0/c$）下 RK4 实测——$s$ 到起振区 0.30 约 **16 min**，首次 $v \ge +1.8$ 尖峰约 **22 min**，$s$ 到 0.95 饱和约 **39 min**。距「首次灾变 3–5 h」差约 **8–10 倍**：$\gamma$ 需从 0.01 降到约 **$7\times10^{-4}$–$1.2\times10^{-3}$**（慢系统相对快系统拉伸 ~10×，快变量周期不受影响）。
    - **裁定（2026-11-07 修订）**：$\gamma$ 在 `StressParam`（`MandateState.scala`）内，源码默认值属契约哈希锚——但外部运行时配置（`VoyConfig`，`config/variations-of-yesterday.json`）在接线层注入参数、不碰源码默认值，**γ 对表因此成为运行时调参，不再占用契约重生成窗口**；恢复优先级为 **存档 > 配置 > 核心默认**（逐值回退）：存档自带的逐格参数对旧存档优先，配置只作用于**新注册**的格子，`RegisterCell` 的缺省值取配置而非硬编码；加载时打一行参数来源日志（存档里有几套参数集、与当前配置是否一致），避免「改了配置却对旧世界无效」静默发生。仍须遵守：落地正式值时按札记 06 §7 开放问题 1 重跑 M 耦合扫描；`stressParam.gamma` 之外锚定契约的行为（如突触解耦改 `MandateState.scala` 结构）仍须金样重生成。多人归因与保护规则仍开放。
    - **与 M 动力学的耦合**：维持源消耗（实测见札记 06 §7.1）使「饱和 → 深度失能」比 $\gamma$ 单独决定的快；$\gamma$ 对表落地时必须重跑耦合扫描，不能只按纯应力路径。
-4. **JVM 侧合流**：将 `tools/voy_world` 导出的 v2 JSON 卷宗接入游戏内成书与结构箱子。
+4. **JVM 侧合流**：将 `tools/voy_world` 导出的 v2 JSON 卷宗接入游戏内成书与结构箱子（随 Elixir 工具链外迁挂起）。
 
 ### 0.1 纵切片检验标准
 1. **两小时盲测**：不读外部文档的玩家能否在两小时内察觉土地异常，并将即时阈下反馈与自身采掘/敲钟行为建立联系。

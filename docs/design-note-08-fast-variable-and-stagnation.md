@@ -1,8 +1,6 @@
 # 札记 08（已被取代）：心跳脉冲语义——快变量读数、三正交轴与极简脉冲短窗
 
-> **⚠️ 已被 [札记 11](design-note-11-heartbeat-shelter.md) 取代（2026-11-16）**：庇护语义已从「脉冲庇护窗」改为「心跳节律」，`PulseStamp` / `PulseLedger` / `PulseBookkeeping` 已整体删除；`c0` 从瞬时锚定改为源驱动的泄漏库存。本文保留为历史设计存档——除史实参考外，**请勿按本文实现**。
-
-> 状态：**历史存档**（2026-11-08 初版落地；2026-11-13 重构精简为三正交读数轴 + `PulseStamp` 极简短窗/冷却；2026-11-16 被札记 11 取代）。
+> **⚠️ 已被 [札记 11](design-note-11-heartbeat-shelter.md) 取代（2026-11-16）**：庇护语义已从「脉冲庇护窗」改为「心跳节律」，`PulseStamp` / `PulseLedger` / `PulseBookkeeping` 已整体删除；`c0` 从瞬时锚定改为源驱动的泄漏库存。本文状态：**历史存档**（2026-11-08 初版落地；2026-11-13 重构精简为三正交读数轴 + `PulseStamp` 极简短窗/冷却）——除史实参考外，**请勿按本文实现**。
 >
 > **2026-11-13 机制精简说明**：
 > - 移除早期的脉冲耐受度衰减账本（`ToleranceBook`）、世界侧急性锁闭窗（`OverloadLock`）与读数层叠加脉冲伪偏移（`Readout.effectiveA`），精简为双时间戳 `PulseStamp(shelterUntil, cooldownUntil)` 与三字段 `PulseParam(shelterWindow = 40.0, minInterval = 8.0, overloadPenaltyTicks = 120)`；存档 `schemaVersion` 升至 `2`。
@@ -19,7 +17,7 @@
 
 ## 1. 核心裁定
 
-| 维度 | 现行口径 |
+| 维度 | 当期口径（已被札记 11 取代） |
 |---|---|
 | 快变量与方程 | **不动四维 RK4 方程与契约数值 oracle**：尖峰（spike）统一采用**正向**除极暴发判据（`v ≥ +1.8`）；黄水渗色（`MandatePhenomena.classifySeepTier`）保留 `|v|` 判据，对应 `dq/dt` 的酸负荷方程。 |
 | 三条正交读数轴 | 1. **动力学轴**：`regime`（`Calm / Strained / Oscillating / Burnout`）、`phase`（`Cycle / Basin / Undefined`）、`isSpiking`、`isSlowOffsetBelowKnee`（`a(s, M) <= -0.4667`）；<br>2. **菌网轴**：`MycelialHealth` 三档（`Intact`：`M ≥ 0.60`；`Damaged`：`floor ≤ M < 0.60`；`Dead`：`M < floor`）与 `isToxicSoil`（`s ≥ 0.60`）；<br>3. **庇护轴**：`isSheltered = isPulseSheltered && mycelium.isViable && !isSlowOffsetBelowKnee && !isSpiking`。 |
@@ -36,7 +34,7 @@
 - 一次**正面积记账脉冲**（`FirePulse(area > 0, bookkeeping = Counted)`：敲钟、水晶链路）到达活细胞（`mycelium.isViable && !isSlowOffsetBelowKnee`）时，由 `PulseLedger.settle` 结算：
   - **正常结算（`PulseSettlement.Sheltered`）**：当 `simTime >= cooldownUntil` 时，更新 `PulseStamp(shelterUntil = t + shelterWindow, cooldownUntil = t + minInterval)`；
   - **冷却拒绝（`PulseSettlement.CooldownRefused`）**：当 `simTime < cooldownUntil` 时，**保持原 `PulseStamp` 不变**（不延长、也不抹除已有庇护窗），敲钟者即刻承受 `voy:pulse_saturation`（默认 120 tick：挖掘 ×0.75、移速 ×0.85）+ 低闷失谐钟声 + 灰烬粒子。
-- 庇护窗内 `沉滞`（`voy:stagnation`）主动移除；窗外每 20 tick 重新评估。`CellReadout.isSheltered` 的定义（[MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala)）：
+- 庇护窗内 `沉滞`（`voy:stagnation`）主动移除；窗外每 20 tick 重新评估。`CellReadout.isSheltered` 的当时定义（原 `MandateReadout.scala` 已在新版中拆分；现行定义见札记 11 §1.3）：
 
   ```scala
   def isSheltered: Boolean =
@@ -79,7 +77,7 @@
 
 ## 5. 代码落点
 
-- [PulseLedger.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/PulseLedger.scala) —— `PulseParam`、`PulseStamp(shelterUntil, cooldownUntil)`、`PulseSettlement` 与 `PulseLedger.settle`；
-- [MandateReadout.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateReadout.scala) —— `MycelialHealth`（`Intact / Damaged / Dead`）、`UndefinedReason`（`SlowOffsetBelowKnee / TransientNoCycle / NoCycleReference`）、三正交轴 `CellReadout` 与纯数学 `PhaseTracker`；
+- `PulseLedger.scala`（已随札记 11 删除）—— `PulseParam`、`PulseStamp(shelterUntil, cooldownUntil)`、`PulseSettlement` 与 `PulseLedger.settle`；
+- `MandateReadout.scala`（已拆分，现为 `ReadoutVocab` / `CellReadout` 等）—— `MycelialHealth`（`Intact / Damaged / Dead`）、`UndefinedReason`（`SlowOffsetBelowKnee / TransientNoCycle / NoCycleReference`）、三正交轴 `CellReadout` 与纯数学 `PhaseTracker`；
 - [MandateAgent.scala](../src/main/scala/moe/chestnut/awa/voy/inner/veins/MandateAgent.scala) —— 单槽位 `CellSlot` 统一管理每格运行时簿记；
 - [MandatePhenomena.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/MandatePhenomena.scala) & [BellRitual.scala](../src/main/scala/moe/chestnut/awa/voy/mandate/BellRitual.scala) —— 感官签名、经济压力档、菌塘生长与敲钟六裁决全部映射在三条正交轴上。

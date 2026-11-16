@@ -65,9 +65,6 @@ object MandateRuntime:
   def setBaselineCalmingAt(chunkX: Int, chunkZ: Int, level: Double): Unit =
     tell(EventMsg.SetBaselineCalming(worldToGrid(chunkX, chunkZ), level))
 
-  def setDisturbanceAt(chunkX: Int, chunkZ: Int, rate: Double): Unit =
-    tell(EventMsg.SetDisturbance(worldToGrid(chunkX, chunkZ), rate))
-
   def setSustenanceAt(chunkX: Int, chunkZ: Int, level: Double): Unit =
     tell(EventMsg.SetSustenance(worldToGrid(chunkX, chunkZ), level))
 

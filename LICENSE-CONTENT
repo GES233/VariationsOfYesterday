@@ -13,10 +13,11 @@ Attribution-NonCommercial-ShareAlike 4.0 International License
 Scope
 -----
 
-  * docs/                      design drafts and notes (including incubator/ and archive/)
+  * docs/                      design drafts and notes (including reference/, incubator/ and archive/)
   * src/**/lang/*.json         player-facing prose (names, tooltips, wording)
   * src/**/textures/**         pixel art
   * src/main/resources/assets/**/icon.png
+  * tools/icon_misc/            icon source art (SVG)
   * README.md, README-zh.md     preamble and framing text
 
 Everything else in this repository — the simulation engine, the game-side
@@ -46,11 +47,11 @@ What this means in practice
 说明（中文摘要）
 --------------
 
-  * 叙事与美术资源（设计文档、卷宗散文、语言文件里的文案、贴图、图标、
+  * 叙事与美术资源（设计文档、语言文件里的文案、贴图、图标、
     README 正文）以 CC BY-NC-SA 4.0 授权：可读、可引用、可翻译、可二次创作、
     可放进整合包或视频，但须署名 RoastedChestnut（GES233）、注明来源、
     **不得用于商业用途**，且二创须以同样协议发布。
-  * 代码部分（模拟引擎、游戏侧接线、mixin、Elixir 工具链、构建脚本）
+  * 代码部分（模拟引擎、游戏侧接线、mixin、构建脚本）
     以 MPL 2.0 授权，见 LICENSE。
   * 作者保留全部商业权利，未来以其它形态（小说、视觉小说、实体出版物）
     使用这些内容不受本协议限制。

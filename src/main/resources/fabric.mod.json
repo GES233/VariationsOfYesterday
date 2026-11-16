@@ -3,7 +3,7 @@
 	"id": "variations-of-yesterday",
 	"version": "${version}",
 	"name": "Variations of Yesterday",
-	"description": "Bla bla bla bla",
+	"description": "A horror mod about a mountain's failing mandate, its mycelial ecology, and the rhythms that keep the valley alive.",
 	"authors": [
 		"GES233"
 	],
@@ -26,20 +26,10 @@
 				"adapter": "kotori_scala",
 				"value": "moe.chestnut.awa.voy.VariationsOfYesterdayClient"
 			}
-		],
-		"fabric-datagen": [
-			{
-				"value": "moe.chestnut.awa.voy.VariationsOfYesterdayDataGenerator",
-				"adapter": "kotori_scala"
-			}
 		]
 	},
 	"mixins": [
-		"variations-of-yesterday.mixins.json",
-		{
-			"config": "variations-of-yesterday.client.mixins.json",
-			"environment": "client"
-		}
+		"variations-of-yesterday.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=0.16.10",

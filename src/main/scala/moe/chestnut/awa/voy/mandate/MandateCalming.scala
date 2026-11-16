@@ -5,7 +5,6 @@ import scala.jdk.CollectionConverters.*
 import net.minecraft.block.Blocks
 import net.minecraft.block.BlockState
 import net.minecraft.server.world.ServerWorld
-import net.minecraft.util.math.BlockPos
 
 import moe.chestnut.awa.voy.VoyConfig
 import moe.chestnut.awa.voy.inner.veins.{CalmingStock, MandateSource, MandateSourceKind}
@@ -46,9 +45,6 @@ object MandateCalming:
     */
   def sourceKindOf(state: BlockState): Option[MandateSourceKind] =
     if state.isOf(Blocks.BELL) then Some(MandateSourceKind.Bell) else None
-
-  def sourceKindAt(world: ServerWorld, pos: BlockPos): Option[MandateSourceKind] =
-    sourceKindOf(world.getBlockState(pos))
 
   /** Register one source (idempotent). */
   def register(source: MandateSource): Unit =
