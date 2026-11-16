@@ -28,7 +28,8 @@
   - `VoyConfig.scala` — 外部运行时配置（`config/variations-of-yesterday.json`：格子几何、`tickDt`、FHN/慢变量参数，默认值即原硬编码值；只注入接线层，不触契约锚）
   - `mandate/` — Mandate 游戏侧接线层：
     - `MandateRuntime.scala` — Minecraft ↔ Mandate 桥接（引擎 actor 生命周期、tick gate、快照发布、动作回包队列）
-    - `MandateOverworld.scala` — 主世界事件接线（采掘注入应力、敲钟/拆钟、验山读数、沉滞施加、感官签名发射、再接种；纯接线，裁决与文案外置）
+    - `MandateOverworld.scala` — 主世界接线门面（只注册两个监听器并转发 server tick / 动作流；具体行为在 `mandate/overworld/`，裁决与文案外置）
+    - `overworld/` — 主世界接线模块（每个通道一个文件，均无状态、可独立阅读）：`BlockBreakListener`（采掘注应力 + 拆钟注销安抚源）、`UseBlockRouter`（右键有序分发）、`Inspection`（验山读数）、`FieldInoculation`（段木田间接菌 / 土壤再接种）、`BellStrike`（敲钟剂量 + 四裁决 VFX + 过驱动反噬）、`StagnationRunner`（20 tick 沉滞施加 + 60 s c0 重平衡）、`PhenomenaEmitter`（感官签名发射 + 黄水渗）、`ActionFeedback`（尖峰 / 相位迁移反馈）、`OverworldVocabulary`（剂量与方块/物品词表）、`VoyDebug`（`/voy debug` 门控的原始数值）
     - `BellRitual.scala` — 敲钟/共振裁决（`BellStrikeOutcome` + `evaluateBellStrike`，四裁决：无应/过密/失锚/起搏·校拍；无 Minecraft 依赖、可单测）
     - `MandateCalming.scala` — c0 安抚源注册表与重平衡接线（`Chunk ↔ List[Source(kind,pos)]`、世界扫描、60 s 重平衡广播、敲钟剂量；库存纯函数在 `inner/veins/CalmingStock`）
     - `MandateWording.scala` — 全部玩家可见文案（验山读数 / 叩钟四裁决 / 接种 / Regime 示警 / 相位盘，纯函数；颜色语言与札记 11 §1.8 一致）
@@ -36,8 +37,8 @@
     - `MandateEconomy.scala` — 沉滞经济档的 mixin 桥接（交易加价 / 繁殖 / 铁傀儡 / 作物 keep 概率，概率判定集中在此）
     - `MandateEffects.scala` — 自定义状态效果（`voy:stagnation` 基础档=无属性标记 / `voy:stagnation_spike` 急性档 ×0.09 / `voy:pulse_saturation` 过驱动反噬；色彩与心跳配色一致）
     - `MandatePersistence.scala` + `inner/veins/MandateSnapshot.scala` — 维度级持久化（`PersistentState`，整格快照含 `M`、通道、参数、边、链路、`BeatStats` 节奏记忆与安抚源列表，`SchemaVersion = 3`；状态与逐格参数来自存档，配置只作用于新注册格子、核心默认兜底）
-  - `blocks/` — 菌网共生与设施方块层（`VoyBlocks` 注册表与创造栏、`GastrodiaBedBlock` 菌塘及荧丝菌材/鲜伏根/煨伏根，含农夫乐事沃土与小刀零依赖软兼容钩子）
-  - `inner/veins/` — 核心模拟（「地脉」= 山的身体，`mandate/` = 人间制度的授命）：`MandateState`、`MandateGrid`、`MandateAgent`、`MandateReadout`（含 `PhaseTracker` 与 `BeatStats`）、`Heartbeat`（节律轴：Warming/Beating/Fast/Slow/Arrhythmic + 退出滞回）、`CalmingStock`（c0 源驱动库存纯函数）、`PhaseResponse`、`PulseCoupling`、`MandateSnapshot`
+  - `blocks/` — 菌网共生与设施方块层（`VoyBlocks` 注册表与创造栏、`GastrodiaBedBlock` 菌塘及荧丝菌材/鲜伏根/煨伏根）：`BedCompat`（农夫乐事沃土与小刀零依赖软兼容 hook + 材料词表，`GastrodiaBedBlock` 选择性 `export`）、`BedFx`（粒子/音效具名封装）、`BedActions`（右键 ①②③④ 四个动作正文）；块本体只留生命周期与点击判定
+  - `inner/veins/` — 核心模拟（「地脉」= 山的身体，`mandate/` = 人间制度的授命）：`MandateState`、`MandateGrid`、`MandateAgent`、`ReadoutVocab`（`Regime` / `MycelialHealth` / `PhaseLabel` / `UndefinedReason` / `PhaseReading` / `ReadoutParam` / `Readout` 读数词表）、`CellReadout`（发布给游戏侧的单格语义读数，含 `isSheltered`）、`PhaseTracker`（Poincaré 截面相位 + `BeatStats` 节律统计）、`Heartbeat`（节律轴：Warming/Beating/Fast/Slow/Arrhythmic + 退出滞回）、`CalmingStock`（c0 源驱动库存纯函数）、`PhaseResponse`、`PulseCoupling`、`MandateSnapshot`
   - `inner/actor/Actor.scala` — 单线程 actor 内核（`ActorRef` 信箱，`tell` / `!` / `stop`）
   - `inner/event/EventMsg.scala` — 入向通道与拓扑协议 `EventDTO`（通道电平/脉冲 + 格子、输运边、链路的增删；`FirePulse.transmitter` 区分钟击与晶链，钟击在引擎内戳 `lastBellStrikeAt` 过驱动守卫）
   - `inner/action/ActionMsg.scala` — 出向动作协议 `MandateActionProtocol`

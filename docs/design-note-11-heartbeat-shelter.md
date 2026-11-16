@@ -182,7 +182,7 @@ def isSheltered: Boolean =
 |---|---|
 | `inner/veins/Heartbeat.scala` | **新增**：`Heartbeat`/`BeatSource`/`BeatStats`/`HeartbeatParam` + 纯分类器 + 退出滞回 |
 | `inner/veins/CalmingStock.scala` | **新增**：`MandateSourceKind`/`MandateSource`/`CalmingParam` + 库存纯函数（`step`/`dose`） |
-| `inner/veins/MandateReadout.scala` | `CellReadout.heartbeat` + `lastBellStrikeAt`；`isSheltered` 改节律；`PhaseTracker` 周期环 + duty 累计 + `beatStats` + `restoreBeatStats` |
+| `inner/veins/{ReadoutVocab,CellReadout,PhaseTracker}.scala` | 原单文件 `MandateReadout.scala`，按类型拆为三份：`CellReadout.heartbeat` + `lastBellStrikeAt`；`isSheltered` 改节律；`PhaseTracker` 周期环 + duty 累计 + `beatStats` + `restoreBeatStats` |
 | `inner/veins/MandateAgent.scala` | 删 `recordPulse`/`pulseStamp`；Bell 脉冲记 `lastBellStrikeAt`；分类 + 滞回；快照带 `BeatStats` |
 | `inner/veins/MandateSnapshot.scala` | `pulseStamps` → `beatStats`（周期环/lastDuty/lastCross/bornAt） |
 | `inner/veins/PulseLedger.scala` | **删除** |
@@ -191,7 +191,7 @@ def isSheltered: Boolean =
 | `mandate/MandatePersistence.scala` | `SchemaVersion = 3`；`BeatStats` + 源注册表读写 |
 | `mandate/MandateSyncProtocol.scala` | `ClientCellView` 心跳类别打包 flags 位（4–6 位）；debug telemetry 删 `remainingShelter/remainingCooldown`，保留 period/duty |
 | `mandate/MandatePhenomena.scala` | 经济/肉体按心跳映射；生态死亡优先 |
-| `mandate/MandateOverworld.scala` | 三层扰动场、敲钟四态 VFX、拆钟源移除 + 文案、20-tick 循环读节律、60 s 重平衡钩子 |
+| `mandate/MandateOverworld.scala` + `mandate/overworld/` | 三层扰动场、敲钟四态 VFX、拆钟源移除 + 文案、20-tick 循环读节律、60 s 重平衡钩子（后按通道拆为 `overworld/` 模块，门面只留注册与转发） |
 | `mandate/MandateWording.scala` | 全量文案换心跳语义 + 颜色语言 |
 | `VoyConfig.scala` | `heartbeatParam` + `calmingParam`；`remnantRadius`/`remnantDisturbance`；`initialStressPeak`/`Falloff` 导出式 |
 | `client/hud/MandateHud.scala` | 心跳配色主轴、两行 telemetry、自适应面板、图例 |

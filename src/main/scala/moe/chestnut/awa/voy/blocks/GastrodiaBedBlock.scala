@@ -1,24 +1,19 @@
 package moe.chestnut.awa.voy.blocks
 
-import net.minecraft.block.{AbstractBlock, Block, BlockState, Blocks, PillarBlock}
+import net.minecraft.block.{AbstractBlock, Block, BlockState}
 import net.minecraft.entity.player.PlayerEntity
 import net.minecraft.item.{ItemPlacementContext, ItemStack, Items}
-import net.minecraft.particle.ParticleTypes
-import net.minecraft.registry.{Registries, RegistryKeys}
-import net.minecraft.registry.tag.{BlockTags, TagKey}
 import net.minecraft.server.world.ServerWorld
-import net.minecraft.sound.{SoundCategory, SoundEvents}
 import net.minecraft.state.StateManager
 import net.minecraft.state.property.IntProperty
-import net.minecraft.text.Text
+import net.minecraft.util.{ActionResult, Hand}
 import net.minecraft.util.hit.BlockHitResult
-import net.minecraft.util.math.{BlockPos, Direction}
+import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.random.Random
-import net.minecraft.util.{ActionResult, Hand, Identifier}
 import net.minecraft.world.World
 
 import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
-import moe.chestnut.awa.voy.mandate.{MandatePhenomena, MandateRuntime, MandateWording}
+import moe.chestnut.awa.voy.mandate.{MandatePhenomena, MandateRuntime}
 
 /** `菌塘` (mycelial bed, design note 06 §4.3 & WO-3).
   *
@@ -41,6 +36,10 @@ import moe.chestnut.awa.voy.mandate.{MandatePhenomena, MandateRuntime, MandateWo
   *    until refurbished with `菌材` or fungal inoculum once `M` is live enough
   *    and the soil is sub-toxic. Neither a lockout nor an unreadable phase
   *    latches a bed (2026-11-12).
+  *
+  * The right-click bodies live in [[BedActions]], the soft-compat vocabularies
+  * in [[BedCompat]] and the particle/sound cues in [[BedFx]]; this file keeps
+  * only the block lifecycle and the click-dispatch decision.
   */
 final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(settings):
   import GastrodiaBedBlock.*
@@ -75,7 +74,7 @@ final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(se
       random: Random
   ): Unit =
     if world.getRegistryKey != World.OVERWORLD then return
-    advanceEcologicalTick(state, world, pos, random, playerBoosted = false)
+    GastrodiaBedBlock.advanceEcologicalTick(state, world, pos, random, playerBoosted = false)
 
   override protected def onUseWithItem(
       stack: ItemStack,
@@ -100,7 +99,8 @@ final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(se
     // bed by accident.
     val tendsBed =
       (currentCond == ConditionWithered && isRefurbishMaterial(stack)) ||
-        (currentCond != ConditionWithered && currentAge < MaxAge && isNutrientMaterial(stack)) ||
+        (currentCond != ConditionWithered && currentAge < MaxAge &&
+          BedCompat.isNutrientMaterial(stack)) ||
         (currentCond != ConditionWithered && currentAge >= MaxAge &&
           (emptyHand || isHarvestKnife(stack))) ||
         emptyHand ||
@@ -117,95 +117,48 @@ final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(se
 
     // 1. Withered bed: refurbish with Inoculated Timber or fungal inoculum.
     if currentCond == ConditionWithered && isRefurbishMaterial(stack) then
-      if MandatePhenomena.canRefurbishGastrodiaBed(readout) then
-        val liveVerdict = MandatePhenomena.evaluateGastrodiaBed(readout)
-        val restoredCond = verdictToCondition(liveVerdict)
-        serverWorld.setBlockState(
-          pos,
-          state
-            .`with`(AGE, Integer.valueOf(0))
-            .`with`(CONDITION, Integer.valueOf(restoredCond)),
-          Block.NOTIFY_LISTENERS
-        )
-        if !player.isCreative then stack.decrement(1)
-        serverWorld.spawnParticles(
-          ParticleTypes.MYCELIUM,
-          pos.getX + 0.5,
-          pos.getY + 1.05,
-          pos.getZ + 0.5,
-          14,
-          0.35,
-          0.15,
-          0.35,
-          0.01
-        )
-        serverWorld.playSound(
-          null,
-          pos,
-          SoundEvents.BLOCK_ROOTED_DIRT_PLACE,
-          SoundCategory.BLOCKS,
-          0.9f,
-          1.0f
-        )
-        player.sendMessage(
-          Text.literal(MandateWording.formatGastrodiaRefurbish(success = true, readout)),
-          true
-        )
-        return ActionResult.SUCCESS
-      else
-        serverWorld.spawnParticles(
-          ParticleTypes.WHITE_ASH,
-          pos.getX + 0.5,
-          pos.getY + 1.05,
-          pos.getZ + 0.5,
-          8,
-          0.3,
-          0.15,
-          0.3,
-          0.01
-        )
-        player.sendMessage(
-          Text.literal(MandateWording.formatGastrodiaRefurbish(success = false, readout)),
-          true
-        )
-        return ActionResult.SUCCESS
+      return BedActions.refurbishWitheredBed(state, serverWorld, pos, player, stack, readout)
 
     // 2. Mature non-withered bed: harvest Fresh Glowroot tubers and re-seed.
     //    Sneaking always means "don't disturb it" (inspect only), matching the
     //    vanilla convention players use when they want to build around a block.
     if currentCond != ConditionWithered && currentAge >= MaxAge && !player.isSneaking then
-      harvestMatureBed(state, serverWorld, pos, player, stack, readout)
-      return ActionResult.SUCCESS
+      return BedActions.harvestMatureBed(state, serverWorld, pos, player, stack, readout)
 
     // 3. Feeding a live bed with fungal nutrients (mushrooms / glow lichen /
     //    bone meal) attempts an ecological growth step that still obeys the
-    //    chunk's s < 0.45 and M >= 0.60 symbiosis gate.
-    if currentCond != ConditionWithered && currentAge < MaxAge && isNutrientMaterial(stack) then
-      val verdict = MandatePhenomena.evaluateGastrodiaBed(readout)
-      if verdict == GastrodiaBedVerdict.Growing then
-        if !player.isCreative then stack.decrement(1)
-        advanceEcologicalTick(state, serverWorld, pos, serverWorld.random, playerBoosted = true)
-        val updatedAge = serverWorld.getBlockState(pos).get(AGE).intValue()
-        val companion = hasCompanionTimber(serverWorld, pos)
-        player.sendMessage(
-          Text.literal(
-            MandateWording.formatGastrodiaInspection(
-              updatedAge,
-              MaxAge,
-              verdict,
-              companion,
-              readout
-            )
-          ),
-          true
-        )
-        return ActionResult.SUCCESS
+    //    chunk's s < 0.45 and M >= 0.60 symbiosis gate. `PASS` means that gate
+    //    refused the boost, so the click falls through to inspection below.
+    if currentCond != ConditionWithered && currentAge < MaxAge && BedCompat.isNutrientMaterial(stack) then
+      val fed = BedActions.feedNutrient(state, serverWorld, pos, player, stack, readout)
+      if fed != ActionResult.PASS then return fed
 
     // 4. Default interaction: sync visual condition and inspect the bed.
-    inspectAndSyncBed(state, serverWorld, pos, player, readout)
-    ActionResult.SUCCESS
+    BedActions.inspectAndSyncBed(state, serverWorld, pos, player, stack, readout)
 
-  private def advanceEcologicalTick(
+object GastrodiaBedBlock:
+  val MaxAge: Int = 3
+  val ConditionHealthy: Int = 0
+  val ConditionStalled: Int = 1
+  val ConditionWithered: Int = 2
+
+  val AGE: IntProperty = IntProperty.of("age", 0, MaxAge)
+  val CONDITION: IntProperty = IntProperty.of("condition", 0, 2)
+
+  // The companion's public vocabulary lives in BedCompat; keep it reachable as
+  // `GastrodiaBedBlock.xxx` because `OverworldVocabulary` and `MandateOverworld`
+  // call `GastrodiaBedBlock.isCompatRichSoil(state)` from outside this package.
+  export BedCompat.verdictToCondition
+  export BedCompat.hasCompanionTimber
+  export BedCompat.isCompatRichSoil
+  export BedCompat.isHarvestKnife
+  export BedCompat.isRefurbishMaterial
+
+  /** Advance one ecological tick of the bed (`randomTick`, or the nutrient
+    * boost from ③). The block holds no state of its own, so this is a pure
+    * projection of the chunk readout onto the `AGE` / `CONDITION` properties.
+    */
+  private[blocks] def advanceEcologicalTick(
       state: BlockState,
       world: ServerWorld,
       pos: BlockPos,
@@ -227,17 +180,7 @@ final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(se
             state.`with`(CONDITION, Integer.valueOf(ConditionWithered)),
             Block.NOTIFY_LISTENERS
           )
-          world.spawnParticles(
-            ParticleTypes.WHITE_ASH,
-            pos.getX + 0.5,
-            pos.getY + 1.05,
-            pos.getZ + 0.5,
-            6,
-            0.35,
-            0.15,
-            0.35,
-            0.0
-          )
+          BedFx.whiteAshWither(world, pos)
 
       case GastrodiaBedVerdict.Stalled =>
         // Once withered, a bed stays withered until manually refurbished.
@@ -266,176 +209,5 @@ final class GastrodiaBedBlock(settings: AbstractBlock.Settings) extends Block(se
             Block.NOTIFY_LISTENERS
           )
         if shouldAdvance then
-          world.spawnParticles(
-            ParticleTypes.SPORE_BLOSSOM_AIR,
-            pos.getX + 0.5,
-            pos.getY + 1.05,
-            pos.getZ + 0.5,
-            6,
-            0.3,
-            0.15,
-            0.3,
-            0.01
-          )
-          if playerBoosted then
-            world.playSound(
-              null,
-              pos,
-              SoundEvents.ITEM_BONE_MEAL_USE,
-              SoundCategory.BLOCKS,
-              0.7f,
-              1.15f
-            )
-
-  private def harvestMatureBed(
-      state: BlockState,
-      world: ServerWorld,
-      pos: BlockPos,
-      player: PlayerEntity,
-      heldStack: ItemStack,
-      readout: moe.chestnut.awa.voy.inner.veins.CellReadout
-  ): Unit =
-    val companion = hasCompanionTimber(world, pos)
-    val knifeBonus = if isHarvestKnife(heldStack) then 1 else 0
-    val count =
-      (if companion then 3 + world.random.nextInt(2)
-       else 1 + world.random.nextInt(2)) + knifeBonus
-    Block.dropStack(world, pos.up(), new ItemStack(VoyBlocks.FreshGastrodiaItem, count))
-
-    val nextCond = verdictToCondition(MandatePhenomena.evaluateGastrodiaBed(readout))
-    world.setBlockState(
-      pos,
-      state
-        .`with`(AGE, Integer.valueOf(0))
-        .`with`(CONDITION, Integer.valueOf(nextCond)),
-      Block.NOTIFY_LISTENERS
-    )
-    world.spawnParticles(
-      ParticleTypes.MYCELIUM,
-      pos.getX + 0.5,
-      pos.getY + 1.05,
-      pos.getZ + 0.5,
-      12,
-      0.35,
-      0.2,
-      0.35,
-      0.01
-    )
-    world.playSound(
-      null,
-      pos,
-      SoundEvents.BLOCK_ROOTED_DIRT_BREAK,
-      SoundCategory.BLOCKS,
-      0.9f,
-      1.05f
-    )
-    player.sendMessage(
-      Text.literal(MandateWording.formatGastrodiaHarvest(count, companion)),
-      true
-    )
-
-  private def inspectAndSyncBed(
-      state: BlockState,
-      world: ServerWorld,
-      pos: BlockPos,
-      player: PlayerEntity,
-      readout: moe.chestnut.awa.voy.inner.veins.CellReadout
-  ): Unit =
-    val currentCond = state.get(CONDITION).intValue()
-    val currentAge = state.get(AGE).intValue()
-    val liveVerdict =
-      if currentCond == ConditionWithered then GastrodiaBedVerdict.Withered
-      else MandatePhenomena.evaluateGastrodiaBed(readout)
-    val syncedCond = verdictToCondition(liveVerdict)
-    if syncedCond != currentCond then
-      world.setBlockState(
-        pos,
-        state.`with`(CONDITION, Integer.valueOf(syncedCond)),
-        Block.NOTIFY_LISTENERS
-      )
-    val companion = hasCompanionTimber(world, pos)
-    player.sendMessage(
-      Text.literal(
-        MandateWording.formatGastrodiaInspection(
-          currentAge,
-          MaxAge,
-          liveVerdict,
-          companion,
-          readout
-        )
-      ),
-      true
-    )
-
-object GastrodiaBedBlock:
-  val MaxAge: Int = 3
-  val ConditionHealthy: Int = 0
-  val ConditionStalled: Int = 1
-  val ConditionWithered: Int = 2
-
-  val AGE: IntProperty = IntProperty.of("age", 0, MaxAge)
-  val CONDITION: IntProperty = IntProperty.of("condition", 0, 2)
-
-  private val CompanionDirections: Array[Direction] = Array(
-    Direction.NORTH,
-    Direction.EAST,
-    Direction.SOUTH,
-    Direction.WEST,
-    Direction.DOWN
-  )
-
-  def verdictToCondition(verdict: GastrodiaBedVerdict): Int = verdict match
-    case GastrodiaBedVerdict.Growing => ConditionHealthy
-    case GastrodiaBedVerdict.Stalled => ConditionStalled
-    case GastrodiaBedVerdict.Withered => ConditionWithered
-
-  /** Optional zero-dependency Farmer's Delight / Common tags soft-compat
-    * hooks (design note 06 §4.3):
-    *
-    *  - `farmersdelight:rich_soil` / `rich_soil_farmland` directly underneath
-    *    acts as a companion substrate alongside `inoculated_timber`;
-    *  - Harvesting with a knife (`#c:tools/knife` / `#farmersdelight:tools/knives`)
-    *    avoids disturbing the lower rhizomorph mat and yields +1 tuber.
-    */
-  private val FdRichSoilId: Identifier = Identifier.of("farmersdelight", "rich_soil")
-  private val FdRichSoilFarmlandId: Identifier = Identifier.of("farmersdelight", "rich_soil_farmland")
-  private val CommonKnifeTag: TagKey[net.minecraft.item.Item] =
-    TagKey.of(RegistryKeys.ITEM, Identifier.of("c", "tools/knife"))
-  private val CommonKnivesTag: TagKey[net.minecraft.item.Item] =
-    TagKey.of(RegistryKeys.ITEM, Identifier.of("c", "tools/knives"))
-  private val FdKnivesTag: TagKey[net.minecraft.item.Item] =
-    TagKey.of(RegistryKeys.ITEM, Identifier.of("farmersdelight", "tools/knives"))
-
-  /** Whether an `inoculated_timber` (`菌材`) block borders this bed
-    * horizontally or directly underneath (段木伴栽), or a Farmer's Delight
-    * rich-soil block lies directly beneath it.
-    */
-  def hasCompanionTimber(world: World, pos: BlockPos): Boolean =
-    var i = 0
-    while i < CompanionDirections.length do
-      val dir = CompanionDirections(i)
-      val neighbor = world.getBlockState(pos.offset(dir))
-      if neighbor.isOf(VoyBlocks.InoculatedTimber) then return true
-      if dir == Direction.DOWN && isCompatRichSoil(neighbor) then return true
-      i += 1
-    false
-
-  def isCompatRichSoil(state: BlockState): Boolean =
-    val id = Registries.BLOCK.getId(state.getBlock)
-    id == FdRichSoilId || id == FdRichSoilFarmlandId
-
-  def isHarvestKnife(stack: ItemStack): Boolean =
-    stack.isIn(CommonKnifeTag) || stack.isIn(CommonKnivesTag) || stack.isIn(FdKnivesTag)
-
-  def isRefurbishMaterial(stack: ItemStack): Boolean =
-    stack.isOf(VoyBlocks.InoculatedTimberItem) ||
-      stack.isOf(Items.GLOW_LICHEN) ||
-      stack.isOf(Items.BROWN_MUSHROOM) ||
-      stack.isOf(Items.RED_MUSHROOM) ||
-      stack.isOf(Items.MYCELIUM)
-
-  private def isNutrientMaterial(stack: ItemStack): Boolean =
-    stack.isOf(Items.BONE_MEAL) ||
-      stack.isOf(Items.GLOW_LICHEN) ||
-      stack.isOf(Items.BROWN_MUSHROOM) ||
-      stack.isOf(Items.RED_MUSHROOM)
+          BedFx.sporeBloom(world, pos)
+          if playerBoosted then BedFx.playBoneMealUse(world, pos)
