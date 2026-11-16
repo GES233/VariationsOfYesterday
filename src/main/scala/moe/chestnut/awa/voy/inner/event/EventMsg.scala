@@ -31,32 +31,11 @@ import moe.chestnut.awa.voy.inner.veins.{
   */
 sealed trait EventDTO
 
-/** What a physical pulse does to the gameplay pulse ledger (design note 08).
-  *
-  * This axis is NOT the physics: a pulse enters the fast-variable equations
-  * either way. It says whether the same arrival also counts as a *counted
-  * pulse* for the discrete pulse mechanisms — shelter window, tolerance book
-  * and acute overload lockout (`inner.veins.PulseLedger`).
-  *
-  * It deliberately does not name the emitter or the reason: the emitter kind
-  * already travels on `FirePulse.transmitter`, and the reason a strike does
-  * not count belongs to the verdict that refused it (the bell dispatch's
-  * `SpikeSwallowed`). The core only needs to know whether the ledger sees
-  * this arrival.
+/** Design note 11 (heartbeat-as-shelter): the discrete pulse ledger
+  * (`PulseBookkeeping`, `PulseStamp`) is gone. A pulse is only physics now;
+  * shelter comes from the heartbeat rhythm axis, and the bell's overdrive
+  * guard is tracked per cell from `FirePulse.transmitter == Bell`.
   */
-enum PulseBookkeeping:
-  /** The arrival is counted: it may open a shelter window, charge tolerance,
-    * or be refused into an overload lockout.
-    */
-  case Counted
-
-  /** The pulse only enters the equations: it sounds, but it is not a
-    * maintenance act (design note 08 §3).
-    */
-  case PhysicsOnly
-
-  def counted: Boolean = this == PulseBookkeeping.Counted
-
 object EventMsg:
   // ==== Timer ==== //
 
@@ -103,22 +82,16 @@ object EventMsg:
     * cell's `synapseTau` to the transmitter's constant before firing,
     * exactly as the prototype does.
     *
-    * `bookkeeping` separates *physics* from *ledger*: the pulse always
-    * enters the equations (the bell always sounds), but only a strike the
-    * six-way bell dispatch allows to count may enter the pulse ledger, which
-    * opens the shelter window, charges tolerance and can be refused into an
-    * acute overload lockout. `SpikeSwallowed` fires the pulse with
-    * `bookkeeping = PulseBookkeeping.PhysicsOnly` (design note 08 §3);
-    * crystal-link pulses, which have no dispatch, are always counted.
-    * Keeping the emitter kind on `transmitter` is what lets a later
-    * mechanism tell an endogenous/link arrival from an external strike
-    * without re-reading the ledger.
+    * Every pulse enters the equations (the bell always sounds). The
+    * `transmitter` axis is what lets downstream mechanisms tell a bell
+    * strike from an endogenous/link arrival: bell strikes stamp the cell's
+    * overdrive guard (`lastBellStrikeAt`), crystal-link pulses do not
+    * (design note 11 §1.5).
     */
   final case class FirePulse(
       cell: CellCoord,
       area: Double,
-      transmitter: PulseTransmitter = PulseTransmitter.Bell,
-      bookkeeping: PulseBookkeeping = PulseBookkeeping.Counted
+      transmitter: PulseTransmitter = PulseTransmitter.Bell
   ) extends EventDTO
 
   /** Set the sustenance level `M ∈ [0, 1]` of a cell — the endogenous

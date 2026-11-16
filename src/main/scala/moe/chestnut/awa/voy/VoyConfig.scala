@@ -11,8 +11,6 @@ import moe.chestnut.awa.voy.inner.veins.{
   MandateAgent,
   MandateParam,
   PhaseResponse,
-  PulseParam,
-  ShelterModel,
   StressParam
 }
 
@@ -67,13 +65,7 @@ final case class VoyConfig(
     fastParam: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
     stressParam: StressParam =
       StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-    pulseParam: PulseParam = PulseParam(),
-    heartbeatParam: HeartbeatParam = HeartbeatParam(),
-    /** Step 1 A/B switch (design note 11): `Window` keeps the legacy
-      * pulse-window shelter semantics; `Heartbeat` switches shelter to the
-      * rhythm axis. Deleted in Step 2 when the window model is removed.
-      */
-    shelterModel: ShelterModel = ShelterModel.Window
+    heartbeatParam: HeartbeatParam = HeartbeatParam()
 )
 
 object VoyConfig:
@@ -107,9 +99,7 @@ object VoyConfig:
         lattice = latticeFrom(obj(root, "lattice")),
         fastParam = fastFrom(obj(root, "fastParam")),
         stressParam = stressFrom(obj(root, "stressParam")),
-        pulseParam = pulseFrom(obj(root, "pulseParam")),
-        heartbeatParam = heartbeatFrom(obj(root, "heartbeatParam")),
-        shelterModel = modelFrom(root)
+        heartbeatParam = heartbeatFrom(obj(root, "heartbeatParam"))
       )
     catch
       case e: Exception =>
@@ -174,14 +164,6 @@ object VoyConfig:
       sustenanceFloor = dbl(o, "sustenanceFloor", d.sustenanceFloor)
     )
 
-  private def pulseFrom(o: JsonObject): PulseParam =
-    val d = PulseParam()
-    PulseParam(
-      shelterWindow = dbl(o, "shelterWindow", d.shelterWindow),
-      minInterval = dbl(o, "minInterval", d.minInterval),
-      overloadPenaltyTicks = int(o, "overloadPenaltyTicks", d.overloadPenaltyTicks)
-    )
-
   private def heartbeatFrom(o: JsonObject): HeartbeatParam =
     val d = HeartbeatParam()
     HeartbeatParam(
@@ -193,13 +175,6 @@ object VoyConfig:
       overloadPenaltyTicks = int(o, "overloadPenaltyTicks", d.overloadPenaltyTicks),
       exitBadCycles = int(o, "exitBadCycles", d.exitBadCycles)
     )
-
-  private def modelFrom(root: JsonObject): ShelterModel =
-    if root.has("shelterModel") && root.get("shelterModel").isJsonPrimitive then
-      root.get("shelterModel").getAsString match
-        case "heartbeat" => ShelterModel.Heartbeat
-        case _           => ShelterModel.Window
-    else ShelterModel.Window
 
   private def defaultsJson(cfg: VoyConfig): String =
     val root = JsonObject()
@@ -244,13 +219,6 @@ object VoyConfig:
     s.addProperty("sustenanceFloor", sp.sustenanceFloor)
     root.add("stressParam", s)
 
-    val pp = cfg.pulseParam
-    val p = JsonObject()
-    p.addProperty("shelterWindow", pp.shelterWindow)
-    p.addProperty("minInterval", pp.minInterval)
-    p.addProperty("overloadPenaltyTicks", pp.overloadPenaltyTicks)
-    root.add("pulseParam", p)
-
     val hp = cfg.heartbeatParam
     val h = JsonObject()
     h.addProperty("nominalPeriod", hp.nominalPeriod)
@@ -261,12 +229,5 @@ object VoyConfig:
     h.addProperty("overloadPenaltyTicks", hp.overloadPenaltyTicks)
     h.addProperty("exitBadCycles", hp.exitBadCycles)
     root.add("heartbeatParam", h)
-
-    root.addProperty(
-      "shelterModel",
-      cfg.shelterModel match
-        case ShelterModel.Window    => "window"
-        case ShelterModel.Heartbeat => "heartbeat"
-    )
 
     GsonBuilder().setPrettyPrinting().create().toJson(root)

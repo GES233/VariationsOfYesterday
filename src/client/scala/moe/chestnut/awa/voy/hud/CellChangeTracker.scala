@@ -48,9 +48,9 @@ object CellChangeTracker:
           wasSpiking = e.view.isSpiking
           push(s"§8— 移至 [$x, $z] —")
         val v = e.view
-        // Heartbeat category rides on the debug telemetry (dev/OP only);
-        // -1 = unknown when telemetry is withheld.
-        val hbOrd = e.debug.map(_.heartbeatOrdinal).getOrElse(-1)
+        // Heartbeat category rides on the view's flags byte — available to
+        // every player, no debug privilege needed (design note 11, Step 2).
+        val hbOrd = v.heartbeatOrdinal
         val sig = Sig(v.regime, v.mycelium.word, v.isSheltered, hbOrd)
         lastSig.foreach { prev =>
           if prev.heartbeat != sig.heartbeat then
@@ -65,7 +65,10 @@ object CellChangeTracker:
             )
         }
         lastSig = Some(sig)
-        if v.isSpiking && !wasSpiking then push(s"§c地鸣尖峰${beatNote(e)}")
+        // A spike is the beat becoming audible, not a warning: the acute
+        // colours (red/orange) belong to Fast / Arrhythmic, never to the
+        // healthy high phase of the rhythm (design note 11 §1.3).
+        if v.isSpiking && !wasSpiking then push(s"§b地鸣尖峰${beatNote(e)}")
         wasSpiking = v.isSpiking
 
   private def push(line: String): Unit =

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
-import moe.chestnut.awa.voy.inner.veins.{HeartbeatParam, ShelterModel}
+import moe.chestnut.awa.voy.inner.veins.HeartbeatParam
 
 /** External configuration loading (`config/variations-of-yesterday.json`). */
 class VoyConfigSpec:
@@ -29,17 +29,17 @@ class VoyConfigSpec:
         |  "tickDt": 0.025,
         |  "stressParam": { "gamma": 0.0007 },
         |  "lattice": { "width": 64 },
-        |  "pulseParam": { "minInterval": 10.0 }
+        |  "heartbeatParam": { "overdriveGuard": 9.6 }
         |}""".stripMargin
     )
     val cfg = VoyConfig.loadFrom(configPath)
 
     assertEquals(0.025, cfg.tickDt, 1e-12)
     assertEquals(0.0007, cfg.stressParam.gamma, 1e-12, "the calibration knob")
-    assertEquals(10.0, cfg.pulseParam.minInterval, 1e-12)
+    assertEquals(9.6, cfg.heartbeatParam.overdriveGuard, 1e-12)
     assertEquals(0.01, VoyConfig().stressParam.gamma, 1e-12)
     assertEquals(1e-3, cfg.stressParam.sustenanceGrowth, 1e-12)
-    assertEquals(40.0, cfg.pulseParam.shelterWindow, 1e-12)
+    assertEquals(39.47, cfg.heartbeatParam.nominalPeriod, 1e-12)
     assertEquals(64, cfg.lattice.width)
     assertEquals(32, cfg.lattice.height)
     assertEquals(-16, cfg.lattice.originX)
@@ -53,18 +53,14 @@ class VoyConfigSpec:
       "a malformed file must never half-apply"
     )
 
-  @Test def `the shelter A/B switch defaults to window and parses heartbeat`(): Unit =
-    assertEquals(ShelterModel.Window, VoyConfig().shelterModel)
-
+  @Test def `heartbeat parameters parse per field and keep derived relations`(): Unit =
     Files.writeString(
       configPath,
       """{
-        |  "shelterModel": "heartbeat",
         |  "heartbeatParam": { "nominalPeriod": 42.0, "minCycles": 4 }
         |}""".stripMargin
     )
     val cfg = VoyConfig.loadFrom(configPath)
-    assertEquals(ShelterModel.Heartbeat, cfg.shelterModel)
     assertEquals(42.0, cfg.heartbeatParam.nominalPeriod, 1e-12)
     assertEquals(4, cfg.heartbeatParam.minCycles)
     assertEquals(0.75 * 42.0, cfg.heartbeatParam.periodMin, 1e-12, "derived thresholds track")

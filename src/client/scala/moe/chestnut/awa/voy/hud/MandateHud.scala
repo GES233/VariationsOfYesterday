@@ -11,10 +11,10 @@ import moe.chestnut.awa.voy.mandate.{
   MandateWording,
   SyncedCellEntry
 }
-import moe.chestnut.awa.voy.inner.veins.{Heartbeat, PhaseLabel, PhaseReading, Regime}
+import moe.chestnut.awa.voy.inner.veins.Heartbeat
 
-/** Development HUD overlay that visualises the mandate readout
-  * (`Regime`, `PhaseReading`, `MycelialHealth`, `c0` status, and continuous
+/** Development HUD overlay that visualises the mandate readout (heartbeat
+  * category, regime, phase dial, mycelial health, `c0` status, and continuous
   * state) of the chunks around the player using uniform-size color tiles.
   */
 object MandateHud:
@@ -24,16 +24,18 @@ object MandateHud:
   private val tileStep = tileSize + tileGap
   private var enabled = false
 
-  // Palette (ARGB)
+  // Palette (ARGB) — heartbeat-first colour language (design note 11): one
+  // hue per rhythm category, shared with chat text and status-effect icons.
   private val ColPanelBg = 0xAA101318
   private val ColPanelBorder = 0xFF343B46
   private val ColOutside = 0xFF252930
-  private val ColCalmMaintained = 0xFF38B86D
-  private val ColCalmStagnant = 0xFF526275
-  private val ColStrained = 0xFFE6B432
-  private val ColOscillating = 0xFFEB6828
-  private val ColSpike = 0xFFFF2E2E
-  private val ColBurnout = 0xFF7D2948
+  private val ColWarming = 0xFF66A98F // Warming grace — muted teal-green
+  private val ColBeating = 0xFF38B86D // Beating — sheltered (green)
+  private val ColSlow = 0xFF526275 // Slow — stagnant (blue-grey)
+  private val ColFast = 0xFFEB6828 // Fast — acute overdrive (orange)
+  private val ColArrhythmic = 0xFFFF2E2E // Arrhythmic — acute irregularity (red)
+  private val ColEcologicalDeath = 0xFF7D2948 // silent blight / dead land (maroon)
+  private val ColDialBase = 0xFF2E343E
   private val ColC0Dot = 0xFFD6FFE4
   private val ColPlayerBorder = 0xFFFFFFFF
 
@@ -103,10 +105,10 @@ object MandateHud:
             val duty = d.beatDuty.map(x => f"$x%.3f").getOrElse("--")
             (
               f"v=${d.dissonance}%+.2f  s=${d.stress}%.3f  q=${d.activity}%.3f  M=${d.sustenance}%.2f  c0=${d.baselineCalming}%.2f",
-              f"p=${d.pulseDrive}%.2f  win=${d.remainingShelter}%.1f  cd=${d.remainingCooldown}%.1f  hb=${Heartbeat.wireName(d.heartbeatOrdinal)}  per=$per  duty=$duty"
+              f"p=${d.pulseDrive}%.2f  hb=${Heartbeat.wireName(view.heartbeatOrdinal)}  per=$per  duty=$duty"
             )
           case None =>
-            ("debug telemetry withheld (requires dev or OP)", "")
+            (s"debug telemetry withheld (requires dev or OP);  hb=${Heartbeat.wireName(view.heartbeatOrdinal)}", "")
         val phaseStr = debugOpt
           .map(d => MandateWording.formatPhaseShort(d.phaseReading(view.phaseLabel)))
           .getOrElse(view.dialTick.map(t => s"刻度 $t/20").getOrElse("无周期"))
@@ -125,12 +127,12 @@ object MandateHud:
         )
 
     val legendLabels = Seq(
-      "Calm + 脉冲 (庇护)",
-      "Calm (沉滞无脉冲)",
-      "Strained (承压)",
-      "Oscillating (振荡)",
-      "Spike (尖峰爆发)",
-      "Burnout (饱和失能)"
+      "起搏 Beating (庇护)",
+      "预热 Warming (宽限)",
+      "过缓 Slow (沉滞)",
+      "过速 Fast (急性)",
+      "失律 Arrhythmic (急性)",
+      "生态死亡 (不可逆)"
     )
     val legendW = gridPixelSize + 21 + legendLabels.map(textRenderer.getWidth(_)).max
     val textW = Seq(headerText, tel1, tel2, phaseLine).map(textRenderer.getWidth(_)).max
@@ -182,7 +184,7 @@ object MandateHud:
 
     // Color swatch legend beside the 7x7 grid
     val legendX = gridX + gridPixelSize + 10
-    val legendColors = Seq(ColCalmMaintained, ColCalmStagnant, ColStrained, ColOscillating, ColSpike, ColBurnout)
+    val legendColors = Seq(ColBeating, ColWarming, ColSlow, ColFast, ColArrhythmic, ColEcologicalDeath)
     legendColors.lazyZip(legendLabels).zipWithIndex.foreach { case ((col, label), idx) =>
       val ly = gridY + idx * 12
       context.fill(legendX, ly + 1, legendX + 7, ly + 8, col)
@@ -193,14 +195,13 @@ object MandateHud:
     val activeTick = centerEntry.flatMap(_.view.dialTick)
     val segW = 6
     val segGap = 2
+    // The old absolute/relative phase-window marks are gone with the
+    // six-way strike dispatch (note 11 §1.5): only the excitation phase still
+    // gates a strike verdict (SpikeSwallowed), so the bar is a plain dial.
     for tick <- 0 until 20 do
       val sx = gridX + tick * (segW + segGap)
       val isCurrent = activeTick.contains(tick)
-      val baseCol =
-        if tick >= 4 && tick <= 5 then 0xFF2B6E58 // absolute window [0.20, 0.30]
-        else if tick >= 8 && tick <= 11 then 0xFF355E88 // relative window [0.40, 0.60]
-        else 0xFF2E343E
-      val fillCol = if isCurrent then 0xFFFFF066 else baseCol
+      val fillCol = if isCurrent then 0xFFFFF066 else ColDialBase
       context.fill(sx, barY, sx + segW, barY + segH, fillCol)
       if isCurrent then
         drawBoxBorder(context, sx - 1, barY - 1, segW + 2, segH + 2, ColPlayerBorder)
@@ -227,20 +228,23 @@ object MandateHud:
         )
       }
 
+  /** Heartbeat-first tile colour (design note 11): the rhythm verdict is what
+    * the player reads; ecological death overrides it. Spikes no longer flash
+    * the tile — the beat's high phase is part of the beat.
+    */
   private def tileColor(viewOpt: Option[ClientCellView]): Int =
     viewOpt match
       case None => ColOutside
       case Some(v) =>
-        if v.isSpiking then ColSpike
+        if v.isBurnoutPhase then ColEcologicalDeath
         else
-          v.regime match
-            case Regime.Burnout => ColBurnout
-            case Regime.Oscillating => ColOscillating
-            case Regime.Strained => ColStrained
-            case Regime.Calm =>
-              v.phaseLabel match
-                case Some(PhaseLabel.Excitation) => ColSpike
-                case _ => if v.isSheltered then ColCalmMaintained else ColCalmStagnant
+          v.heartbeatOrdinal match
+            case 0 => ColWarming
+            case 1 => ColBeating
+            case 2 => ColFast
+            case 3 => ColSlow
+            case 4 => ColArrhythmic
+            case _ => ColOutside
 
   private def drawBoxBorder(
       context: DrawContext,

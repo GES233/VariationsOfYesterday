@@ -3,7 +3,6 @@ package moe.chestnut.awa.voy.inner.veins
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-import moe.chestnut.awa.voy.inner.event.PulseBookkeeping
 import moe.chestnut.awa.voy.mandate.BellRitual
 import moe.chestnut.awa.voy.mandate.BellRitual.BellStrikeOutcome
 
@@ -109,35 +108,35 @@ class MandateReadoutSpec:
     assertEquals(MycelialHealth.Intact, Readout.mycelialHealth(0.60))
     assertEquals(MycelialHealth.Intact, Readout.mycelialHealth(1.0))
 
-  @Test def `pulse window shelter and 20-division dial tick semantics`(): Unit =
-    val calmUnpulsed = CellReadout(
+  @Test def `heartbeat shelter and 20-division dial tick semantics`(): Unit =
+    val calmWarming = CellReadout(
       MandateCurrent(-1.2, -0.6, 0.05, 0.0),
       Regime.Calm,
       PhaseReading.Basin(PhaseLabel.Resting),
       baselineCalming = 0.0
     )
-    assertFalse(calmUnpulsed.isSheltered, "no fresh pulse -> stagnant")
+    assertTrue(calmWarming.isSheltered, "a fresh cell is in the Warming grace -> sheltered")
 
-    val calmMaintained = calmUnpulsed.copy(baselineCalming = 0.03)
-    assertFalse(
-      calmMaintained.isSheltered,
-      "c0 alone does not shelter: a fresh pulse window is required"
-    )
+    val calmMaintained = calmWarming.copy(baselineCalming = 0.03)
+    assertTrue(calmMaintained.isSheltered, "c0 is unrelated to shelter (decoupled, note 08/11)")
 
-    val pulsed = calmMaintained.copy(
-      pulseStamp = PulseStamp(shelterUntil = 40.0, cooldownUntil = 8.0),
-      simTime = 5.0
-    )
-    assertTrue(pulsed.isSheltered, "a fresh pulse window shelters the cell")
+    val silent = calmMaintained.copy(heartbeat = Heartbeat.Slow(Double.NaN))
+    assertFalse(silent.isSheltered, "no heartbeat -> stagnant")
 
-    val spikingPulsed = pulsed.copy(
+    val beating = calmMaintained.copy(heartbeat = Heartbeat.Beating(40.0, 0.1, BeatSource.Intrinsic))
+    assertTrue(beating.isSheltered, "a healthy beat shelters the cell")
+
+    val spikingBeating = beating.copy(
       current = MandateCurrent(1.9, 0.2, 0.6, 0.5),
       regime = Regime.Oscillating,
       phase = PhaseReading.Cycle(PhaseLabel.Excitation, 0.05)
     )
-    assertFalse(spikingPulsed.isSheltered, "a positive spike excursion suspends pulse shelter")
+    assertTrue(
+      spikingBeating.isSheltered,
+      "the beat's high phase is part of the shelter (note 11 section 1.3)"
+    )
 
-    val negativeOvershoot = pulsed.copy(
+    val negativeOvershoot = beating.copy(
       current = MandateCurrent(-1.9, 0.2, 0.6, 0.5),
       regime = Regime.Oscillating,
       phase = PhaseReading.Cycle(PhaseLabel.Resting, 0.75)
@@ -147,20 +146,20 @@ class MandateReadoutSpec:
       "the negative repolarisation overshoot (|v| > 1.8, v < 0) is NOT a spike"
     )
 
-    val deadMycelium = pulsed.copy(sustenance = 0.0)
+    val deadMycelium = beating.copy(sustenance = 0.0)
     assertFalse(deadMycelium.isSheltered, "a dead mycelial network cannot be sheltered")
 
-    val collapsedOffset = pulsed.copy(
+    val collapsedOffset = beating.copy(
       phase = PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee)
     )
     assertFalse(collapsedOffset.isSheltered, "a cell with collapsed slow offset cannot be sheltered")
 
-    val refractoryCycle = pulsed.copy(
+    val refractoryCycle = beating.copy(
       current = MandateCurrent(0.5, 0.8, 0.6, 0.5),
       regime = Regime.Oscillating,
       phase = PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory, 0.25)
     )
-    assertTrue(refractoryCycle.isSheltered, "between spikes, pulse shelter holds")
+    assertTrue(refractoryCycle.isSheltered, "between spikes, the beat shelters")
     assertEquals(Some(5), refractoryCycle.dialTick, "0.25 of 20 divisions is tick 5")
     assertEquals(None, calmMaintained.dialTick, "resting basin has no cycle dial tick")
 
@@ -194,7 +193,7 @@ class MandateReadoutSpec:
       baselineCalming = 0.0
     )
     val reanchorOutcome = BellRitual.evaluateBellStrike(oscRefractoryUnanchored)
-    assertEquals(BellStrikeOutcome.RefractoryReanchored, reanchorOutcome)
+    assertEquals(BellStrikeOutcome.AnchoredOrMaintained, reanchorOutcome)
     assertTrue(reanchorOutcome.anchorsC0, "striking in refractory window re-anchors c0")
     assertEquals(BellRitual.BellBaselineCalming, reanchorOutcome.baselineCalming, 1e-12)
 
@@ -205,9 +204,11 @@ class MandateReadoutSpec:
       baselineCalming = 0.0
     )
     val burnoutOutcome = BellRitual.evaluateBellStrike(burnoutCell)
-    assertEquals(BellStrikeOutcome.SaturatedNoAnchor, burnoutOutcome)
-    assertFalse(burnoutOutcome.anchorsC0, "saturated cell cannot re-anchor c0 while stress stays high")
-    assertEquals(PulseBookkeeping.Counted, burnoutOutcome.bookkeeping)
+    assertEquals(BellStrikeOutcome.AnchoredOrMaintained, burnoutOutcome)
+    assertTrue(
+      burnoutOutcome.anchorsC0,
+      "saturated but living cells anchor: re-anchoring is part of the rescue chain (ruling 13)"
+    )
 
   @Test def `bell strike on dead mycelium answers nothing`(): Unit =
     val deadCell = CellReadout(
@@ -220,20 +221,28 @@ class MandateReadoutSpec:
     val outcome = BellRitual.evaluateBellStrike(deadCell)
     assertEquals(BellStrikeOutcome.DeadMyceliumBurnout, outcome)
     assertFalse(outcome.anchorsC0)
-    assertEquals(PulseBookkeeping.PhysicsOnly, outcome.bookkeeping)
     assertFalse(outcome.triggersOverloadPenalty)
 
-  @Test def `striking inside the cooldown interval triggers overload backlash`(): Unit =
-    val inCooldown = CellReadout(
+  @Test def `striking inside the overdrive guard triggers overload backlash`(): Unit =
+    val inGuard = CellReadout(
       MandateCurrent(-1.2, -0.6, 0.05, 0.0),
       Regime.Calm,
       PhaseReading.Basin(PhaseLabel.Resting),
       baselineCalming = 0.03,
-      pulseStamp = PulseStamp(shelterUntil = 45.0, cooldownUntil = 13.0),
+      lastBellStrikeAt = 2.0,
       simTime = 6.0
     )
-    val outcome = BellRitual.evaluateBellStrike(inCooldown)
+    val outcome = BellRitual.evaluateBellStrike(inGuard)
     assertEquals(BellStrikeOutcome.PulseOverloadBurnout, outcome)
     assertFalse(outcome.anchorsC0)
-    assertEquals(PulseBookkeeping.Counted, outcome.bookkeeping)
     assertTrue(outcome.triggersOverloadPenalty)
+
+    val guardExpired = inGuard.copy(simTime = 11.0) // 9 s later > 8 s guard
+    assertEquals(BellStrikeOutcome.AnchoredOrMaintained, BellRitual.evaluateBellStrike(guardExpired))
+
+    val neverStruck = inGuard.copy(lastBellStrikeAt = Double.NaN)
+    assertEquals(
+      BellStrikeOutcome.AnchoredOrMaintained,
+      BellRitual.evaluateBellStrike(neverStruck),
+      "a fresh cell has no guard history"
+    )

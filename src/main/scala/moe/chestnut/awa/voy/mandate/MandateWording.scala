@@ -92,17 +92,15 @@ object MandateWording:
       debugNumbers: Boolean
   ): String =
     val shelter =
-      if r.isSheltered then "§a脉动庇护(免除沉滞)"
-      else "§c沉滞生效(太久无脉冲/尖峰/烧毁)"
+      if r.isSheltered then "§a心跳庇护(节律在线)"
+      else "§c沉滞生效(无心跳/过缓/失律)"
     val base =
       f"§e[验山读数] [$chunkX%d,$chunkZ%d] 态:${regimeWord(r.regime)} 相:${formatPhaseDial(r.phase)} 菌网:${r.mycelium.word} | $shelter"
     if debugNumbers then
       val fracText = r.phase match
         case PhaseReading.Cycle(_, frac) => f" frac=$frac%.3f"
         case _ => ""
-      val windowLeft = r.pulseStamp.remainingShelterAt(r.simTime)
-      val cdLeft = r.pulseStamp.remainingCooldownAt(r.simTime)
-      // Heartbeat axis observability (design note 11, Step 0/1: output only).
+      // Heartbeat axis observability (design note 11).
       val hbText = r.heartbeat match
         case Heartbeat.Beating(per, duty, src) =>
           f" hb=Beating($src) per=$per%.1f duty=$duty%.3f"
@@ -113,7 +111,7 @@ object MandateWording:
           f" hb=Arrhythmic per=$per%.1f duty=$duty%.3f"
         case Heartbeat.Warming => " hb=Warming"
       base +
-        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.dissonance}%.2f p=${r.pulseDrive}%.2f win=${windowLeft}%.1f cd=${cdLeft}%.1f$fracText$hbText]"
+        f" §8[s=${r.current.stress}%.3f c0=${r.baselineCalming}%.3f q=${r.current.activity}%.3f M=${r.sustenance}%.2f v=${r.current.dissonance}%.2f p=${r.pulseDrive}%.2f$fracText$hbText]"
     else base
 
   def regimeWord(regime: Regime): String = regime match
@@ -145,42 +143,30 @@ object MandateWording:
       r: CellReadout,
       outcome: BellStrikeOutcome
   ): String =
-    val win = VoyConfig.current.pulseParam.shelterWindow
     outcome match
       case BellStrikeOutcome.DeadMyceliumBurnout =>
         f"§4[叩钟无应] [$chunkX%d,$chunkZ%d] 菌网枯绝或地脉失能，钟声如击死肉，连片回音都没有——须先泄压降酸、再接种菌丝"
 
       case BellStrikeOutcome.PulseOverloadBurnout =>
-        f"§c[脉冲过密] [$chunkX%d,$chunkZ%d] 钟声未息又起一记，地脉反震使庇护溃散——稍候片刻再叩"
-
-      case BellStrikeOutcome.SaturatedNoAnchor =>
-        f"§4[叩钟无锚] [$chunkX%d,$chunkZ%d] 地脉饱和失能 (Burnout)，无法重锚 c0；但本次脉冲仍压住沉滞约 ${win}%.0f 息——根治须持续泄压"
+        f"§c[叩钟过密] [$chunkX%d,$chunkZ%d] 钟声未息又起一记，过驱动反震沿铜钲回撞上臂——稍候片刻再叩"
 
       case BellStrikeOutcome.SpikeSwallowed =>
         val tick = r.dialTick.getOrElse(0)
-        f"§c[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 (Excitation) -> 正处尖峰爆发期，钟声被吞没：c0 未重锚、本次不计脉动(需候不应期推迟窗口)"
-
-      case BellStrikeOutcome.RefractoryReanchored =>
-        val tick = r.dialTick.getOrElse(0)
-        val label = r.phase match
-          case PhaseReading.Cycle(l, _) => l.toString
-          case _ => "Refractory"
-        f"§a[叩钟重锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 命中推迟刻度，c0已重锚 ($BellBaselineCalming%.2f)，下一次尖峰延后，沉滞退去约 ${win}%.0f 息"
+        f"§e[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 (Excitation) -> 正处尖峰爆发期，钟声被地鸣吞没：c0 未重锚，这一拍也没能校进来"
 
       case BellStrikeOutcome.AnchoredOrMaintained =>
         r.phase match
           case PhaseReading.Cycle(label, _) =>
             val tick = r.dialTick.getOrElse(0)
-            val effectHint = label match
+            label match
               case PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory =>
-                "§a命中推迟刻度，下一次地鸣尖峰延后"
-              case PhaseLabel.Excitation =>
-                "§c正处尖峰爆发期，钟声被地鸣吞没"
+                f"§b[叩钟校拍] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 命中不应期刻度，c0 已重锚，节拍被校正"
               case PhaseLabel.Resting =>
-                "§7处于恢复晚期，脉冲被平缓吸收"
-            f"§b[叩钟谐振] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> $effectHint，沉滞退去约 ${win}%.0f 息"
+                f"§7[叩钟静息] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 处于恢复晚期，脉冲被平缓吸收"
+              case PhaseLabel.Excitation =>
+                f"§c[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 正处尖峰爆发期，钟声被地鸣吞没"
           case _ =>
-            f"§b[叩钟镇山] [$chunkX%d,$chunkZ%d] 维持源已锚定 (c0=$BellBaselineCalming%.2f)，一记脉动荡开，沉滞退去约 ${win}%.0f 息"
+            f"§b[叩钟起搏] [$chunkX%d,$chunkZ%d] 维持源已锚定 (c0=$BellBaselineCalming%.2f)，一记脉动唤起地鸣——守住节拍，山便醒着"
 
   def formatPhaseShort(phase: PhaseReading): String =
     phase match

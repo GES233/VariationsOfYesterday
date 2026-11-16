@@ -25,15 +25,18 @@ final case class ClientCellView(
     c0Sheltered: Boolean,
     seepTier: MandatePhenomena.YellowSeepTier,
     dialTick: Option[Int],
-    phaseLabel: Option[PhaseLabel]
+    phaseLabel: Option[PhaseLabel],
+    /** Heartbeat category wire ordinal (`Heartbeat.wireOrdinal`), packed into
+      * the flags byte (bits 4-6). Available to every player, not just debug.
+      */
+    heartbeatOrdinal: Int = 0
 )
 
 object ClientCellView:
   def fromReadout(
       chunkX: Int,
       chunkZ: Int,
-      readout: CellReadout,
-      model: ShelterModel = ShelterModel.Window
+      readout: CellReadout
   ): ClientCellView =
     val phaseLabel = readout.phase match
       case PhaseReading.Cycle(lbl, _) => Some(lbl)
@@ -44,13 +47,14 @@ object ClientCellView:
       chunkZ = chunkZ,
       regime = readout.regime,
       mycelium = readout.mycelium,
-      isSheltered = readout.sheltered(model),
+      isSheltered = readout.isSheltered,
       isSpiking = readout.isSpiking,
       isBurnoutPhase = MandatePhenomena.hasSilentBlight(readout),
       c0Sheltered = readout.baselineCalming >= MandatePhenomena.C0ShelterLevel,
       seepTier = MandatePhenomena.classifySeepTier(readout),
       dialTick = readout.dialTick,
-      phaseLabel = phaseLabel
+      phaseLabel = phaseLabel,
+      heartbeatOrdinal = Heartbeat.wireOrdinal(readout.heartbeat)
     )
 
 /** Full numerical telemetry attached only for dev environments or OP players. */
@@ -61,16 +65,13 @@ final case class DebugCellTelemetry(
     sustenance: Double,
     baselineCalming: Double,
     pulseDrive: Double,
-    remainingShelter: Double,
-    remainingCooldown: Double,
     simTime: Double,
     phaseKind: Byte,
     phaseFraction: Double,
     undefinedReason: Option[UndefinedReason],
-    // Heartbeat axis observability (design note 11, Step 0/1: additive;
-    // remainingShelter/remainingCooldown are removed in Step 2). Options, not
-    // NaN sentinels: IEEE NaN != NaN would break payload equality.
-    heartbeatOrdinal: Int = 0,
+    // Heartbeat axis observability (design note 11): precise period/duty live
+    // here; the category rides on ClientCellView's flags byte for everyone.
+    // Options, not NaN sentinels: IEEE NaN != NaN would break payload equality.
     beatPeriod: Option[Double] = None,
     beatDuty: Option[Double] = None
 ):
@@ -93,13 +94,10 @@ object DebugCellTelemetry:
       sustenance = readout.sustenance,
       baselineCalming = readout.baselineCalming,
       pulseDrive = readout.pulseDrive,
-      remainingShelter = readout.pulseStamp.remainingShelterAt(readout.simTime),
-      remainingCooldown = readout.pulseStamp.remainingCooldownAt(readout.simTime),
       simTime = readout.simTime,
       phaseKind = kind,
       phaseFraction = frac,
       undefinedReason = reason,
-      heartbeatOrdinal = Heartbeat.wireOrdinal(readout.heartbeat),
       beatPeriod = Heartbeat.periodOf(readout.heartbeat),
       beatDuty = Heartbeat.dutyOf(readout.heartbeat)
     )
@@ -156,7 +154,8 @@ object MandateChunkSyncPayload:
       (if v.isSheltered then FlagSheltered else 0) |
         (if v.isSpiking then FlagSpiking else 0) |
         (if v.isBurnoutPhase then FlagBurnoutPhase else 0) |
-        (if v.c0Sheltered then FlagC0Sheltered else 0)
+        (if v.c0Sheltered then FlagC0Sheltered else 0) |
+        ((v.heartbeatOrdinal & 0x7) << 4)
     buf.writeByte(flags)
     buf.writeByte(v.seepTier.ordinal)
     buf.writeByte(v.dialTick.getOrElse(-1))
@@ -172,13 +171,10 @@ object MandateChunkSyncPayload:
         buf.writeDouble(d.sustenance)
         buf.writeDouble(d.baselineCalming)
         buf.writeDouble(d.pulseDrive)
-        buf.writeDouble(d.remainingShelter)
-        buf.writeDouble(d.remainingCooldown)
         buf.writeDouble(d.simTime)
         buf.writeByte(d.phaseKind)
         buf.writeDouble(d.phaseFraction)
         buf.writeByte(d.undefinedReason.map(_.ordinal).getOrElse(-1))
-        buf.writeByte(d.heartbeatOrdinal)
         buf.writeBoolean(d.beatPeriod.isDefined)
         d.beatPeriod.foreach(buf.writeDouble)
         buf.writeBoolean(d.beatDuty.isDefined)
@@ -206,7 +202,8 @@ object MandateChunkSyncPayload:
       c0Sheltered = (flags & FlagC0Sheltered) != 0,
       seepTier = seepTier,
       dialTick = dialTick,
-      phaseLabel = phaseLabel
+      phaseLabel = phaseLabel,
+      heartbeatOrdinal = (flags >> 4) & 0x7
     )
     val hasDebug = buf.readBoolean()
     val debug =
@@ -218,15 +215,12 @@ object MandateChunkSyncPayload:
         val sustenance = buf.readDouble()
         val baselineCalming = buf.readDouble()
         val pulseDrive = buf.readDouble()
-        val remainingShelter = buf.readDouble()
-        val remainingCooldown = buf.readDouble()
         val simTime = buf.readDouble()
         val phaseKind = buf.readByte()
         val phaseFraction = buf.readDouble()
         val rawReason = buf.readByte().toInt
         val undefinedReason =
           if rawReason < 0 then None else Some(UndefinedReason.fromOrdinal(rawReason))
-        val heartbeatOrdinal = buf.readByte() & 0xff
         val beatPeriod = if buf.readBoolean() then Some(buf.readDouble()) else None
         val beatDuty = if buf.readBoolean() then Some(buf.readDouble()) else None
         Some(
@@ -237,13 +231,10 @@ object MandateChunkSyncPayload:
             sustenance = sustenance,
             baselineCalming = baselineCalming,
             pulseDrive = pulseDrive,
-            remainingShelter = remainingShelter,
-            remainingCooldown = remainingCooldown,
             simTime = simTime,
             phaseKind = phaseKind,
             phaseFraction = phaseFraction,
             undefinedReason = undefinedReason,
-            heartbeatOrdinal = heartbeatOrdinal,
             beatPeriod = beatPeriod,
             beatDuty = beatDuty
           )

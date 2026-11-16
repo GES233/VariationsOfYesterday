@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Assertions.*
 
 import moe.chestnut.awa.voy.inner.action.{ActionMsgPool, MandateActionProtocol}
 import moe.chestnut.awa.voy.inner.actor.ActorRef
-import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg, PulseBookkeeping}
+import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 
 /** Wiring contract of [[MandateAgent]]: tick events drive integration
   * deterministically, one published snapshot per tick, no tick no integration;
@@ -229,7 +229,7 @@ class MandateAgentSpec:
     )
     assertEquals(Regime.Calm, readouts.get()(origin).regime)
 
-  @Test def reRegisteringCellClearsPulseBookkeeping(): Unit =
+  @Test def reRegisteringCellClearsBellGuardAndRhythm(): Unit =
     val readouts =
       new AtomicReference[Map[CellCoord, CellReadout]](Map.empty)
     val latchRef = new AtomicReference[CountDownLatch](new CountDownLatch(1))
@@ -245,19 +245,25 @@ class MandateAgentSpec:
     agent ! EventMsg.FirePulse(origin, 25.0)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(awaitPhase(latchRef))
-    assertTrue(
-      readouts.get()(origin).isPulseSheltered,
-      "a counted pulse must open the pulse stamp shelter window"
+    assertEquals(
+      0.0,
+      readouts.get()(origin).lastBellStrikeAt,
+      1e-12,
+      "a bell strike stamps the overdrive guard at the event's own simTime (before the tick)"
     )
 
     latchRef.set(new CountDownLatch(1))
     agent ! EventMsg.RegisterCell(origin)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(awaitPhase(latchRef))
+    assertTrue(
+      readouts.get()(origin).lastBellStrikeAt.isNaN,
+      "re-registration resets the dynamics, and the guard stamp goes with it"
+    )
     assertEquals(
-      PulseStamp.zero,
-      readouts.get()(origin).pulseStamp,
-      "re-registration resets the dynamics, and the pulse stamp goes with it"
+      Heartbeat.Warming,
+      readouts.get()(origin).heartbeat,
+      "the rhythm memory is fresh again after re-registration"
     )
 
   private def awaitPhase(latchRef: AtomicReference[CountDownLatch]): Boolean =
@@ -283,7 +289,7 @@ class MandateAgentSpec:
       "a freshly observed cell is in the Warming grace (design note 11)"
     )
     assertTrue(
-      readouts.get()(origin).isShelteredByHeartbeat,
+      readouts.get()(origin).isSheltered,
       "the Warming grace shelters under the heartbeat model"
     )
 
@@ -438,7 +444,7 @@ class MandateAgentSpec:
     Thread.sleep(300)
     assertEquals(1.0, grid.cells(origin).sustenance, 1e-12)
 
-  @Test def wellSpacedPulsesOpenShelterWindows(): Unit =
+  @Test def bellStrikeStampsTheGuardAndKeepsWarmingShelter(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
     val latch = new CountDownLatch(2)
     val grid = singleCellGrid(mkCell(0.0))
@@ -449,27 +455,27 @@ class MandateAgentSpec:
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
     val stages = seen.toArray(Array.empty[CellReadout]).toSeq
-    assertFalse(stages.head.isPulseSheltered)
-    assertTrue(stages.last.isPulseSheltered)
-    assertTrue(stages.last.pulseDrive > 0.0)
+    assertTrue(stages.head.isSheltered, "a fresh cell rests in the Warming grace")
+    assertTrue(stages.head.lastBellStrikeAt.isNaN, "no strike yet -> no guard stamp")
+    assertEquals(0.05, stages.last.lastBellStrikeAt, 1e-12, "the strike stamps the guard at its own simTime")
+    assertTrue(stages.last.pulseDrive > 0.0, "the pulse enters the equations")
+    assertTrue(stages.last.isSheltered, "Warming shelter is not a strike reward")
 
-  @Test def swallowedStrikeDoesNotOpenAWindow(): Unit =
+  @Test def linkPulsesDoNotStampTheOverdriveGuard(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
     val latch = new CountDownLatch(2)
     val grid = singleCellGrid(mkCell(0.0))
     val agent = spawnReadoutLog(grid, seen, latch)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
-    agent ! EventMsg.FirePulse(origin, 12.0, bookkeeping = PulseBookkeeping.PhysicsOnly)
+    agent ! EventMsg.FirePulse(origin, 0.5, PulseTransmitter.CrystalLink)
     agent ! EventMsg.TickArrived(0.05, 20.0f)
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
     val stages = seen.toArray(Array.empty[CellReadout]).toSeq
-    assertFalse(stages.last.isPulseSheltered)
-    assertFalse(stages.last.isSheltered)
+    assertTrue(stages.last.lastBellStrikeAt.isNaN, "link pulses are autonomous physics, no guard")
     assertTrue(stages.last.pulseDrive > 0.0)
-    assertEquals(PulseStamp.zero, stages.last.pulseStamp)
 
-  @Test def rapidPulsesCollapseShelterWindowWithoutFakingBurnoutPhase(): Unit =
+  @Test def rapidStrikesKeepTheGuardFreshWithoutEngineSidePunishment(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
     val latch = new CountDownLatch(1)
     val grid = singleCellGrid(mkCell(0.0))
@@ -480,9 +486,8 @@ class MandateAgentSpec:
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
     val r = seen.toArray(Array.empty[CellReadout]).last
-    assertFalse(r.isPulseSheltered, "striking inside cooldown collapses the shelter window")
-    assertFalse(r.isSheltered, "an over-pulsed cell grants no shelter")
-    assertTrue(r.pulseStamp.isInCooldownAt(r.simTime), "the cooldown remains active")
+    assertEquals(0.0, r.lastBellStrikeAt, 1e-12, "every strike refreshes the guard stamp (pre-tick simTime)")
+    assertTrue(r.isSheltered, "overdrive punishment is the wiring layer's verdict, not the engine's")
 
   @Test def deadMyceliumIgnoresPulsesEntirely(): Unit =
     val seen = new java.util.concurrent.ConcurrentLinkedQueue[CellReadout]()
@@ -495,7 +500,8 @@ class MandateAgentSpec:
     assertTrue(latch.await(5, TimeUnit.SECONDS))
 
     val r = seen.toArray(Array.empty[CellReadout]).last
-    assertFalse(r.isPulseSheltered, "a dead network carries no pulse: no window is opened")
+    assertTrue(r.lastBellStrikeAt.isNaN, "dead land is not guarded: dead meat gives no echo")
+    assertFalse(r.isSheltered)
     assertEquals(
       PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee),
       r.phase

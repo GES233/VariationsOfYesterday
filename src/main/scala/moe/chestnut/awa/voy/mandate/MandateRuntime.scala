@@ -10,7 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import moe.chestnut.awa.voy.inner.action.MandateActionProtocol
 import moe.chestnut.awa.voy.inner.actor.ActorRef
-import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg, PulseBookkeeping}
+import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 import moe.chestnut.awa.voy.inner.veins.*
 
 /** Game-side bridge between Minecraft and the mandate engine actor: owns the
@@ -58,10 +58,9 @@ object MandateRuntime:
   def firePulseAt(
       chunkX: Int,
       chunkZ: Int,
-      area: Double,
-      bookkeeping: PulseBookkeeping = PulseBookkeeping.Counted
+      area: Double
   ): Unit =
-    tell(EventMsg.FirePulse(worldToGrid(chunkX, chunkZ), area, bookkeeping = bookkeeping))
+    tell(EventMsg.FirePulse(worldToGrid(chunkX, chunkZ), area))
 
   def setBaselineCalmingAt(chunkX: Int, chunkZ: Int, level: Double): Unit =
     tell(EventMsg.SetBaselineCalming(worldToGrid(chunkX, chunkZ), level))
@@ -114,7 +113,7 @@ object MandateRuntime:
         matches
       }
 
-      val (grid, links, initialSimTime, initialPulseStamps) = restored match
+      val (grid, links, initialSimTime, initialBeatStats) = restored match
         case Some(snap) =>
           logger.info(
             s"Restoring mandate lattice from saved state " +
@@ -122,20 +121,20 @@ object MandateRuntime:
               s"simTime = ${snap.simTime})."
           )
           val grid = MandateSnapshot.restoreGrid(snap)
-          val pulseStamps = MandateSnapshot.restorePulseStamps(snap)
+          val beatStats = MandateSnapshot.restoreBeatStats(snap)
           logSavedParameters(snap)
-          (grid, snap.links, snap.simTime, pulseStamps)
+          (grid, snap.links, snap.simTime, beatStats)
         case None =>
           logger.info(
             s"Starting fresh mandate lattice (${width}x$height cells); " +
               s"parameters from config `${VoyConfig.FileName}` " +
               "(core defaults if absent)."
           )
-          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, PulseStamp])
+          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, BeatStats])
 
       persistence.geometry = expectedGeometry
       persistence.snapshot = Some(
-        MandateSnapshot.capture(grid, links, initialSimTime, initialPulseStamps)
+        MandateSnapshot.capture(grid, links, initialSimTime, initialBeatStats)
       )
       persistence.markDirty()
 
@@ -156,9 +155,8 @@ object MandateRuntime:
             val pending = flushLatch.getAndSet(null)
             if pending != null then pending.countDown()
           },
-          pulseParam = VoyConfig.current.pulseParam,
           heartbeatParam = VoyConfig.current.heartbeatParam,
-          initialPulseStamps = initialPulseStamps
+          initialBeatStats = initialBeatStats
         )
       )
   }

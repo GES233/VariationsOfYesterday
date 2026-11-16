@@ -36,23 +36,26 @@ import moe.chestnut.awa.voy.inner.veins.*
   *  - **World -> Mandate (1:N channel mapping)**:
   *    - Breaking stone / ore blocks injects land stress (`StressInject`)
   *      with immediate sub-threshold feedback inside the active lattice;
-  *    - Ringing a `Blocks.BELL` establishes baseline calming (`c0 = 0.03`)
-  *      and fires an alpha-synapse pulse (`FirePulse(area = 12.0)`);
+  *    - Ringing a `Blocks.BELL` paces/corrects the cell's heartbeat, anchors
+  *      baseline calming (`c0 = 0.03`) and fires an alpha-synapse pulse
+  *      (`FirePulse(area = 12.0)`); over-rapid striking recoils on the
+  *      striker (overdrive guard, note 11 §1.5);
   *      breaking a Bell collapses `c0` in that chunk (`c0 = 0.0`).
   *  - **Diegetic Readout**:
   *    - Right-clicking a block while holding a Clock or Compass reads out
   *      the chunk's `Regime`, `PhaseReading` (with 20-division dial tick),
   *      and `c0` shelter status.
   *  - **Mandate -> Overworld (`沉滞` Stagnation & Spike actions)**:
-  *    - Chunks without a fresh pulse-window shelter are stagnated: the
-  *      vanilla *economy* sags (trade prices, breeding, golem summons, crop
-  *      growth — see `MandateEconomy` and the mixins), and nearby villagers
-  *      visibly wear `voy:stagnation`. The baseline tier never touches the
-  *      player's body; while the ground spikes (or sits in saturated
-  *      burnout) the pressure turns bodily: players get
-  *      `voy:stagnation_spike` (`×0.09` block break speed), plus `SLOWNESS`
-  *      and ash particles. `c0` no longer gates stagnation: the source is
-  *      "too long without a pulse" (pulse-shelter model, note 08);
+  *    - Chunks without a living heartbeat (Slow / Fast / Arrhythmic, note 11)
+  *      are stagnated: the vanilla *economy* sags (trade prices, breeding,
+  *      golem summons, crop growth — see `MandateEconomy` and the mixins),
+  *      and nearby villagers visibly wear `voy:stagnation`. The baseline tier
+  *      never touches the player's body; while the rhythm runs acute (Fast /
+  *      Arrhythmic) or the ground sits in saturated burnout the pressure
+  *      turns bodily: players get `voy:stagnation_spike` (`×0.09` block
+  *      break speed), plus `SLOWNESS` and ash particles. `c0` no longer
+  *      gates stagnation: the source is the heartbeat rhythm itself
+  *      (heartbeat-shelter model, note 11);
   *    - Outbound `CellSpikeTriggered` and `RegimeTransitioned` actions produce
   *      audible tremors and ash plumes on the server thread.
   *  - **Sensory phenomena (design note 06 §3)**: the world itself is the
@@ -183,7 +186,7 @@ object MandateOverworld:
             0.5f
           )
           player.sendMessage(
-            Text.literal(f"§c[旧日变奏] 镇山钟损毁：区块 [$chunkX%d, $chunkZ%d] 维持源 (c0) 坍塌，失去镇山钟将无法续上脉动庇护"),
+            Text.literal(f"§c[旧日变奏] 镇山钟损毁：区块 [$chunkX%d, $chunkZ%d] 维持源 (c0) 坍塌，失锚的地脉将难以守住心跳节拍"),
             true
           )
         else
@@ -356,27 +359,20 @@ object MandateOverworld:
               ActionResult.SUCCESS
         else if state.isOf(Blocks.BELL) then
           val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-          val outcome = BellRitual.evaluateBellStrike(readout)
+          val outcome = BellRitual.evaluateBellStrike(readout, VoyConfig.current.heartbeatParam)
           if outcome.anchorsC0 then
             MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, outcome.baselineCalming)
-          // Physics always applies; the pulse ledger only records arrivals the
-          // bookkeeping axis counts (SpikeSwallowed is PhysicsOnly).
-          MandateRuntime.firePulseAt(
-            chunkX,
-            chunkZ,
-            outcome.pulseArea,
-            bookkeeping = outcome.bookkeeping
-          )
-          // Acute pulse-overload backlash (design note 08): over-rapid pulsing
-          // drives the cell into a transient overload lockout; the striker
-          // feels the recoil immediately, and the chunk's tolerance makes
-          // every later pulse shelter stagnation for a shorter window.
+          // Physics always applies (the bell always sounds); the guard stamp
+          // is recorded engine-side from the Bell transmitter (note 11 §1.5).
+          MandateRuntime.firePulseAt(chunkX, chunkZ, outcome.pulseArea)
+          // Acute overdrive backlash (design note 11 §1.5 row 2): striking
+          // inside the guard recoils on the striker immediately.
           if outcome.triggersOverloadPenalty then
             val serverWorld = world.asInstanceOf[ServerWorld]
             player.addStatusEffect(
               new StatusEffectInstance(
                 MandateEffects.PulseSaturationEntry,
-                VoyConfig.current.pulseParam.overloadPenaltyTicks,
+                VoyConfig.current.heartbeatParam.overloadPenaltyTicks,
                 0,
                 false,
                 true,
@@ -413,8 +409,8 @@ object MandateOverworld:
 
   /** Periodic Overworld check (runs on server thread): applies or clears the
     * `沉滞` (Stagnation) debuff on players and nearby villagers depending on
-    * whether their chunk is currently sheltered by a fresh pulse window
-    * (pulse-shelter model, design note 08).
+    * whether their chunk currently has a living heartbeat (heartbeat-shelter
+    * model, design note 11).
     */
   def onServerTick(server: MinecraftServer): Unit =
     if server.getTicks % StagnationReapplyTicks != 0 then return
@@ -439,8 +435,7 @@ object MandateOverworld:
     val chunkX = player.getChunkPos.x
     val chunkZ = player.getChunkPos.z
     val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
-    val model = VoyConfig.current.shelterModel
-    val sheltered = readout.sheltered(model)
+    val sheltered = readout.isSheltered
 
     announceShelterChange(player, sheltered)
 
@@ -448,7 +443,7 @@ object MandateOverworld:
       player.removeStatusEffect(MandateEffects.StagnationEntry)
       player.removeStatusEffect(MandateEffects.StagnationSpikeEntry)
     else
-      val acuteBodyStrain = MandatePhenomena.shouldApplyAcuteBodyStrain(readout, model)
+      val acuteBodyStrain = MandatePhenomena.shouldApplyAcuteBodyStrain(readout)
       if acuteBodyStrain then
         player.addStatusEffect(
           new StatusEffectInstance(
@@ -614,8 +609,8 @@ object MandateOverworld:
     val previous = lastShelter.put(player.getUuid, java.lang.Boolean.valueOf(maintained))
     if previous == null || previous.booleanValue == maintained then return
     val line =
-      if maintained then "§a一记脉动荡开，沉滞退去，寨里的营生又活络了"
-      else "§7太久没有脉动：沉滞漫上来，寨里的营生蔫了下去"
+      if maintained then "§a地鸣的心跳续上了：节律在线，沉滞退去，寨里的营生又活络了"
+      else "§c心跳断了或乱了：沉滞漫上来，寨里的营生蔫了下去"
     player.sendMessage(Text.literal(line), true)
 
   /** Handle outbound actions drained from the Mandate actor on the server thread. */

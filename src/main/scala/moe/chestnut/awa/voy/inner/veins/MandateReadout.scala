@@ -168,10 +168,8 @@ end Readout
   * Exposes three orthogonal dimensions without leaking internal parameter bags:
   *   1. **Dynamics**: `regime`, `phase`, `isSpiking`, `isSlowOffsetBelowKnee`
   *   2. **Mycelium**: `mycelium` (`Intact` / `Damaged` / `Dead`), `isToxicSoil`
-  *   3. **Shelter**: `isSheltered` (active `pulseStamp` window on viable,
-  *      non-collapsed, non-spiking ground) — legacy window model; the
-  *      heartbeat model (design note 11) is `isShelteredByHeartbeat`, with
-  *      `sheltered(model)` dispatching between them (Step 1 A/B switch)
+  *   3. **Shelter**: `isSheltered` — the heartbeat model (design note 11 §1.3):
+  *      a beating or warming rhythm on viable, non-collapsed ground
   */
 final case class CellReadout(
     current: MandateCurrent,
@@ -180,8 +178,11 @@ final case class CellReadout(
     sustenance: Double = 1.0,
     baselineCalming: Double = 0.0,
     pulseDrive: Double = 0.0,
-    pulseStamp: PulseStamp = PulseStamp.zero,
     heartbeat: Heartbeat = Heartbeat.Warming,
+    /** simTime of the last bell strike on this cell; NaN = none. Drives the
+      * bell's overdrive guard (design note 11 §1.5, `overdriveGuard`).
+      */
+    lastBellStrikeAt: Double = Double.NaN,
     simTime: Double = 0.0,
     sustenanceFloor: Double = StressParam().sustenanceFloor,
     toxicityThreshold: Double = StressParam().sustenanceBurnThreshold
@@ -200,33 +201,16 @@ final case class CellReadout(
   /** Whether soil stress is at or above the acid burn threshold that kills inoculum. */
   def isToxicSoil: Boolean = current.stress >= toxicityThreshold
 
-  /** Whether the cell has an active pulse shelter window right now. */
-  def isPulseSheltered: Boolean = pulseStamp.isShelteredAt(simTime)
-
-  /** Dimension 3: Whether this chunk is sheltered from `沉滞` (Stagnation). */
-  def isSheltered: Boolean =
-    isPulseSheltered &&
-      mycelium.isViable &&
-      !isSlowOffsetBelowKnee &&
-      !isSpiking
-
-  /** Dimension 3 under the heartbeat model (design note 11 §1.3): the beat
-    * itself shelters. `Warming` grace shelters (it replaces the old "first
-    * strike opens a window" immediacy); a spike phase deliberately does NOT
-    * suspend shelter — the beat's high phase is part of it.
+  /** Dimension 3: Whether this chunk is sheltered from `沉滞` (Stagnation).
+    * The beat itself shelters (design note 11 §1.3). `Warming` grace shelters
+    * (it replaces the old "first strike opens a window" immediacy); a spike
+    * phase deliberately does NOT suspend shelter — the beat's high phase is
+    * part of it.
     */
-  def isShelteredByHeartbeat: Boolean =
+  def isSheltered: Boolean =
     (heartbeat.isBeating || heartbeat.isWarming) &&
       mycelium.isViable &&
       !isSlowOffsetBelowKnee
-
-  /** A/B dispatch on the active shelter model (Step 1 switch; the `Window`
-    * branch is deleted in Step 2).
-    */
-  def sheltered(model: ShelterModel): Boolean =
-    model match
-      case ShelterModel.Window    => isSheltered
-      case ShelterModel.Heartbeat => isShelteredByHeartbeat
 
   /** 20-division mountain dial tick (`0..19`) when in a regular cycle. */
   def dialTick: Option[Int] = Readout.dialTick(phase)
@@ -289,6 +273,20 @@ class PhaseTracker(
     */
   def beatStats: BeatStats =
     BeatStats(periodHistory, lastDutyV, lastCross, bornAtT)
+
+  /** Restore rhythm statistics from a snapshot (design note 11 risk 2: a
+    * reload must not reset every cell to a fresh Warming grace). The raw
+    * crossing list and the excursion counter are not persisted — only the
+    * period ring, duty, and the Warming anchors matter downstream.
+    */
+  def restoreBeatStats(stats: BeatStats): Unit =
+    periodHistory = stats.periods.take(PhaseTracker.PeriodHistoryCap)
+    lastDutyV = stats.lastDuty
+    lastCross = stats.lastCross
+    bornAtT = stats.bornAt
+    cycleStart = stats.lastCross
+    highTime = 0.0
+    crossTimes = Nil
 
   def observe(t: Double, cur: MandateCurrent, sustenance: Double = 1.0): PhaseReading =
     val v = cur.dissonance

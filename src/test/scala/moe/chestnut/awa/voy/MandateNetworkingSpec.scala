@@ -29,7 +29,10 @@ class MandateNetworkingSpec:
       sustenance = sustenance,
       baselineCalming = baselineCalming,
       pulseDrive = 0.1,
-      pulseStamp = PulseStamp(if sheltered then 20.0 else 5.0, 10.0),
+      heartbeat =
+        if sheltered then Heartbeat.Beating(40.0, 0.08, BeatSource.Intrinsic)
+        else Heartbeat.Slow(Double.NaN),
+      lastBellStrikeAt = 4.0,
       simTime = 12.0
     )
 

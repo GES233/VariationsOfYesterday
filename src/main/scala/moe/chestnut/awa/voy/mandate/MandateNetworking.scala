@@ -12,8 +12,7 @@ import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.util.Identifier
 import net.minecraft.world.World
 
-import moe.chestnut.awa.voy.VoyConfig
-import moe.chestnut.awa.voy.inner.veins.{CellReadout, ShelterModel}
+import moe.chestnut.awa.voy.inner.veins.CellReadout
 
 /** Server-side synchronization of live mandate cells within each player's
   * render/view distance.
@@ -107,8 +106,7 @@ object MandateNetworking:
         radius = radius,
         includeDebug = includeDebug,
         isLive = MandateRuntime.isLiveChunk,
-        readoutAt = MandateRuntime.readoutAt,
-        model = VoyConfig.current.shelterModel
+        readoutAt = MandateRuntime.readoutAt
       )
       playerStates.put(uuid, nextState)
       maybePayload.foreach(ServerPlayNetworking.send(player, _))
@@ -128,8 +126,7 @@ object MandateNetworking:
       radius: Int,
       includeDebug: Boolean,
       isLive: (Int, Int) => Boolean,
-      readoutAt: (Int, Int) => CellReadout,
-      model: ShelterModel = ShelterModel.Window
+      readoutAt: (Int, Int) => CellReadout
   ): (Option[MandateChunkSyncPayload], PlayerSyncState) =
     val windowChanged = prev.forall { s =>
       s.dimensionId != dimId ||
@@ -151,7 +148,7 @@ object MandateNetworking:
         val cz = centerZ + dz
         if isLive(cx, cz) then
           val readout = readoutAt(cx, cz)
-          val view = ClientCellView.fromReadout(cx, cz, readout, model)
+          val view = ClientCellView.fromReadout(cx, cz, readout)
           val debug = if includeDebug then Some(DebugCellTelemetry.fromReadout(readout)) else None
           val entry = SyncedCellEntry(view, debug)
           currentBuilder += ((cx, cz) -> entry)

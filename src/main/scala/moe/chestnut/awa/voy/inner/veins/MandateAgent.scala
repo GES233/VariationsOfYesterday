@@ -27,12 +27,16 @@ object MandateAgent:
     */
   private final class CellSlot(
       val tracker: PhaseTracker,
-      var pulseStamp: PulseStamp,
       var publishedRegime: Regime,
       var regimeCandidate: Option[(Regime, Double)] = None,
       var inSpike: Boolean = false,
       var heartbeat: Heartbeat = Heartbeat.Warming,
-      var heartbeatBadSince: Double = Double.NaN
+      var heartbeatBadSince: Double = Double.NaN,
+      /** Last bell strike time for the overdrive guard (design note 11 §1.5).
+        * Deliberately NOT persisted: an 8 s guard is meaningless across a
+        * save/load boundary, so a reload simply reads as guard-expired.
+        */
+      var lastBellStrikeAt: Double = Double.NaN
   )
 
   /** Apply one channel or topology event to the lattice. */
@@ -55,7 +59,7 @@ object MandateAgent:
       case EventMsg.HoldImpulse(cell, strength) => onCell(cell)(_.impulse = strength)
       case EventMsg.SetSustenance(cell, level) =>
         onCell(cell)(c => c.sustenance = Math.min(Math.max(level, 0.0), 1.0))
-      case EventMsg.FirePulse(cell, area, transmitter, _) =>
+      case EventMsg.FirePulse(cell, area, transmitter) =>
         onCell(cell) { state =>
           state.synapseTau = transmitter.tau
           state.firePulse(area)
@@ -89,8 +93,7 @@ object MandateAgent:
       defaultStressParam: StressParam = DefaultStressParam,
       persistSink: MandateSnapshot => Unit = (_ => ()),
       persistPeriod: Double = 1.0,
-      pulseParam: PulseParam = PulseParam(),
-      initialPulseStamps: Map[CellCoord, PulseStamp] = Map.empty,
+      initialBeatStats: Map[CellCoord, BeatStats] = Map.empty,
       regimeDwell: Double = 5.0,
       heartbeatParam: HeartbeatParam = HeartbeatParam()
   ): ActorRef[EventDTO] =
@@ -99,27 +102,34 @@ object MandateAgent:
     var nextPersistAt: Double = initialSimTime
     val linkRunner = new PulseLinkRunner(links, criterion = spikeCriterion)
 
-    def mkSlot(cell: MandateState, stamp: PulseStamp = PulseStamp.zero): CellSlot =
+    def mkSlot(cell: MandateState, stats: BeatStats = BeatStats.zero): CellSlot =
+      val tracker = new PhaseTracker(
+        readoutParam,
+        cell.param,
+        cell.stressParam.coupling,
+        cell.stressParam.sustenanceDepth
+      )
+      // Restoring beat statistics keeps a reloaded cell's rhythm verdict
+      // continuous instead of restarting the Warming grace (note 11 risk 2).
+      if stats.periods.nonEmpty || !stats.lastCross.isNaN || !stats.bornAt.isNaN then
+        tracker.restoreBeatStats(stats)
       new CellSlot(
-        tracker = new PhaseTracker(
-          readoutParam,
-          cell.param,
-          cell.stressParam.coupling,
-          cell.stressParam.sustenanceDepth
-        ),
-        pulseStamp = stamp,
+        tracker = tracker,
         publishedRegime = Readout.regime(cell.getState, readoutParam)
       )
 
     val slots = scala.collection.mutable.HashMap.empty[CellCoord, CellSlot]
     grid.cells.foreach { case (coord, cell) =>
-      slots(coord) = mkSlot(cell, initialPulseStamps.getOrElse(coord, PulseStamp.zero))
+      slots(coord) = mkSlot(cell, initialBeatStats.getOrElse(coord, BeatStats.zero))
     }
 
-    def currentStamps: Map[CellCoord, PulseStamp] =
-      slots.iterator.map { case (c, slot) => c -> slot.pulseStamp }.toMap
+    def currentBeatStats: Map[CellCoord, BeatStats] =
+      slots.iterator.map { case (c, slot) => c -> slot.tracker.beatStats }.toMap
 
-    def recordPulse(coord: CellCoord, area: Double): Unit =
+    /** Bell strikes stamp the overdrive guard on living cells (dead land
+      * answers nothing and is not guarded — design note 11 §1.5 row 1).
+      */
+    def recordBellStrike(coord: CellCoord, area: Double): Unit =
       if area > 0.0 then
         grid.cells.get(coord).foreach { state =>
           val cur = state.getState
@@ -132,9 +142,7 @@ object MandateAgent:
             state.stressParam.sustenanceFloor
           )
           if !ecoDead then
-            val slot = slots.getOrElseUpdate(coord, mkSlot(state))
-            val (next, _) = slot.pulseStamp.onCountedPulse(simTime, pulseParam)
-            slot.pulseStamp = next
+            slots.getOrElseUpdate(coord, mkSlot(state)).lastBellStrikeAt = simTime
         }
 
     def integrate(dt: Double): Unit =
@@ -142,7 +150,6 @@ object MandateAgent:
         .duePulses(simTime)
         .foreach { event =>
           applyEvent(grid, event, defaultFastParam, defaultStressParam)
-          if event.bookkeeping.counted then recordPulse(event.cell, event.area)
         }
       grid.step(dt)
       simTime += dt
@@ -211,8 +218,8 @@ object MandateAgent:
           sustenance = cell.sustenance,
           baselineCalming = cell.baselineCalming,
           pulseDrive = pDrive,
-          pulseStamp = slot.pulseStamp,
           heartbeat = heartbeat,
+          lastBellStrikeAt = slot.lastBellStrikeAt,
           simTime = simTime,
           sustenanceFloor = cell.stressParam.sustenanceFloor,
           toxicityThreshold = cell.stressParam.sustenanceBurnThreshold
@@ -230,7 +237,7 @@ object MandateAgent:
       readoutSink(readoutBuilder.result())
 
       if simTime >= nextPersistAt then
-        persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentStamps))
+        persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentBeatStats))
         nextPersistAt = simTime + persistPeriod
 
     def handle(event: EventDTO): Unit =
@@ -239,7 +246,7 @@ object MandateAgent:
         case EventMsg.AddLink(link) => linkRunner.addLink(link)
         case EventMsg.RemoveLink(src, dst) => linkRunner.removeLink(src, dst)
         case EventMsg.FlushNow =>
-          persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentStamps))
+          persistSink(MandateSnapshot.capture(grid, linkRunner.links, simTime, currentBeatStats))
           nextPersistAt = simTime + persistPeriod
         case other @ EventMsg.RegisterCell(cell, _, _) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
@@ -250,9 +257,11 @@ object MandateAgent:
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
           slots.remove(cell)
           linkRunner.forgetCell(cell)
-        case other @ EventMsg.FirePulse(cell, area, _, bookkeeping) =>
+        case other @ EventMsg.FirePulse(cell, area, transmitter) =>
           applyEvent(grid, other, defaultFastParam, defaultStressParam)
-          if bookkeeping.counted then recordPulse(cell, area)
+          // Only actual bell strikes feed the overdrive guard; crystal-link
+          // pulses are autonomous physics, not a player cadence.
+          if transmitter == PulseTransmitter.Bell then recordBellStrike(cell, area)
         case other => applyEvent(grid, other, defaultFastParam, defaultStressParam)
 
     Actor.spawn("mandate")(handle)

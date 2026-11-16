@@ -1,12 +1,13 @@
 package moe.chestnut.awa.voy.mandate
 
 import net.minecraft.datafixer.DataFixTypes
-import net.minecraft.nbt.{NbtCompound, NbtElement, NbtList}
+import net.minecraft.nbt.{NbtCompound, NbtDouble, NbtElement, NbtList}
 import net.minecraft.registry.RegistryWrapper
 import net.minecraft.world.PersistentState
 import org.slf4j.{Logger, LoggerFactory}
 
 import moe.chestnut.awa.voy.inner.veins.{
+  BeatStats,
   CellCoord,
   CellSnapshot,
   LatticeEdge,
@@ -14,7 +15,6 @@ import moe.chestnut.awa.voy.inner.veins.{
   MandateParam,
   MandateSnapshot,
   PulseLink,
-  PulseStamp,
   PulseTransmitter,
   StressParam
 }
@@ -41,7 +41,7 @@ final class MandatePersistence extends PersistentState:
 object MandatePersistence:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
   val Id = "voy_mandate"
-  val SchemaVersion = 2
+  val SchemaVersion = 3
 
   val StateType: PersistentState.Type[MandatePersistence] =
     new PersistentState.Type[MandatePersistence](
@@ -100,8 +100,14 @@ object MandatePersistence:
       c.putDouble("sustenanceBurn", sp.sustenanceBurn)
       c.putDouble("sustenanceBurnThreshold", sp.sustenanceBurnThreshold)
       c.putDouble("sustenanceFloor", sp.sustenanceFloor)
-      c.putDouble("shelterUntil", cs.pulseStamp.shelterUntil)
-      c.putDouble("cooldownUntil", cs.pulseStamp.cooldownUntil)
+      // Heartbeat rhythm memory (schema 3, design note 11 risk 2). NaN
+      // sentinels round-trip through NBT doubles unchanged.
+      val periodList = NbtList()
+      cs.beatStats.periods.foreach(per => periodList.add(NbtDouble.of(per)))
+      c.put("beatPeriods", periodList)
+      c.putDouble("beatDuty", cs.beatStats.lastDuty)
+      c.putDouble("lastCross", cs.beatStats.lastCross)
+      c.putDouble("bornAt", cs.beatStats.bornAt)
       cells.add(c)
     }
     nbt.put("cells", cells)
@@ -182,13 +188,13 @@ object MandatePersistence:
             sustenanceBurnThreshold = c.getDouble("sustenanceBurnThreshold"),
             sustenanceFloor = c.getDouble("sustenanceFloor")
           ),
-          pulseStamp = PulseStamp(
-            shelterUntil =
-              if c.contains("shelterUntil") then c.getDouble("shelterUntil")
-              else Double.NegativeInfinity,
-            cooldownUntil =
-              if c.contains("cooldownUntil") then c.getDouble("cooldownUntil")
-              else Double.NegativeInfinity
+          beatStats = BeatStats(
+            periods = c.getList("beatPeriods", NbtElement.DOUBLE_TYPE).toArray.map {
+              case d: NbtDouble => d.doubleValue()
+            }.toVector,
+            lastDuty = c.getDouble("beatDuty"),
+            lastCross = c.getDouble("lastCross"),
+            bornAt = c.getDouble("bornAt")
           )
         )
     }.toSeq

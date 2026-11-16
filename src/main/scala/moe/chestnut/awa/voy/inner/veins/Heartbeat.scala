@@ -165,7 +165,26 @@ final case class BeatStats(
     lastDuty: Double,
     lastCross: Double,
     bornAt: Double
-)
+):
+  // NaN-safe value equality: the "never crossed / never measured" sentinels
+  // are NaN, and snapshot round-trips must compare equal. `Double.compare`
+  // (boxed semantics) treats NaN == NaN; Vector elements are boxed, so
+  // period equality is already NaN-safe.
+  override def equals(other: Any): Boolean = other match
+    case o: BeatStats =>
+      periods == o.periods &&
+        java.lang.Double.compare(lastDuty, o.lastDuty) == 0 &&
+        java.lang.Double.compare(lastCross, o.lastCross) == 0 &&
+        java.lang.Double.compare(bornAt, o.bornAt) == 0
+    case _ => false
+
+  override def hashCode: Int =
+    java.util.Objects.hash(
+      periods,
+      Double.box(lastDuty),
+      Double.box(lastCross),
+      Double.box(bornAt)
+    )
 
 object BeatStats:
   val zero: BeatStats = BeatStats(Vector.empty, Double.NaN, Double.NaN, Double.NaN)
@@ -215,9 +234,3 @@ final case class HeartbeatParam(
 object HeartbeatParam:
   /** measured: high-plateau fraction of the saturated work point (draft 01 §1.1). */
   val SaturationPlateauFraction: Double = 0.606
-
-/** Which shelter semantics a readout consumer applies (the Step 1 A/B
-  * switch; `Window` is the legacy pulse-window model, deleted in Step 2).
-  */
-enum ShelterModel:
-  case Window, Heartbeat

@@ -2,8 +2,6 @@ package moe.chestnut.awa.voy.mandate
 
 import java.util.concurrent.ThreadLocalRandom
 
-import moe.chestnut.awa.voy.VoyConfig
-
 /** Server-thread bridge between the stagnation economy tiers
   * ([[MandatePhenomena.classifyEconomy]]) and the vanilla-economy mixins
   * (`moe.chestnut.awa.voy.mixin`): trade prices, villager breeding, iron
@@ -18,10 +16,7 @@ import moe.chestnut.awa.voy.VoyConfig
 object MandateEconomy:
 
   private def profile(chunkX: Int, chunkZ: Int): MandatePhenomena.EconomyProfile =
-    MandatePhenomena.classifyEconomy(
-      MandateRuntime.readoutAt(chunkX, chunkZ),
-      VoyConfig.current.shelterModel
-    )
+    MandatePhenomena.classifyEconomy(MandateRuntime.readoutAt(chunkX, chunkZ))
 
   private def rollsAgainst(keepChance: Double): Boolean =
     keepChance < 1.0 && ThreadLocalRandom.current().nextDouble() >= keepChance

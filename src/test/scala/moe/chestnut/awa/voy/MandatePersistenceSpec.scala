@@ -14,6 +14,7 @@ import net.minecraft.SharedConstants
 import net.minecraft.world.PersistentStateManager
 
 import moe.chestnut.awa.voy.inner.veins.{
+  BeatStats,
   CellCoord,
   CellSnapshot,
   LatticeEdge,
@@ -21,7 +22,6 @@ import moe.chestnut.awa.voy.inner.veins.{
   MandateParam,
   MandateSnapshot,
   PulseLink,
-  PulseStamp,
   PulseTransmitter,
   StressParam
 }
@@ -44,9 +44,11 @@ class MandatePersistenceSpec:
         fastParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
         stressParam =
           StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-        pulseStamp = PulseStamp(
-          shelterUntil = 54336.0,
-          cooldownUntil = 54308.0
+        beatStats = BeatStats(
+          periods = Vector(40.1, 39.8, 40.3),
+          lastDuty = 0.05,
+          lastCross = 54300.0,
+          bornAt = 54000.0
         )
       ),
       CellSnapshot(
@@ -59,10 +61,7 @@ class MandatePersistenceSpec:
         impulse = 0.0,
         fastParam = MandateParam(alpha = 0.65, beta = 0.75, epsilon = 0.1),
         stressParam = StressParam(coupling = 1.4, stressMax = 0.9),
-        pulseStamp = PulseStamp(
-          shelterUntil = Double.NegativeInfinity,
-          cooldownUntil = 54310.0
-        )
+        beatStats = BeatStats.zero // never-observed cell: NaN sentinels round-trip
       )
     ),
     edges = Seq(

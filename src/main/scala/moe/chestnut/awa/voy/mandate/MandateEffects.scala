@@ -14,10 +14,11 @@ import net.minecraft.util.Identifier
   * mixins), restoring the original §7.8 motivation loop. The baseline tier
   * never touches the player's body — villagers wear `Stagnation` as a
   * visible marker of the settlement going listless. The player's body pays
-  * during the acute tiers — `StagnationSpike` while the ground is spiking
-  * or burnout-saturated (×0.09 break speed, plus vanilla `SLOWNESS` as a
-  * secondary cue), and `PulseSaturation` as the immediate recoil for
-  * over-pulsing a cell into an acute overload lockout.
+  * during the acute tiers — `StagnationSpike` while the rhythm runs Fast /
+  * Arrhythmic or the ground sits in saturated burnout (×0.09 break speed,
+  * plus vanilla `SLOWNESS` as a secondary cue), and `PulseSaturation` as the
+  * immediate recoil for over-rapid bell striking (overdrive guard, note 11
+  * §1.5). Colours follow the heartbeat palette shared with the HUD and chat.
   *
   * Why these are *our* effects instead of vanilla `MINING_FATIGUE`: a vanilla
   * effect carries a vanilla name, icon and tooltip, so the pressure reads as
@@ -45,7 +46,7 @@ object MandateEffects:
     */
   val Stagnation: StatusEffect = register(
     StagnationId,
-    new StagnationEffect(StagnationId, 0x4C5B52, None)
+    new StagnationEffect(StagnationId, 0x526275, None) // heartbeat palette: Slow / stagnant blue-grey
   )
 
   /** 沉滞·尖峰: what the same ground does to the body while it is spiking
@@ -53,7 +54,7 @@ object MandateEffects:
     */
   val StagnationSpike: StatusEffect = register(
     StagnationSpikeId,
-    new StagnationEffect(StagnationSpikeId, 0x6B2F45, Some(-0.91))
+    new StagnationEffect(StagnationSpikeId, 0xFF2E2E, Some(-0.91)) // acute rhythm: Fast/Arrhythmic red
   )
 
   /** 脉冲过载: immediate minor backlash when over-rapid pulses drive a cell into

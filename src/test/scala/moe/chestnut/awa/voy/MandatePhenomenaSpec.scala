@@ -22,8 +22,8 @@ class MandatePhenomenaSpec:
       phase: PhaseReading = PhaseReading.Basin(PhaseLabel.Resting),
       c0: Double = 0.03,
       sustenance: Double = 1.0,
-      pulseStamp: PulseStamp = PulseStamp.zero,
       heartbeat: Heartbeat = Heartbeat.Warming,
+      lastBellStrikeAt: Double = Double.NaN,
       simTime: Double = 0.0
   ): CellReadout =
     CellReadout(
@@ -32,8 +32,8 @@ class MandatePhenomenaSpec:
       phase = phase,
       baselineCalming = c0,
       sustenance = sustenance,
-      pulseStamp = pulseStamp,
       heartbeat = heartbeat,
+      lastBellStrikeAt = lastBellStrikeAt,
       simTime = simTime
     )
 
@@ -52,13 +52,13 @@ class MandatePhenomenaSpec:
     )
     assertTrue(deadNetwork.silentBlight, "dead mycelium is silent blight")
 
-    val inPulseCooldown = MandatePhenomena.classifyPhenomena(
-      readout(pulseStamp = PulseStamp(cooldownUntil = 20.0), simTime = 5.0),
+    val inOverdriveGuard = MandatePhenomena.classifyPhenomena(
+      readout(lastBellStrikeAt = 2.0, simTime = 5.0),
       isNight = true
     )
     assertFalse(
-      inPulseCooldown.silentBlight,
-      "a short pulse cooldown is NOT ecological death and must not trigger silent blight"
+      inOverdriveGuard.silentBlight,
+      "a recent bell strike is NOT ecological death and must not trigger silent blight"
     )
 
     val saturated = MandatePhenomena.classifyPhenomena(
@@ -121,81 +121,57 @@ class MandatePhenomenaSpec:
     val viable = readout(s = 0.20, sustenance = 0.25)
     assertEquals(ReInoculationOutcome.AlreadyViable, MandatePhenomena.evaluateReInoculation(viable))
 
-  @Test def `economy tiers follow the shelter window, with spiking as the acute tier`(): Unit =
-    val sheltered = readout(pulseStamp = PulseStamp(shelterUntil = 40.0, cooldownUntil = 8.0), simTime = 2.0)
-    assertEquals(MandatePhenomena.EconomyMaintained, MandatePhenomena.classifyEconomy(sheltered))
-    assertEquals(MandatePhenomena.EconomyStagnant, MandatePhenomena.classifyEconomy(readout()))
-    assertEquals(MandatePhenomena.EconomySpiking, MandatePhenomena.classifyEconomy(readout(v = 1.9)))
-    assertEquals(
-      MandatePhenomena.EconomySpiking,
-      MandatePhenomena.classifyEconomy(readout(s = 0.98, regime = Regime.Burnout))
-    )
-    assertEquals(MandatePhenomena.EconomyStagnant, MandatePhenomena.classifyEconomy(CellReadout.zero))
-    assertEquals(MandatePhenomena.EconomyStagnant, MandatePhenomena.classifyEconomy(readout(v = -1.9)))
-
-  @Test def `heartbeat economy map: rhythm decides the tier (design note 11 section 1 point 4)`(): Unit =
+  @Test def `economy tiers follow the heartbeat rhythm (design note 11 section 1 point 4)`(): Unit =
     val beating = readout(heartbeat = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic))
+    assertEquals(MandatePhenomena.EconomyMaintained, MandatePhenomena.classifyEconomy(beating))
     assertEquals(
       MandatePhenomena.EconomyMaintained,
-      MandatePhenomena.classifyEconomy(beating, ShelterModel.Heartbeat)
-    )
-    assertEquals(
-      MandatePhenomena.EconomyMaintained,
-      MandatePhenomena.classifyEconomy(readout(), ShelterModel.Heartbeat),
+      MandatePhenomena.classifyEconomy(readout()),
       "Warming counts as maintained"
     )
     assertEquals(
-      MandatePhenomena.EconomySpiking,
-      MandatePhenomena.classifyEconomy(readout(heartbeat = Heartbeat.Fast(20.0)), ShelterModel.Heartbeat)
+      MandatePhenomena.EconomyMaintained,
+      MandatePhenomena.classifyEconomy(CellReadout.zero),
+      "a never-observed cell rests in the Warming grace"
     )
     assertEquals(
       MandatePhenomena.EconomySpiking,
-      MandatePhenomena.classifyEconomy(
-        readout(heartbeat = Heartbeat.Arrhythmic(44.0, 0.45)),
-        ShelterModel.Heartbeat
-      )
+      MandatePhenomena.classifyEconomy(readout(heartbeat = Heartbeat.Fast(20.0)))
+    )
+    assertEquals(
+      MandatePhenomena.EconomySpiking,
+      MandatePhenomena.classifyEconomy(readout(heartbeat = Heartbeat.Arrhythmic(44.0, 0.45)))
     )
     assertEquals(
       MandatePhenomena.EconomyStagnant,
-      MandatePhenomena.classifyEconomy(
-        readout(heartbeat = Heartbeat.Slow(Double.NaN)),
-        ShelterModel.Heartbeat
-      )
+      MandatePhenomena.classifyEconomy(readout(heartbeat = Heartbeat.Slow(Double.NaN)))
     )
     assertEquals(
       MandatePhenomena.EconomyStagnant,
-      MandatePhenomena.classifyEconomy(beating.copy(sustenance = 0.0), ShelterModel.Heartbeat),
+      MandatePhenomena.classifyEconomy(beating.copy(sustenance = 0.0)),
       "ecological death stays stagnant regardless of the rhythm verdict"
     )
     assertEquals(
       MandatePhenomena.EconomyStagnant,
       MandatePhenomena.classifyEconomy(
-        beating.copy(phase = PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee)),
-        ShelterModel.Heartbeat
+        beating.copy(phase = PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee))
       ),
       "a below-knee cell stays stagnant regardless of the rhythm verdict"
     )
 
   @Test def `heartbeat bodily strain: acute means Fast or Arrhythmic, never Slow`(): Unit =
     val fast = readout(heartbeat = Heartbeat.Fast(20.0))
-    assertTrue(MandatePhenomena.shouldApplyAcuteBodyStrain(fast, ShelterModel.Heartbeat))
+    assertTrue(MandatePhenomena.shouldApplyAcuteBodyStrain(fast))
     assertTrue(
-      MandatePhenomena.shouldApplyAcuteBodyStrain(
-        readout(heartbeat = Heartbeat.Arrhythmic(44.0, 0.45)),
-        ShelterModel.Heartbeat
-      )
+      MandatePhenomena.shouldApplyAcuteBodyStrain(readout(heartbeat = Heartbeat.Arrhythmic(44.0, 0.45)))
     )
     assertFalse(
-      MandatePhenomena.shouldApplyAcuteBodyStrain(
-        readout(heartbeat = Heartbeat.Slow(Double.NaN)),
-        ShelterModel.Heartbeat
-      ),
+      MandatePhenomena.shouldApplyAcuteBodyStrain(readout(heartbeat = Heartbeat.Slow(Double.NaN))),
       "stagnation only presses the economy, never the body"
     )
     assertFalse(
       MandatePhenomena.shouldApplyAcuteBodyStrain(
-        readout(heartbeat = Heartbeat.Beating(40.0, 0.10, BeatSource.Paced)),
-        ShelterModel.Heartbeat
+        readout(heartbeat = Heartbeat.Beating(40.0, 0.10, BeatSource.Paced))
       )
     )
 
@@ -209,14 +185,11 @@ class MandatePhenomenaSpec:
     assertEquals(GastrodiaBedVerdict.Growing, MandatePhenomena.evaluateGastrodiaBed(healthy))
     assertTrue(MandatePhenomena.canInoculateTimberInField(healthy))
 
-    val inCooldown = healthy.copy(
-      pulseStamp = PulseStamp(shelterUntil = Double.NegativeInfinity, cooldownUntil = 20.0),
-      simTime = 5.0
-    )
+    val inGuard = healthy.copy(lastBellStrikeAt = 2.0, simTime = 5.0)
     assertEquals(
       GastrodiaBedVerdict.Growing,
-      MandatePhenomena.evaluateGastrodiaBed(inCooldown),
-      "pulse cooldown is a bell/shelter rule and does not stall healthy mycelial beds"
+      MandatePhenomena.evaluateGastrodiaBed(inGuard),
+      "the bell overdrive guard is a strike rule and does not stall healthy mycelial beds"
     )
 
     val strained = readout(s = 0.45, regime = Regime.Strained, sustenance = 1.0)

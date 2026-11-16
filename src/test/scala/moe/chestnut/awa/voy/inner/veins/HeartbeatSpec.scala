@@ -84,7 +84,7 @@ class HeartbeatSpec:
     val hb = Heartbeat.classify(stats(Vector(40.0, 40.0)), 100.0, selfSustained = true, p)
     assertEquals(Heartbeat.Warming, hb)
     assertTrue(
-      healthyReadout(Heartbeat.Warming).isShelteredByHeartbeat,
+      healthyReadout(Heartbeat.Warming).isSheltered,
       "the Warming grace shelters (it replaces the old first-strike window)"
     )
 
@@ -101,14 +101,14 @@ class HeartbeatSpec:
 
   @Test def `Warming with dead mycelium is not sheltered`(): Unit =
     val r = healthyReadout(Heartbeat.Warming).copy(sustenance = 0.0)
-    assertFalse(r.isShelteredByHeartbeat, "mycelium and knee still take priority")
+    assertFalse(r.isSheltered, "mycelium and knee still take priority")
 
   @Test def `a below-knee cell is not sheltered even when Beating`(): Unit =
     val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
     val r = healthyReadout(beating).copy(
       phase = PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee)
     )
-    assertFalse(r.isShelteredByHeartbeat)
+    assertFalse(r.isSheltered)
 
   @Test def `the spike phase does not suspend heartbeat shelter`(): Unit =
     val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
@@ -119,7 +119,7 @@ class HeartbeatSpec:
     )
     assertTrue(r.isSpiking)
     assertTrue(
-      r.isShelteredByHeartbeat,
+      r.isSheltered,
       "the beat's high phase is part of the shelter (design note 11 §1.3)"
     )
 
@@ -128,7 +128,7 @@ class HeartbeatSpec:
     hb match
       case Heartbeat.Beating(_, _, source) => assertEquals(BeatSource.Paced, source)
       case other                           => fail(s"expected Beating, got $other")
-    assertTrue(healthyReadout(hb).isShelteredByHeartbeat, "Paced counts as shelter (ruling 1)")
+    assertTrue(healthyReadout(hb).isSheltered, "Paced counts as shelter (ruling 1)")
 
   @Test def `a beat gone stale reads Slow`(): Unit =
     val hb = Heartbeat.classify(
@@ -141,21 +141,16 @@ class HeartbeatSpec:
       case Heartbeat.Slow(period) => assertEquals(40.0, period, 1e-12)
       case other                  => fail(s"expected Slow, got $other")
 
-  @Test def `A/B benchmark: the two shelter models on the same readouts`(): Unit =
-    val openWindow = PulseStamp(shelterUntil = 40.0, cooldownUntil = 8.0)
+  @Test def `shelter follows the heartbeat category alone`(): Unit =
     val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)
-
-    val bothWays = healthyReadout(beating).copy(pulseStamp = openWindow)
-    assertTrue(bothWays.sheltered(ShelterModel.Window))
-    assertTrue(bothWays.sheltered(ShelterModel.Heartbeat))
-
-    val windowOnly = healthyReadout(Heartbeat.Slow(Double.NaN)).copy(pulseStamp = openWindow)
-    assertTrue(windowOnly.sheltered(ShelterModel.Window), "the window still shelters")
-    assertFalse(windowOnly.sheltered(ShelterModel.Heartbeat), "a silent heart does not")
-
-    val graceOnly = healthyReadout(Heartbeat.Warming) // PulseStamp.zero by default
-    assertFalse(graceOnly.sheltered(ShelterModel.Window), "no pulse window, no shelter")
-    assertTrue(graceOnly.sheltered(ShelterModel.Heartbeat), "the Warming grace shelters")
+    assertTrue(healthyReadout(beating).isSheltered)
+    assertTrue(healthyReadout(Heartbeat.Warming).isSheltered, "the Warming grace shelters")
+    assertFalse(healthyReadout(Heartbeat.Slow(Double.NaN)).isSheltered, "a silent heart does not")
+    assertFalse(healthyReadout(Heartbeat.Fast(20.0)).isSheltered, "tachycardia is not shelter")
+    assertFalse(
+      healthyReadout(Heartbeat.Arrhythmic(44.0, 0.45)).isSheltered,
+      "arrhythmia is not shelter"
+    )
 
   @Test def `exit hysteresis: a bad stretch shorter than two cycles does not leave Beating`(): Unit =
     val beating = Heartbeat.Beating(40.0, 0.10, BeatSource.Intrinsic)

@@ -15,7 +15,10 @@ final case class CellSnapshot(
     impulse: Double,
     fastParam: MandateParam,
     stressParam: StressParam,
-    pulseStamp: PulseStamp = PulseStamp.zero
+    /** Rhythm memory (design note 11 risk 2): persisted so a reload resumes
+      * the cell's heartbeat verdict instead of restarting the Warming grace.
+      */
+    beatStats: BeatStats = BeatStats.zero
 )
 
 /** The full snapshot: cells, edges, links, and the integration clock. */
@@ -32,7 +35,7 @@ object MandateSnapshot:
       grid: MandateGrid,
       links: Seq[PulseLink],
       simTime: Double,
-      pulseStamps: Map[CellCoord, PulseStamp] = Map.empty
+      beatStats: Map[CellCoord, BeatStats] = Map.empty
   ): MandateSnapshot =
     val cells = grid.cells.iterator.map { case (coord, state) =>
       CellSnapshot(
@@ -45,19 +48,19 @@ object MandateSnapshot:
         state.impulse,
         state.getParam,
         state.stressParam,
-        pulseStamps.getOrElse(coord, PulseStamp.zero)
+        beatStats.getOrElse(coord, BeatStats.zero)
       )
     }.toSeq.sortBy(c => (c.coord.x, c.coord.z))
     MandateSnapshot(simTime, cells, grid.edges, links)
 
-  /** Extract the per-cell pulse stamps from a captured snapshot. */
-  def restorePulseStamps(
+  /** Extract the per-cell beat statistics from a captured snapshot.
+    * (No `== BeatStats.zero` filter: NaN fields make case-class equality
+    * useless here, so empty stats are simply restored as fresh.)
+    */
+  def restoreBeatStats(
       snapshot: MandateSnapshot
-  ): Map[CellCoord, PulseStamp] =
-    snapshot.cells.iterator
-      .filter(_.pulseStamp != PulseStamp.zero)
-      .map(cs => cs.coord -> cs.pulseStamp)
-      .toMap
+  ): Map[CellCoord, BeatStats] =
+    snapshot.cells.iterator.map(cs => cs.coord -> cs.beatStats).toMap
 
   /** Rebuild a lattice from a snapshot. Edges whose endpoints are not
     * both present are dropped.

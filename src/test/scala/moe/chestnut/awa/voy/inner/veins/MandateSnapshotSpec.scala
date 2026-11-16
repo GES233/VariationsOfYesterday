@@ -112,6 +112,20 @@ class MandateSnapshotSpec:
       "the land must remember a dead patch across a restart"
     )
 
+  @Test def `beat statistics ride the snapshot round trip (note 11 risk 2)`(): Unit =
+    val grid = mkGrid()
+    val coord = CellCoord(1, 1)
+    val stats = BeatStats(Vector(40.1, 39.8), lastDuty = 0.05, lastCross = 120.0, bornAt = 0.0)
+    val snap = MandateSnapshot.capture(grid, Nil, simTime = 130.0, Map(coord -> stats))
+    assertEquals(stats, snap.cells.find(_.coord == coord).get.beatStats)
+    val restored = MandateSnapshot.restoreBeatStats(snap)
+    assertEquals(stats, restored(coord))
+    assertEquals(
+      BeatStats.zero,
+      restored(CellCoord(0, 0)),
+      "cells without rhythm history restore as fresh (NaN-safe equality)"
+    )
+
   @Test def `parameter sets report what the save actually carries`(): Unit =
     val snap = MandateSnapshot.capture(mkGrid(), Nil, 0.0)
     assertEquals(
