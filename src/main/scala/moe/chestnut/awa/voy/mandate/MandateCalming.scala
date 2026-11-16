@@ -72,49 +72,36 @@ object MandateCalming:
     * pistons) once the chunk is loaded again.
     */
   def scanLoaded(world: ServerWorld): Unit =
-    val lattice = VoyConfig.current.lattice
     var changed = false
-    var cz = lattice.originZ
-    while cz < lattice.originZ + lattice.height do
-      var cx = lattice.originX
-      while cx < lattice.originX + lattice.width do
-        if world.isChunkLoaded(cx, cz) then
-          val found = scala.collection.mutable.Set.empty[MandateSource]
-          world.getChunk(cx, cz).getBlockEntities.values.asScala.foreach { be =>
-            sourceKindOf(be.getCachedState).foreach { kind =>
-              val pos = be.getPos
-              found.add(MandateSource(kind, pos.getX, pos.getY, pos.getZ))
-            }
+    MandateRuntime.liveChunks.foreach { case (cx, cz) =>
+      if world.isChunkLoaded(cx, cz) then
+        val found = scala.collection.mutable.Set.empty[MandateSource]
+        world.getChunk(cx, cz).getBlockEntities.values.asScala.foreach { be =>
+          sourceKindOf(be.getCachedState).foreach { kind =>
+            val pos = be.getPos
+            found.add(MandateSource(kind, pos.getX, pos.getY, pos.getZ))
           }
-          val key = (cx, cz)
-          val existing = registry.getOrElse(key, scala.collection.mutable.Set.empty[MandateSource])
-          if existing != found then
-            if found.isEmpty then registry.remove(key) else registry(key) = found
-            changed = true
-        cx += 1
-      cz += 1
+        }
+        val key = (cx, cz)
+        val existing = registry.getOrElse(key, scala.collection.mutable.Set.empty[MandateSource])
+        if existing != found then
+          if found.isEmpty then registry.remove(key) else registry(key) = found
+          changed = true
+    }
     if changed then persist()
 
-  /** One rebalance pass: scan the world truth, then step every lattice cell's
+  /** One rebalance pass: scan the world truth, then step every live cell's
     * stock toward its source-driven equilibrium (leak included).
     */
   def rebalance(world: ServerWorld): Unit =
     scanLoaded(world)
-    val lattice = VoyConfig.current.lattice
     val p = VoyConfig.current.calmingParam
-    var cz = 0
-    while cz < lattice.height do
-      var cx = 0
-      while cx < lattice.width do
-        val chunkX = lattice.originX + cx
-        val chunkZ = lattice.originZ + cz
-        if MandateRuntime.isLiveChunk(chunkX, chunkZ) then
-          val c0 = MandateRuntime.readoutAt(chunkX, chunkZ).baselineCalming
-          val next = CalmingStock.step(c0, weightAt(chunkX, chunkZ), RebalanceSeconds, p)
-          if Math.abs(next - c0) > 1e-9 then
-            MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, next)
-        cx += 1
-      cz += 1
+    MandateRuntime.liveChunks.foreach { case (chunkX, chunkZ) =>
+      val c0 = MandateRuntime.readoutAt(chunkX, chunkZ).baselineCalming
+      val next = CalmingStock.step(c0, weightAt(chunkX, chunkZ), RebalanceSeconds, p)
+      if Math.abs(next - c0) > 1e-9 then
+        MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, next)
+    }
 
   private def addSilently(source: MandateSource): Boolean =
     val key = (source.x >> 4, source.z >> 4)

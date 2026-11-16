@@ -20,14 +20,9 @@ import moe.chestnut.awa.voy.inner.veins.*
 object MandateRuntime:
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  private def lattice = VoyConfig.current.lattice
-  private def width = lattice.width
-  private def height = lattice.height
-  private def originX = lattice.originX
-  private def originZ = lattice.originZ
-
   private def TickDt = VoyConfig.current.tickDt
 
+  @volatile private var fieldStrategy: MandateField = PrototypeValleyField
   @volatile private var system: Option[ActorRef[EventDTO]] = None
   @volatile private var readoutSnapshot: Map[(Int, Int), CellReadout] =
     Map.empty
@@ -38,14 +33,15 @@ object MandateRuntime:
   private val flushLatch = new AtomicReference[CountDownLatch](null)
 
   def worldToGrid(chunkX: Int, chunkZ: Int): CellCoord =
-    CellCoord(chunkX - originX, chunkZ - originZ)
+    fieldStrategy.worldToGrid(chunkX, chunkZ, VoyConfig.current)
 
   def gridToWorld(cell: CellCoord): (Int, Int) =
-    (cell.x + originX, cell.z + originZ)
+    fieldStrategy.gridToWorld(cell, VoyConfig.current)
 
   def isLiveChunk(chunkX: Int, chunkZ: Int): Boolean =
-    val c = worldToGrid(chunkX, chunkZ)
-    c.x >= 0 && c.x < width && c.z >= 0 && c.z < height
+    fieldStrategy.isLiveChunk(chunkX, chunkZ, readoutSnapshot, VoyConfig.current)
+
+  def liveChunks: Iterable[(Int, Int)] = readoutSnapshot.keys
 
   def tell(event: EventDTO): Unit =
     system.foreach(_ ! event)
@@ -77,37 +73,9 @@ object MandateRuntime:
   def setSustenanceAt(chunkX: Int, chunkZ: Int, level: Double): Unit =
     tell(EventMsg.SetSustenance(worldToGrid(chunkX, chunkZ), level))
 
-  private def buildGrid(): MandateGrid = MandateGrid.rectangular(
-    width,
-    height,
-    diffusion = lattice.diffusion,
-    coord =>
-      val localX = coord.x - width / 2
-      val localZ = coord.z - height / 2
-      val distance = Math.sqrt(localX * localX + localZ * localZ)
-      val initialStress = Math.max(
-        0.0,
-        lattice.initialStressPeak - distance * lattice.initialStressFalloff
-      )
-      val state = MandateCurrent(0.0, 0.0, initialStress, 0.0)
-      val cell = MandateState(
-        state,
-        VoyConfig.current.fastParam,
-        VoyConfig.current.stressParam
-      )
-      // Three-tier disturbance field (design note 11 ruling 12): hot core,
-      // remnant ring (the 8x8 "old-era pulse"), silent outer land.
-      cell.disturbance =
-        if distance < lattice.hotspotRadius then lattice.hotspotDisturbance
-        else if distance < lattice.remnantRadius then lattice.remnantDisturbance
-        else lattice.ambientDisturbance
-      cell.baselineCalming =
-        if distance < lattice.calmingRadius then lattice.baselineCalming else 0.0
-      cell
-  )
-
   def start(server: MinecraftServer): Unit = synchronized {
     if system.isEmpty then
+      val cfg = VoyConfig.current
       val persistence = server.getOverworld.getPersistentStateManager
         .getOrCreate(MandatePersistence.StateType, MandatePersistence.Id)
 
@@ -122,7 +90,7 @@ object MandateRuntime:
         }
       )
 
-      val expectedGeometry = (originX, originZ, width, height)
+      val expectedGeometry = fieldStrategy.geometrySignature(cfg)
       val restored = persistence.snapshot.filter { _ =>
         val matches = persistence.geometry == expectedGeometry
         if !matches then
@@ -145,12 +113,13 @@ object MandateRuntime:
           logSavedParameters(snap)
           (grid, snap.links, snap.simTime, rhythmEvidence)
         case None =>
+          val fresh = fieldStrategy.buildInitialGrid(cfg)
           logger.info(
-            s"Starting fresh mandate lattice (${width}x$height cells); " +
+            s"Starting fresh mandate lattice (${fresh.cells.size} cells); " +
               s"parameters from config `${VoyConfig.FileName}` " +
               "(core defaults if absent)."
           )
-          (buildGrid(), Nil, 0.0, Map.empty[CellCoord, RhythmEvidence])
+          (fresh, Nil, 0.0, Map.empty[CellCoord, RhythmEvidence])
 
       persistence.geometry = expectedGeometry
       persistence.snapshot = Some(
@@ -253,8 +222,9 @@ object MandateRuntime:
     readoutSnapshot.getOrElse((chunkX, chunkZ), CellReadout.zero)
 
   private def publishReadout(cells: Map[CellCoord, CellReadout]): Unit =
+    val cfg = VoyConfig.current
     readoutSnapshot = cells.iterator.map { case (coord, readout) =>
-      (coord.x + originX, coord.z + originZ) -> readout
+      fieldStrategy.gridToWorld(coord, cfg) -> readout
     }.toMap
 
   private def drainActions(server: MinecraftServer): Unit =

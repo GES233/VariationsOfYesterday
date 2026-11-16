@@ -10,7 +10,7 @@
 2. **内核步进（`inner/veins/`）**：
    - **四维 RK4 核**（`MandateState.scala`）：快变量 FHN（`excitation` $v$、`recovery` $w$）+ 慢变量（`stress` $s \in [0, 1]$、`activity` $q$）+ step 间闭式衰减的 $\alpha$ 突触脉冲核（`Bell` $\tau=5$ / `CrystalLink` $\tau=2$）。
    - **第五状态 `sustenance`（$M \in [0, 1]$）**：每步 RK4 之后显式推进（logistic 再生 − 高应力酸蚀 + 格间扩散），$M=0$ 为 Allee 吸收态。
-   - **空间耦合**（`MandateGrid.scala`）：目前为固定矩形格（默认 `32×32` 区块），支持对称扩散与有向平流。
+   - **空间耦合**（`MandateGrid.scala` + `MandateField.scala`）：当前通过 `MandateField` 接口（默认实现 `PrototypeValleyField`）注入固定 `32×32` 区块初始场与坐标映射，后续动态生态/一般模式可直接替换该策略。
 3. **输出（引擎 → 世界）**：
    - 每 tick 发布 `@volatile readoutSnapshot: Map[(Int, Int), CellReadout]`（游戏线程只读，不含 `lastBellStrikeAt` / `simTime` 等引擎私有状态）；
    - 离散动作队列 `MandateActionProtocol`（`CellSpikeTriggered`、`RegimeTransitioned`、`BellStruck`）在下一服务端 tick 由 `ActionFeedback` 消费。
