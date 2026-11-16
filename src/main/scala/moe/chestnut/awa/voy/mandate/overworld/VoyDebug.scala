@@ -5,6 +5,8 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.minecraft.server.command.{CommandManager, ServerCommandSource}
 import net.minecraft.text.Text
 
+import moe.chestnut.awa.voy.mandate.MandateRuntime
+
 /** Raw `v` / `s` / `c0` numbers are diagnostics, not player-facing text.
   *
   * Off by default; `/voy debug on` in-game turns them back on. The toggle is
@@ -45,6 +47,22 @@ object VoyDebug:
       val hudPlaceholder = CommandManager.literal("hud").executes { ctx =>
         report(ctx, "§7[旧日变奏] /voy hud 是客户端命令，直接在本地生效")
       }
-      dispatcher.register(CommandManager.literal("voy").`then`(debug).`then`(hudPlaceholder))
+      // Verification aid for ruling 16's `NoAnswer` outcome: a dead cell is
+      // otherwise ~30 min of play away (design note 11 §2). Sets the player's
+      // chunk to M = 0 (absorbing), then `/voy debug on` + ring a bell there.
+      // Development-only: a release build never registers this node.
+      val decay = CommandManager.literal("decay").executes { ctx =>
+        val player = ctx.getSource.getPlayer
+        val cx = player.getChunkPos.x
+        val cz = player.getChunkPos.z
+        MandateRuntime.setSustenanceAt(cx, cz, 0.0)
+        report(
+          ctx,
+          s"§7[旧日变奏] 区块 [$cx,$cz] 菌网置 0（M=0 吸收态）——现在敲钟应得「叩钟无应」"
+        )
+      }
+      dispatcher.register(
+        CommandManager.literal("voy").`then`(debug).`then`(hudPlaceholder).`then`(decay)
+      )
     }
 end VoyDebug
