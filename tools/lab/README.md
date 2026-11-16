@@ -1,7 +1,7 @@
 # tools/lab — FHN 探针（数值依据的可复现出处）
 
 五个纯 Python（仅标准库，Python 3.x）探针，复现「心跳即庇护」迁移计划
-（[docs/reference/heartbeat-shelter-migration-plan-2026-11-16.md](../../docs/reference/heartbeat-shelter-migration-plan-2026-11-16.md)）与札记 11 §2 的实测数据。
+（[docs/archive/heartbeat-shelter-migration-plan-2026-11-16.md](../../docs/archive/heartbeat-shelter-migration-plan-2026-11-16.md)）与札记 11 §2 的实测数据。
 它们模拟的是模组核心同一个四维系统：FHN 快慢变量（`a = α − k·s`，M = 1）
 + 钟声的 α 核脉冲（area 12 / τ 5），RK4 积分。
 

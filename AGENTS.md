@@ -62,6 +62,7 @@ Minecraft 世界                         引擎（单线程 actor）            
 - 本机 JDK 21 路径等环境注意事项见 `ref/本地环境.md`（`ref/` 被 git 忽略）。
 - 测试：22 个 JUnit 5 spec（`inner/veins/` 17 个），`GridBenchmarkSpec` 需 `VOY_BENCH=1` 才运行；数值快照 oracle `SliceContract` / `SliceReplay` 也在 test 源集（不进模组 jar；跨栈角色已于 2026-11-16 退役）。
 - 2026-11-16 起 Elixir 关系沙盘不在本仓库构建内（`mix test` 不适用）；存档与取回见 `docs/README.md`「已外迁」。
+- **现状以代码与 `docs/CURRENT_ARCHITECTURE.md` / `docs/CREATIVE_BIBLE.md` 为准**；`docs/archive/` 仅作历史考古，切勿把归档中未实现的构想或旧术语当成现状。
 
 ## 代码与目录组织
 
@@ -81,7 +82,7 @@ Minecraft 世界                         引擎（单线程 actor）            
 - `src/test/scala/.../` — 上述 spec 与契约 oracle。
 - `tools/lab/` — FHN 数值探针（纯 Python，`RhythmVerdict` 阈值与余脉弧的实测出处）。
 - `contracts/mandate-slice-v1.json` — Scala 实测生成的**内部数值快照**（跨栈角色已退役），勿手改；须重生成时走 `build.gradle` 的 `voy.contract.write` 流程并评审 diff。
-- `docs/` — 中文设计文档与参考稿，索引见 `docs/README.md`；现行庇护语义看札记 11，**现行命名与边界语义看札记 12**（札记 08 仅供历史参考），其来源工作稿在 `docs/reference/`。
+- `docs/` — 现行只看 `docs/CURRENT_ARCHITECTURE.md`（工程）与 `docs/CREATIVE_BIBLE.md`（创作/美工/文案），索引见 `docs/README.md`；全部历史札记已迁入 `docs/archive/`。
 
 ## 开发约定
 

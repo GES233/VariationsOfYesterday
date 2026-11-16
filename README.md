@@ -11,7 +11,7 @@
 
 > _The echo off the rock is wrong when the pick bites in. And █████ is ringing again._
 >
-> _If you can read this, **DO NOT RING THE BELL BEFORE THE PHASES ALIGN. DO NOT TRUST █████ ON ████. Follow the ditch uphill and block the █████ weir.**_
+> _If you can read this, **DO NOT STRIKE AGAIN BEFORE THE RINGING FADES, AND DO NOT TRY TO QUIET THE MOUNTAIN DEAD. DO NOT TRUST █████ ON ████. Follow the ditch uphill and keep what is still beating alive.**_
 
 _The ash of stagnation is spreading. The river downstream has already gone murky._
 
@@ -25,7 +25,7 @@ Design notes live in [`docs/`](docs/) (in Chinese). Build & test: `./gradlew tes
 
 ## Series Context
 
-This is the first act of the thematic *Three Dreams* trilogy. The three works share a meta-theme, recurring imagery, and the player's memory, but they do not promise loader, save, or runtime compatibility and are not intended to form a single modpack. What crosses their incompatible worlds is the player, not the inventory. See [Design Note 10](docs/design-note-10-meta-trilogy-and-drift.md) (in Chinese).
+This is the first act of the thematic *Three Dreams* trilogy. The three works share a meta-theme, recurring imagery, and the player's memory, but they do not promise loader, save, or runtime compatibility and are not intended to form a single modpack. What crosses their incompatible worlds is the player, not the inventory. See [Creative Bible](docs/CREATIVE_BIBLE.md) and [Design Note 10 (archive)](docs/archive/design-note-10-meta-trilogy-and-drift.md) (in Chinese).
 
 ## License
 
