@@ -29,7 +29,8 @@ class VoyConfigSpec:
         |  "tickDt": 0.025,
         |  "stressParam": { "gamma": 0.0007 },
         |  "lattice": { "width": 64 },
-        |  "heartbeatParam": { "overdriveGuard": 9.6 }
+        |  "heartbeatParam": { "overdriveGuard": 9.6 },
+        |  "calmingParam": { "dose": 0.01, "tau": 1800.0 }
         |}""".stripMargin
     )
     val cfg = VoyConfig.loadFrom(configPath)
@@ -37,6 +38,9 @@ class VoyConfigSpec:
     assertEquals(0.025, cfg.tickDt, 1e-12)
     assertEquals(0.0007, cfg.stressParam.gamma, 1e-12, "the calibration knob")
     assertEquals(9.6, cfg.heartbeatParam.overdriveGuard, 1e-12)
+    assertEquals(0.01, cfg.calmingParam.dose, 1e-12)
+    assertEquals(1800.0, cfg.calmingParam.tau, 1e-12)
+    assertEquals(0.04, cfg.calmingParam.cap, 1e-12, "unspecified fields keep their defaults")
     assertEquals(0.01, VoyConfig().stressParam.gamma, 1e-12)
     assertEquals(1e-3, cfg.stressParam.sustenanceGrowth, 1e-12)
     assertEquals(39.47, cfg.heartbeatParam.nominalPeriod, 1e-12)

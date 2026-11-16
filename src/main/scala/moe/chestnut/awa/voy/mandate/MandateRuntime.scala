@@ -102,6 +102,17 @@ object MandateRuntime:
       val persistence = server.getOverworld.getPersistentStateManager
         .getOrCreate(MandatePersistence.StateType, MandatePersistence.Id)
 
+      // Baseline-calming sources (design note 11 ruling 11): load the
+      // persisted chunk ↔ source registry and keep it saved on every change.
+      // The world scan in `rebalance` heals anything the save missed.
+      MandateCalming.load(
+        persistence.sources,
+        sources => {
+          persistence.sources = sources
+          persistence.markDirty()
+        }
+      )
+
       val expectedGeometry = (originX, originZ, width, height)
       val restored = persistence.snapshot.filter { _ =>
         val matches = persistence.geometry == expectedGeometry

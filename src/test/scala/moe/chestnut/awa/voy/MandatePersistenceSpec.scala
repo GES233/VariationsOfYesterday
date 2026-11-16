@@ -21,6 +21,8 @@ import moe.chestnut.awa.voy.inner.veins.{
   MandateCurrent,
   MandateParam,
   MandateSnapshot,
+  MandateSource,
+  MandateSourceKind,
   PulseLink,
   PulseTransmitter,
   StressParam
@@ -91,6 +93,16 @@ class MandatePersistenceSpec:
     assertEquals(geometry, loaded.geometry)
     assertTrue(loaded.snapshot.isDefined, "a valid payload must deserialize")
     assertEquals(sample, loaded.snapshot.get)
+
+  @Test def `calming sources ride the NBT round trip`(): Unit =
+    val sources = List(
+      MandateSource(MandateSourceKind.Bell, 12, 64, -7),
+      MandateSource(MandateSourceKind.Bell, 13, 64, -7)
+    )
+    val nbt = MandatePersistence.toNbt(geometry, sample, sources)
+    val loaded = MandatePersistence.StateType.deserializer.apply(nbt, null)
+    assertEquals(sources, loaded.sources)
+    assertTrue(loaded.snapshot.isDefined, "the lattice still deserializes alongside the sources")
 
   @Test def `an unknown schema version is discarded whole`(): Unit =
     val nbt = MandatePersistence.toNbt(geometry, sample)

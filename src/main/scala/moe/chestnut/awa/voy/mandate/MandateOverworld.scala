@@ -175,8 +175,12 @@ object MandateOverworld:
         val serverWorld = world.asInstanceOf[ServerWorld]
 
         if state.isOf(Blocks.BELL) then
-          MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, 0.0)
+          // A broken bell removes ONE calming source; the chunk's c0 stock
+          // leaks away with its time constant instead of snapping to zero
+          // (design note 11 ruling 11).
+          MandateCalming.unregister(pos.getX, pos.getY, pos.getZ)
           MandateRuntime.injectStressAt(chunkX, chunkZ, 0.06)
+          val remaining = MandateCalming.weightAt(chunkX, chunkZ)
           serverWorld.playSound(
             null,
             pos,
@@ -186,7 +190,12 @@ object MandateOverworld:
             0.5f
           )
           player.sendMessage(
-            Text.literal(f"§c[旧日变奏] 镇山钟损毁：区块 [$chunkX%d, $chunkZ%d] 维持源 (c0) 坍塌，失锚的地脉将难以守住心跳节拍"),
+            Text.literal(
+              if remaining > 0.0 then
+                f"§e[旧日变奏] 镇山钟损毁：区块 [$chunkX%d, $chunkZ%d] 尚有安抚源在维持涓流（余 ${remaining}%.0f 份），c0 将缓慢回落"
+              else
+                f"§c[旧日变奏] 镇山钟损毁：区块 [$chunkX%d, $chunkZ%d] 最后一座安抚源消失，c0 开始缓慢漏失"
+            ),
             true
           )
         else
@@ -361,7 +370,13 @@ object MandateOverworld:
           val readout = MandateRuntime.readoutAt(chunkX, chunkZ)
           val outcome = BellRitual.evaluateBellStrike(readout, VoyConfig.current.heartbeatParam)
           if outcome.anchorsC0 then
-            MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, outcome.baselineCalming)
+            // The strike is a DOSE into the chunk's calming stock, and the
+            // bell itself is registered as a source so its trickle starts
+            // immediately (design note 11 ruling 11).
+            MandateCalming.register(
+              MandateSource(MandateSourceKind.Bell, pos.getX, pos.getY, pos.getZ)
+            )
+            MandateRuntime.setBaselineCalmingAt(chunkX, chunkZ, MandateCalming.dose(readout.baselineCalming))
           // Physics always applies (the bell always sounds); the guard stamp
           // is recorded engine-side from the Bell transmitter (note 11 §1.5).
           MandateRuntime.firePulseAt(chunkX, chunkZ, outcome.pulseArea)
@@ -420,6 +435,12 @@ object MandateOverworld:
     overworld.getPlayers.asScala.foreach { player =>
       applyChunkMandateEffects(overworld, player)
     }
+
+    // Baseline-calming stock rebalance (design note 11 ruling 11): scan the
+    // world truth for calming sources, then step every cell's c0 stock toward
+    // its source-driven equilibrium / leak.
+    if server.getTicks % MandateCalming.RebalanceTicks == 0 then
+      MandateCalming.rebalance(overworld)
 
   /** Raw `v` / `s` / `c0` numbers are diagnostics, not player-facing text.
     * Off by default; `/voy debug on` in-game turns them back on.

@@ -14,6 +14,8 @@ import moe.chestnut.awa.voy.inner.veins.{
   MandateCurrent,
   MandateParam,
   MandateSnapshot,
+  MandateSource,
+  MandateSourceKind,
   PulseLink,
   PulseTransmitter,
   StressParam
@@ -26,12 +28,20 @@ final class MandatePersistence extends PersistentState:
   var geometry: (Int, Int, Int, Int) = (0, 0, 0, 0)
   @volatile var snapshot: Option[MandateSnapshot] = None
 
+  /** Registered calming sources (design note 11 ruling 11): the chunk ↔
+    * source map that feeds the baseline-calming stock. Additive field: saves
+    * without it simply start with an empty registry and re-scan the world on
+    * the next rebalance.
+    */
+  var sources: List[MandateSource] = Nil
+
   override def writeNbt(
       nbt: NbtCompound,
       registryLookup: RegistryWrapper.WrapperLookup
   ): NbtCompound =
     snapshot.foreach { snap =>
       MandatePersistence.writeSnapshot(nbt, geometry, snap)
+      MandatePersistence.writeSources(nbt, sources)
       MandatePersistence.logger.info(
         f"Saved mandate lattice (${snap.cells.size}%d cells, ${snap.links.size}%d links, simTime = ${snap.simTime}%.2f)."
       )
@@ -52,9 +62,38 @@ object MandatePersistence:
 
   def toNbt(
       geometry: (Int, Int, Int, Int),
-      snapshot: MandateSnapshot
+      snapshot: MandateSnapshot,
+      sources: List[MandateSource] = Nil
   ): NbtCompound =
-    writeSnapshot(NbtCompound(), geometry, snapshot)
+    val nbt = writeSnapshot(NbtCompound(), geometry, snapshot)
+    writeSources(nbt, sources)
+    nbt
+
+  /** Write the calming-source registry (additive, schema-3 compatible). */
+  private def writeSources(nbt: NbtCompound, sources: List[MandateSource]): Unit =
+    val list = NbtList()
+    sources.foreach { s =>
+      val c = NbtCompound()
+      c.putString("kind", s.kind.toString)
+      c.putInt("x", s.x)
+      c.putInt("y", s.y)
+      c.putInt("z", s.z)
+      list.add(c)
+    }
+    nbt.put("sources", list)
+
+  private def readSources(nbt: NbtCompound): List[MandateSource] =
+    if !nbt.contains("sources") then Nil
+    else
+      nbt.getList("sources", NbtElement.COMPOUND_TYPE).toArray.toList.collect {
+        case c: NbtCompound =>
+          MandateSource(
+            MandateSourceKind.valueOf(c.getString("kind")),
+            c.getInt("x"),
+            c.getInt("y"),
+            c.getInt("z")
+          )
+      }
 
   private def writeSnapshot(
       nbt: NbtCompound,
@@ -223,4 +262,5 @@ object MandatePersistence:
     state.snapshot = Some(
       MandateSnapshot(nbt.getDouble("simTime"), cells, edges, links)
     )
+    state.sources = readSources(nbt)
     state

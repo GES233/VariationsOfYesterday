@@ -64,7 +64,9 @@ object BellRitual:
       BellStrikeOutcome.DeadMyceliumBurnout
     else if inOverdriveGuard(readout, p) then
       BellStrikeOutcome.PulseOverloadBurnout
-    else if readout.baselineCalming <= 0.0 && readout.regime == Regime.Oscillating then
+    else if readout.baselineCalming < MandatePhenomena.C0ShelterLevel &&
+      readout.regime == Regime.Oscillating
+    then
       readout.phase match
         case PhaseReading.Cycle(PhaseLabel.Excitation, _) =>
           BellStrikeOutcome.SpikeSwallowed

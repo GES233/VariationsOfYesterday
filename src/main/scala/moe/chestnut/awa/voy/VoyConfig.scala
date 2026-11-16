@@ -7,6 +7,7 @@ import net.fabricmc.loader.api.FabricLoader
 import org.slf4j.{Logger, LoggerFactory}
 
 import moe.chestnut.awa.voy.inner.veins.{
+  CalmingParam,
   HeartbeatParam,
   MandateAgent,
   MandateParam,
@@ -65,7 +66,8 @@ final case class VoyConfig(
     fastParam: MandateParam = MandateParam(alpha = 0.7, beta = 0.8, epsilon = 0.08),
     stressParam: StressParam =
       StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3),
-    heartbeatParam: HeartbeatParam = HeartbeatParam()
+    heartbeatParam: HeartbeatParam = HeartbeatParam(),
+    calmingParam: CalmingParam = CalmingParam()
 )
 
 object VoyConfig:
@@ -99,7 +101,8 @@ object VoyConfig:
         lattice = latticeFrom(obj(root, "lattice")),
         fastParam = fastFrom(obj(root, "fastParam")),
         stressParam = stressFrom(obj(root, "stressParam")),
-        heartbeatParam = heartbeatFrom(obj(root, "heartbeatParam"))
+        heartbeatParam = heartbeatFrom(obj(root, "heartbeatParam")),
+        calmingParam = calmingFrom(obj(root, "calmingParam"))
       )
     catch
       case e: Exception =>
@@ -162,6 +165,15 @@ object VoyConfig:
       sustenanceBurn = dbl(o, "sustenanceBurn", d.sustenanceBurn),
       sustenanceBurnThreshold = dbl(o, "sustenanceBurnThreshold", d.sustenanceBurnThreshold),
       sustenanceFloor = dbl(o, "sustenanceFloor", d.sustenanceFloor)
+    )
+
+  private def calmingFrom(o: JsonObject): CalmingParam =
+    val d = CalmingParam()
+    CalmingParam(
+      tau = dbl(o, "tau", d.tau),
+      tricklePerWeight = dbl(o, "tricklePerWeight", d.tricklePerWeight),
+      dose = dbl(o, "dose", d.dose),
+      cap = dbl(o, "cap", d.cap)
     )
 
   private def heartbeatFrom(o: JsonObject): HeartbeatParam =
@@ -229,5 +241,13 @@ object VoyConfig:
     h.addProperty("overloadPenaltyTicks", hp.overloadPenaltyTicks)
     h.addProperty("exitBadCycles", hp.exitBadCycles)
     root.add("heartbeatParam", h)
+
+    val cp = cfg.calmingParam
+    val c = JsonObject()
+    c.addProperty("tau", cp.tau)
+    c.addProperty("tricklePerWeight", cp.tricklePerWeight)
+    c.addProperty("dose", cp.dose)
+    c.addProperty("cap", cp.cap)
+    root.add("calmingParam", c)
 
     GsonBuilder().setPrettyPrinting().create().toJson(root)

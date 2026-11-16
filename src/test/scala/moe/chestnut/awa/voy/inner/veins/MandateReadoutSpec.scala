@@ -3,7 +3,7 @@ package moe.chestnut.awa.voy.inner.veins
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-import moe.chestnut.awa.voy.mandate.BellRitual
+import moe.chestnut.awa.voy.mandate.{BellRitual, MandatePhenomena}
 import moe.chestnut.awa.voy.mandate.BellRitual.BellStrikeOutcome
 
 /** Defined-domain behaviour of the 3-axis readout and bell strike adjudication. */
@@ -208,6 +208,26 @@ class MandateReadoutSpec:
     assertTrue(
       burnoutOutcome.anchorsC0,
       "saturated but living cells anchor: re-anchoring is part of the rescue chain (ruling 13)"
+    )
+
+  @Test def `the unanchored test follows the calming-stock threshold`(): Unit =
+    val lowStock = CellReadout(
+      MandateCurrent(1.9, 0.2, 0.65, 0.55),
+      Regime.Oscillating,
+      PhaseReading.Cycle(PhaseLabel.Excitation, 0.05),
+      baselineCalming = MandatePhenomena.C0ShelterLevel / 2.0
+    )
+    assertEquals(
+      BellStrikeOutcome.SpikeSwallowed,
+      BellRitual.evaluateBellStrike(lowStock),
+      "a stock below the c0 shelf threshold is still 'unanchored'"
+    )
+
+    val stocked = lowStock.copy(baselineCalming = MandatePhenomena.C0ShelterLevel + 0.005)
+    assertEquals(
+      BellStrikeOutcome.AnchoredOrMaintained,
+      BellRitual.evaluateBellStrike(stocked),
+      "a trickled stock above the threshold anchors even mid-excitation"
     )
 
   @Test def `bell strike on dead mycelium answers nothing`(): Unit =
