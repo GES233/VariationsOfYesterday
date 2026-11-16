@@ -48,10 +48,5 @@
 		"fabric-api": "*",
 		"kotori_scala": ">=3.0.0"
 	},
-	"requires": {
-		"kotori_scala": ">=3.0.0"
-	},
-	"suggests": {
-		"another-mod": "*"
-	}
+	"suggests": {}
 }
