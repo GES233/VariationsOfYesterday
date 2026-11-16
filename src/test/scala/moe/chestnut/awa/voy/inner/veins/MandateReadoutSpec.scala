@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 import moe.chestnut.awa.voy.mandate.{BellRitual, MandatePhenomena}
-import moe.chestnut.awa.voy.mandate.BellRitual.BellStrikeOutcome
+import moe.chestnut.awa.voy.mandate.BellRitual.BellOutcome
 
 /** Defined-domain behaviour of the 3-axis readout and bell strike adjudication. */
 class MandateReadoutSpec:
@@ -163,7 +163,7 @@ class MandateReadoutSpec:
     assertEquals(Some(5), refractoryCycle.dialTick, "0.25 of 20 divisions is tick 5")
     assertEquals(None, calmMaintained.dialTick, "resting basin has no cycle dial tick")
 
-  @Test def `phase-gated bell strike re-anchoring across Calm, Oscillating, and Burnout`(): Unit =
+  @Test def `bell strike anchors on every living cell regardless of phase`(): Unit =
     val calmUnanchored = CellReadout(
       MandateCurrent(-1.2, -0.6, 0.05, 0.0),
       Regime.Calm,
@@ -171,10 +171,12 @@ class MandateReadoutSpec:
       baselineCalming = 0.0
     )
     val calmOutcome = BellRitual.evaluateBellStrike(calmUnanchored)
-    assertEquals(BellStrikeOutcome.AnchoredOrMaintained, calmOutcome)
+    assertEquals(BellOutcome.Struck, calmOutcome)
     assertTrue(calmOutcome.anchorsC0)
-    assertEquals(BellRitual.BellBaselineCalming, calmOutcome.baselineCalming, 1e-12)
 
+    // Ruling 16 (note 12 §4): the old `SpikeSwallowed` phase gate is gone. A
+    // strike during Excitation anchors like any other living cell — the bell
+    // paces the rhythm, it does not snipe the phase.
     val oscExcitationUnanchored = CellReadout(
       MandateCurrent(1.9, 0.2, 0.65, 0.55),
       Regime.Oscillating,
@@ -182,9 +184,11 @@ class MandateReadoutSpec:
       baselineCalming = 0.0
     )
     val spikeOutcome = BellRitual.evaluateBellStrike(oscExcitationUnanchored)
-    assertEquals(BellStrikeOutcome.SpikeSwallowed, spikeOutcome)
-    assertFalse(spikeOutcome.anchorsC0, "striking during Excitation must fail to re-anchor c0")
-    assertEquals(0.0, spikeOutcome.baselineCalming, 1e-12)
+    assertEquals(BellOutcome.Struck, spikeOutcome)
+    assertTrue(
+      spikeOutcome.anchorsC0,
+      "striking during Excitation anchors: no phase gate (ruling 16)"
+    )
 
     val oscRefractoryUnanchored = CellReadout(
       MandateCurrent(0.4, 0.8, 0.65, 0.55),
@@ -193,9 +197,8 @@ class MandateReadoutSpec:
       baselineCalming = 0.0
     )
     val reanchorOutcome = BellRitual.evaluateBellStrike(oscRefractoryUnanchored)
-    assertEquals(BellStrikeOutcome.AnchoredOrMaintained, reanchorOutcome)
-    assertTrue(reanchorOutcome.anchorsC0, "striking in refractory window re-anchors c0")
-    assertEquals(BellRitual.BellBaselineCalming, reanchorOutcome.baselineCalming, 1e-12)
+    assertEquals(BellOutcome.Struck, reanchorOutcome)
+    assertTrue(reanchorOutcome.anchorsC0)
 
     val burnoutCell = CellReadout(
       MandateCurrent(1.1, 0.4, 0.98, 0.0),
@@ -204,30 +207,28 @@ class MandateReadoutSpec:
       baselineCalming = 0.0
     )
     val burnoutOutcome = BellRitual.evaluateBellStrike(burnoutCell)
-    assertEquals(BellStrikeOutcome.AnchoredOrMaintained, burnoutOutcome)
+    assertEquals(BellOutcome.Struck, burnoutOutcome)
     assertTrue(
       burnoutOutcome.anchorsC0,
       "saturated but living cells anchor: re-anchoring is part of the rescue chain (ruling 13)"
     )
 
-  @Test def `the unanchored test follows the calming-stock threshold`(): Unit =
+  @Test def `the strike outcome ignores the c0 stock level`(): Unit =
+    // Regression guard for ruling 16: reintroducing a c0 (or phase) gate into
+    // the bell verdict makes this test fail.
     val lowStock = CellReadout(
       MandateCurrent(1.9, 0.2, 0.65, 0.55),
       Regime.Oscillating,
       PhaseReading.Cycle(PhaseLabel.Excitation, 0.05),
-      baselineCalming = MandatePhenomena.C0ShelterLevel / 2.0
+      baselineCalming = 0.0
     )
-    assertEquals(
-      BellStrikeOutcome.SpikeSwallowed,
-      BellRitual.evaluateBellStrike(lowStock),
-      "a stock below the c0 shelf threshold is still 'unanchored'"
-    )
-
     val stocked = lowStock.copy(baselineCalming = MandatePhenomena.C0ShelterLevel + 0.005)
+    assertEquals(BellOutcome.Struck, BellRitual.evaluateBellStrike(lowStock))
+    assertEquals(BellOutcome.Struck, BellRitual.evaluateBellStrike(stocked))
     assertEquals(
-      BellStrikeOutcome.AnchoredOrMaintained,
+      BellRitual.evaluateBellStrike(lowStock),
       BellRitual.evaluateBellStrike(stocked),
-      "a trickled stock above the threshold anchors even mid-excitation"
+      "the calming stock must not change a bell verdict (ruling 16)"
     )
 
   @Test def `bell strike on dead mycelium answers nothing`(): Unit =
@@ -239,7 +240,7 @@ class MandateReadoutSpec:
       sustenance = 0.0
     )
     val outcome = BellRitual.evaluateBellStrike(deadCell)
-    assertEquals(BellStrikeOutcome.DeadMyceliumBurnout, outcome)
+    assertEquals(BellOutcome.NoAnswer, outcome)
     assertFalse(outcome.anchorsC0)
     assertFalse(outcome.triggersOverloadPenalty)
 
@@ -253,16 +254,16 @@ class MandateReadoutSpec:
       simTime = 6.0
     )
     val outcome = BellRitual.evaluateBellStrike(inGuard)
-    assertEquals(BellStrikeOutcome.PulseOverloadBurnout, outcome)
+    assertEquals(BellOutcome.Overdriven, outcome)
     assertFalse(outcome.anchorsC0)
     assertTrue(outcome.triggersOverloadPenalty)
 
     val guardExpired = inGuard.copy(simTime = 11.0) // 9 s later > 8 s guard
-    assertEquals(BellStrikeOutcome.AnchoredOrMaintained, BellRitual.evaluateBellStrike(guardExpired))
+    assertEquals(BellOutcome.Struck, BellRitual.evaluateBellStrike(guardExpired))
 
     val neverStruck = inGuard.copy(lastBellStrikeAt = Double.NaN)
     assertEquals(
-      BellStrikeOutcome.AnchoredOrMaintained,
+      BellOutcome.Struck,
       BellRitual.evaluateBellStrike(neverStruck),
       "a fresh cell has no guard history"
     )

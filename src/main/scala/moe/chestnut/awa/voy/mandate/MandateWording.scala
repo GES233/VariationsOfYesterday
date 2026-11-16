@@ -2,7 +2,7 @@ package moe.chestnut.awa.voy.mandate
 
 import moe.chestnut.awa.voy.inner.plant.GastrodiaBedVerdict
 import moe.chestnut.awa.voy.inner.veins.*
-import moe.chestnut.awa.voy.mandate.BellRitual.{BellBaselineCalming, BellStrikeOutcome}
+import moe.chestnut.awa.voy.mandate.BellRitual.BellOutcome
 
 /** All player-facing wording of the mandate wiring layer.
   *
@@ -139,33 +139,21 @@ object MandateWording:
   def formatBellPulse(
       chunkX: Int,
       chunkZ: Int,
-      r: CellReadout,
-      outcome: BellStrikeOutcome
+      outcome: BellOutcome
   ): String =
     outcome match
-      case BellStrikeOutcome.DeadMyceliumBurnout =>
+      case BellOutcome.NoAnswer =>
         f"§4[叩钟无应] [$chunkX%d,$chunkZ%d] 菌网枯绝或地脉失能，钟声如击死肉，连片回音都没有——须先泄压降酸、再接种菌丝"
 
-      case BellStrikeOutcome.PulseOverloadBurnout =>
+      case BellOutcome.Overdriven =>
         f"§c[叩钟过密] [$chunkX%d,$chunkZ%d] 钟声未息又起一记，过驱动反震沿铜钲回撞上臂——稍候片刻再叩"
 
-      case BellStrikeOutcome.SpikeSwallowed =>
-        val tick = r.dialTick.getOrElse(0)
-        f"§e[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 (Excitation) -> 正处尖峰爆发期，钟声被地鸣吞没：c0 未重锚，这一拍也没能校进来"
-
-      case BellStrikeOutcome.AnchoredOrMaintained =>
-        r.phase match
-          case PhaseReading.Cycle(label, _) =>
-            val tick = r.dialTick.getOrElse(0)
-            label match
-              case PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory =>
-                f"§b[叩钟校拍] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 命中不应期刻度，c0 已重锚，节拍被校正"
-              case PhaseLabel.Resting =>
-                f"§7[叩钟静息] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 处于恢复晚期，脉冲被平缓吸收"
-              case PhaseLabel.Excitation =>
-                f"§c[叩钟失锚] [$chunkX%d,$chunkZ%d] 刻度:第$tick%02d/20格 ($label) -> 正处尖峰爆发期，钟声被地鸣吞没"
-          case _ =>
-            f"§b[叩钟起搏] [$chunkX%d,$chunkZ%d] 维持源已锚定 (c0=$BellBaselineCalming%.2f)，一记脉动唤起地鸣——守住节拍，山便醒着"
+      // One wording for every landed strike (note 12 §4.2, ruling 16): the bell
+      // no longer claims to know where the cycle was, so 校拍/静息/失锚 leave
+      // the verdict path. They survive, if at all, as a delayed echo
+      // (`PulseOutcome`, note 12 §4.3).
+      case BellOutcome.Struck =>
+        f"§b[叩钟] [$chunkX%d,$chunkZ%d] 一记脉动沉进地脉，维持源已锚定——守住节拍，山便醒着"
 
   def formatPhaseShort(phase: PhaseReading): String =
     phase match

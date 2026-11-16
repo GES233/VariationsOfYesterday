@@ -15,12 +15,14 @@ import moe.chestnut.awa.voy.inner.veins.*
 import moe.chestnut.awa.voy.mandate.*
 
 /** Bell strike: the one ritual gesture that both *paces* the heartbeat and
-  * *doses* the chunk's calming stock (design note 11 §1.5, ruling 11).
+  * *doses* the chunk's calming stock (design note 11 §1.5, ruling 11; note 12 §4,
+  * ruling 16).
   *
-  * The four verdicts come from the pure [[BellRitual]] adjudicator; this
-  * module only spends their consequences and renders them. Every verdict is
-  * distinguishable without reading chat: amber + notes = paced, a muffled
-  * puff = swallowed, rust burst = overdrive, dead ash = no answer.
+  * The three outcomes come from the pure [[BellRitual]] adjudicator; this module
+  * only spends their consequences and renders them. Every outcome is
+  * distinguishable without reading chat: amber + notes = the strike landed, rust
+  * burst = overdrive, dead ash = no answer. No outcome depends on the cycle's
+  * phase any more — the bell is a pacemaker, not a phase sniper.
   */
 object BellStrike:
   /** Warm amber ring: the strike landed in the rhythm (bell-palette copper). */
@@ -54,10 +56,10 @@ object BellStrike:
         )
       // Physics always applies (the bell always sounds); the guard stamp
       // is recorded engine-side from the Bell transmitter (note 11 §1.5).
-      MandateRuntime.firePulseAt(chunkX, chunkZ, outcome.pulseArea)
-      // Four verdicts must be distinguishable without reading chat
-      // (design note 11 §1.5): particles + layered sounds per outcome.
-      feedback(world, pos, outcome, readout)
+      MandateRuntime.firePulseAt(chunkX, chunkZ, BellRitual.BellPulseArea)
+      // Three outcomes must be distinguishable without reading chat
+      // (design note 12 §4.2): particles + layered sounds per outcome.
+      feedback(world, pos, outcome)
       // Acute overdrive backlash (design note 11 §1.5 row 2): striking
       // inside the guard recoils on the striker immediately.
       if outcome.triggersOverloadPenalty then
@@ -91,44 +93,37 @@ object BellStrike:
           0.02
         )
       player.sendMessage(
-        Text.literal(MandateWording.formatBellPulse(chunkX, chunkZ, readout, outcome)),
+        Text.literal(MandateWording.formatBellPulse(chunkX, chunkZ, outcome)),
         true
       )
       Some(ActionResult.PASS)
     else None
 
-  /** Per-verdict bell feedback (design note 11 §1.5). The vanilla bell keeps
-    * its own sound (the interaction stays PASS), and these layers make the
-    * four verdicts readable at a glance.
+  /** Per-outcome bell feedback (design note 12 §4.2). The vanilla bell keeps its
+    * own sound (the interaction stays PASS), and these layers make the three
+    * outcomes readable at a glance.
+    *
+    * The old "phase-corrected" variant (amethyst chime) is gone with the phase
+    * gate: the bell no longer claims to know where the cycle was.
     */
   private def feedback(
       world: ServerWorld,
       pos: BlockPos,
-      outcome: BellRitual.BellStrikeOutcome,
-      readout: CellReadout
+      outcome: BellRitual.BellOutcome
   ): Unit =
     val x = pos.getX + 0.5
     val y = pos.getY + 0.8
     val z = pos.getZ + 0.5
     outcome match
-      case BellRitual.BellStrikeOutcome.AnchoredOrMaintained =>
+      case BellRitual.BellOutcome.Struck =>
         world.spawnParticles(StrikeAmber, x, y, z, 10, 0.35, 0.25, 0.35, 0.01)
-        readout.phase match
-          case PhaseReading.Cycle(PhaseLabel.AbsoluteRefractory | PhaseLabel.RelativeRefractory, _) =>
-            // Phase-corrected: a clear chime and rising notes.
-            world.playSound(
-              null,
-              pos,
-              SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME,
-              SoundCategory.BLOCKS,
-              0.9f,
-              1.4f
-            )
-            world.spawnParticles(ParticleTypes.NOTE, x, y + 0.4, z, 6, 0.4, 0.3, 0.4, 0.05)
-          case _ =>
-            world.spawnParticles(ParticleTypes.NOTE, x, y + 0.3, z, 3, 0.3, 0.2, 0.3, 0.02)
+        world.spawnParticles(ParticleTypes.NOTE, x, y + 0.4, z, 6, 0.4, 0.3, 0.4, 0.05)
 
-      case BellRitual.BellStrikeOutcome.SpikeSwallowed =>
+      case BellRitual.BellOutcome.NoAnswer =>
+        // Dead meat gives no echo — but "no echo" must still be *legible* as a
+        // distinct outcome, not as a missed click. A muffled candle-out (the cue
+        // freed by the collapsed `SpikeSwallowed` state) plus a thin drift of
+        // ash: the bell did ring, and died instantly.
         world.playSound(
           null,
           pos,
@@ -137,11 +132,9 @@ object BellStrike:
           0.8f,
           0.7f
         )
-        world.spawnParticles(ParticleTypes.ASH, x, y, z, 6, 0.3, 0.3, 0.3, 0.01)
+        world.spawnParticles(ParticleTypes.ASH, x, y, z, 8, 0.35, 0.25, 0.35, 0.01)
+        world.spawnParticles(ParticleTypes.ASH, x, y - 0.3, z, 4, 0.4, 0.15, 0.4, 0.005)
 
-      case BellRitual.BellStrikeOutcome.DeadMyceliumBurnout =>
-        world.spawnParticles(ParticleTypes.ASH, x, y - 0.2, z, 3, 0.4, 0.2, 0.4, 0.005)
-
-      case BellRitual.BellStrikeOutcome.PulseOverloadBurnout =>
+      case BellRitual.BellOutcome.Overdriven =>
         world.spawnParticles(StrikeRust, x, y, z, 14, 0.5, 0.4, 0.5, 0.02)
 end BellStrike

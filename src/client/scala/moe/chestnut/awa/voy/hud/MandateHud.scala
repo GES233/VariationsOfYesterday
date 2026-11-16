@@ -195,9 +195,10 @@ object MandateHud:
     val activeTick = centerEntry.flatMap(_.view.dialTick)
     val segW = 6
     val segGap = 2
-    // The old absolute/relative phase-window marks are gone with the
-    // six-way strike dispatch (note 11 §1.5): only the excitation phase still
-    // gates a strike verdict (SpikeSwallowed), so the bar is a plain dial.
+    // The old absolute/relative phase-window marks are gone with the six-way
+    // strike dispatch (note 11 §1.5), and the last consumer of the phase in the
+    // strike path left with ruling 16 (note 12 §4): the dial is now purely
+    // observational — no verdict reads it.
     for tick <- 0 until 20 do
       val sx = gridX + tick * (segW + segGap)
       val isCurrent = activeTick.contains(tick)
