@@ -2,10 +2,9 @@ package moe.chestnut.awa.voy.mandate.overworld
 
 import scala.jdk.CollectionConverters.*
 
-import net.minecraft.block.Blocks
 import net.minecraft.entity.effect.{StatusEffectInstance, StatusEffects}
 import net.minecraft.entity.passive.VillagerEntity
-import net.minecraft.particle.{DustParticleEffect, ParticleTypes}
+import net.minecraft.particle.ParticleTypes
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.server.world.ServerWorld
@@ -40,9 +39,6 @@ object StagnationRunner:
     * instead of the same line every second. Server thread only.
     */
   private val lastShelter = new java.util.HashMap[java.util.UUID, java.lang.Boolean]()
-
-  /** Iron-ochre seep colour (the "yellow boy" precipitate of note 06 §3). */
-  private val SeepDust = new DustParticleEffect(0xc77e1f, 1.1f)
 
   /** Periodic Overworld check (runs on server thread). */
   def tick(server: MinecraftServer): Unit =
@@ -204,22 +200,25 @@ object StagnationRunner:
     if profile.seepTier != MandatePhenomena.YellowSeepTier.None then
       emitYellowSeep(world, player, profile.seepTier.particleCount)
 
-  /** Sample a few nearby surface water blocks and tint them with iron-ochre
-    * dust ("yellow boy", note 06 §3). Bounded scan — at most 24 attempts and
-    * 2 emission sites per player per emission tick — keeps the per-tick cost
-    * fixed regardless of world size.
+  /** Sample a few nearby surface carrier blocks and tint them with the chunk's
+    * ecological seep dust (iron-ochre water in mountains, smoldering peat fume
+    * in swamps, thermokarst silt in permafrost, wind-blown sand in deserts).
+    * Bounded scan — at most 24 attempts and 2 emission sites per player per
+    * emission tick — keeps the per-tick cost fixed regardless of world size.
     */
   private def emitYellowSeep(world: ServerWorld, player: ServerPlayerEntity, count: Int): Unit =
     val base = player.getBlockPos
+    val ecology = OverworldVocabulary.ecologyAt(world, base)
+    val dust = OverworldVocabulary.seepDust(ecology)
     val rng = world.random
     var emitted = 0
     var attempts = 0
     while emitted < 2 && attempts < 24 do
       attempts += 1
       val pos = base.add(rng.nextInt(17) - 8, rng.nextInt(9) - 4, rng.nextInt(17) - 8)
-      if world.getBlockState(pos).isOf(Blocks.WATER) then
+      if OverworldVocabulary.isSeepCarrier(world.getBlockState(pos), ecology) then
         world.spawnParticles(
-          SeepDust,
+          dust,
           pos.getX + 0.5,
           pos.getY + 0.95,
           pos.getZ + 0.5,

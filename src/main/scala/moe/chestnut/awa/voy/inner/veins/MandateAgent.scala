@@ -208,7 +208,8 @@ object MandateAgent:
           pulseDrive = pDrive,
           rhythm = rhythm,
           sustenanceFloor = cell.stressParam.sustenanceFloor,
-          toxicityThreshold = cell.stressParam.sustenanceBurnThreshold
+          toxicityThreshold = cell.stressParam.sustenanceBurnThreshold,
+          sustenanceDepth = cell.stressParam.sustenanceDepth
         ))
 
         val spikingNow = cur.excitation >= readoutParam.spikeLevel

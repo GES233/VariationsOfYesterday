@@ -51,17 +51,118 @@ case class StressParam(
     // trickle from living neighbours survives and may grow past it
 )
 
+/** Ecological adapter kind for the slow subsystem (land stress `s`, activity
+  * `q`, and endogenous sustenance `M`).
+  *
+  * All four ecologies share the exact same 4D RK4 + Fisher-KPP governing
+  * equations in [[MandateState]]; they differ only in their parameter regime
+  * ([[StressParam.forEcology]]) and world-side input/phenomena vocabulary:
+  *
+  *  - [[EcologyKind.Mountain]]: Sulfide oxidation (AMD) + subterranean mycelial network;
+  *  - [[EcologyKind.Swamp]]: Natural wetland buffer + subterranean peat smoldering fire;
+  *  - [[EcologyKind.Permafrost]]: Permafrost thermal inertia + thermokarst thaw slump;
+  *  - [[EcologyKind.Desert]]: Biological soil crust (BSC) + wind-erosion saltation.
+  */
+enum EcologyKind:
+  case Mountain, Swamp, Permafrost, Desert
+
+object EcologyKind:
+  /** Pure biome-id path classifier (no Minecraft dependency, testable in isolation). */
+  def fromBiomePath(biomePath: String): EcologyKind =
+    val p = biomePath.toLowerCase(java.util.Locale.ROOT)
+    if p.contains("swamp") || p.contains("mangrove") || p.contains("marsh") ||
+      p.contains("bog") || p.contains("peat") || p.contains("wetland")
+    then EcologyKind.Swamp
+    else if p.contains("snow") || p.contains("ice") || p.contains("frozen") ||
+      p.contains("permafrost") || p.contains("tundra") || p == "grove"
+    then EcologyKind.Permafrost
+    else if p.contains("desert") || p.contains("badlands") || p.contains("dune") ||
+      p.contains("arid")
+    then EcologyKind.Desert
+    else EcologyKind.Mountain
+
 object StressParam:
   /** Dormant sustenance (`r = 0, c = 0`): measures the bare FHN core at native
     * `M = 1`, used by the numeric snapshot contract and isolated core specs.
     */
   val BareCore: StressParam = StressParam()
 
-  /** Gameplay overworld defaults (design note 06 §7.1): enables mycelial
-    * logistic regrowth and high-stress acid burn.
+  /** Gameplay overworld defaults (design note 06 §7.1): mountain AMD +
+    * mycelial logistic regrowth and high-stress acid burn.
     */
   val OverworldDefault: StressParam =
     StressParam(sustenanceGrowth = 1e-3, sustenanceBurn = 4e-3)
+
+  /** Swamp adapter (natural wetland buffer + peat smoldering fire):
+    *  - High low-stress recovery (`delta0 = 0.50, sHalf = 0.12` -> peak buffer
+    *    0.030 vs mountain 0.0225) lets intact wet peatlands absorb stress from
+    *    neighbouring cells;
+    *  - Once dried past `sHalf`, hydrophobic peat loses buffering sharply and
+    *    strong smoldering feedback (`eta = 1.60`) drives self-sustaining
+    *    underground fire that rapidly burns the Sphagnum mat (`M`).
+    */
+  val SwampPeatDefault: StressParam =
+    StressParam(
+      gamma = 0.01,
+      delta0 = 0.50,
+      sHalf = 0.12,
+      eta = 1.60,
+      sustenanceGrowth = 1.5e-3,
+      sustenanceBurn = 6e-3,
+      sustenanceBurnThreshold = 0.60
+    )
+
+  /** Permafrost adapter (permafrost thermal inertia + thermokarst collapse):
+    *  - Low `gamma = 0.005` reflects latent-heat inertia under early disturbance;
+    *  - Narrow `sHalf = 0.10` creates a sharp phase-change cliff once active-layer
+    *    thaw exceeds refreezing capacity;
+    *  - Deeper collapse `sustenanceDepth = 1.35` and slow cryo-mat regrowth
+    *    (`sustenanceGrowth = 4e-4`) model irreversible-feeling thermokarst slump.
+    */
+  val PermafrostDefault: StressParam =
+    StressParam(
+      gamma = 0.005,
+      delta0 = 0.36,
+      sHalf = 0.10,
+      eta = 1.25,
+      sustenanceDepth = 1.35,
+      sustenanceGrowth = 4e-4,
+      sustenanceBurn = 5e-3,
+      sustenanceBurnThreshold = 0.55
+    )
+
+  /** Desert adapter (biological soil crust BSC + wind-erosion saltation):
+    *  - High sensitivity `gamma = 0.016` and weak bare-sand recovery (`delta0 = 0.18,
+    *    sHalf = 0.12`) make mechanical disturbance immediately felt;
+    *  - Low burn threshold `sustenanceBurnThreshold = 0.45` and fast abrasion
+    *    `sustenanceBurn = 6e-3` with ultra-slow natural crust regeneration
+    *    (`sustenanceGrowth = 3e-4, sustenanceFloor = 2e-4`) require stabilization
+    *    and deliberate re-inoculation.
+    */
+  val DesertBscDefault: StressParam =
+    StressParam(
+      gamma = 0.016,
+      delta0 = 0.18,
+      sHalf = 0.12,
+      eta = 1.20,
+      sustenanceGrowth = 3e-4,
+      sustenanceBurn = 6e-3,
+      sustenanceBurnThreshold = 0.45,
+      sustenanceFloor = 2e-4
+    )
+
+  /** Select the slow-subsystem parameter preset for `ecology`.
+    * `Mountain` returns `mountainBase` so `VoyConfig` overrides remain respected.
+    */
+  def forEcology(
+      ecology: EcologyKind,
+      mountainBase: StressParam = OverworldDefault
+  ): StressParam =
+    ecology match
+      case EcologyKind.Mountain   => mountainBase
+      case EcologyKind.Swamp      => SwampPeatDefault
+      case EcologyKind.Permafrost => PermafrostDefault
+      case EcologyKind.Desert     => DesertBscDefault
 
 /** Full state of the mandate system.
   *

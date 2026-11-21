@@ -32,7 +32,8 @@ object BlockBreakListener:
         if state.isOf(Blocks.BELL) then
           onBellBroken(serverWorld, player, pos, chunkX, chunkZ)
         else
-          val dose = OverworldVocabulary.stressDoseForBlock(state)
+          val ecology = OverworldVocabulary.ecologyAt(serverWorld, pos)
+          val dose = OverworldVocabulary.stressDoseForBlock(state, ecology)
           if dose > 0.0 && MandateRuntime.isLiveChunk(chunkX, chunkZ) then
             MandateRuntime.injectStressAt(chunkX, chunkZ, dose)
             val readout = MandateRuntime.readoutAt(chunkX, chunkZ)

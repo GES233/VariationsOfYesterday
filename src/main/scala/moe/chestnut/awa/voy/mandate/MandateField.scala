@@ -15,7 +15,10 @@ trait MandateField:
   def geometrySignature(cfg: VoyConfig): (Int, Int, Int, Int)
 
   /** Build the initial lattice (cells, transport edges, initial fields). */
-  def buildInitialGrid(cfg: VoyConfig): MandateGrid
+  def buildInitialGrid(
+      cfg: VoyConfig,
+      ecologyAtChunk: (Int, Int) => EcologyKind = (_, _) => EcologyKind.Mountain
+  ): MandateGrid
 
   /** Map a Minecraft chunk coordinate to its engine cell coordinate. */
   def worldToGrid(chunkX: Int, chunkZ: Int, cfg: VoyConfig): CellCoord
@@ -57,7 +60,10 @@ object PrototypeValleyField extends MandateField:
       val c = worldToGrid(chunkX, chunkZ, cfg)
       c.x >= 0 && c.x < l.width && c.z >= 0 && c.z < l.height
 
-  override def buildInitialGrid(cfg: VoyConfig): MandateGrid =
+  override def buildInitialGrid(
+      cfg: VoyConfig,
+      ecologyAtChunk: (Int, Int) => EcologyKind = (_, _) => EcologyKind.Mountain
+  ): MandateGrid =
     val l = cfg.lattice
     MandateGrid.rectangular(
       l.width,
@@ -72,7 +78,10 @@ object PrototypeValleyField extends MandateField:
           l.initialStressPeak - distance * l.initialStressFalloff
         )
         val state = MandateCurrent(0.0, 0.0, initialStress, 0.0)
-        val cell = MandateState(state, cfg.fastParam, cfg.stressParam)
+        val (chunkX, chunkZ) = gridToWorld(coord, cfg)
+        val ecology = ecologyAtChunk(chunkX, chunkZ)
+        val stressParam = StressParam.forEcology(ecology, cfg.stressParam)
+        val cell = MandateState(state, cfg.fastParam, stressParam)
         // Three-tier disturbance field (design note 11 ruling 12): hot core,
         // remnant ring (the 8x8 "old-era pulse"), silent outer land.
         cell.disturbance =

@@ -12,6 +12,7 @@ import moe.chestnut.awa.voy.inner.action.MandateActionProtocol
 import moe.chestnut.awa.voy.inner.actor.ActorRef
 import moe.chestnut.awa.voy.inner.event.{EventDTO, EventMsg}
 import moe.chestnut.awa.voy.inner.veins.*
+import moe.chestnut.awa.voy.mandate.overworld.OverworldVocabulary
 
 /** Game-side bridge between Minecraft and the mandate engine actor: owns the
   * engine actor lifecycle, the tick gate, readout publication, and the action
@@ -76,7 +77,8 @@ object MandateRuntime:
   def start(server: MinecraftServer): Unit = synchronized {
     if system.isEmpty then
       val cfg = VoyConfig.current
-      val persistence = server.getOverworld.getPersistentStateManager
+      val overworld = server.getOverworld
+      val persistence = overworld.getPersistentStateManager
         .getOrCreate(MandatePersistence.StateType, MandatePersistence.Id)
 
       // Baseline-calming sources (design note 11 ruling 11): load the
@@ -113,7 +115,10 @@ object MandateRuntime:
           logSavedParameters(snap)
           (grid, snap.links, snap.simTime, rhythmEvidence)
         case None =>
-          val fresh = fieldStrategy.buildInitialGrid(cfg)
+          val fresh = fieldStrategy.buildInitialGrid(
+            cfg,
+            (cx, cz) => OverworldVocabulary.ecologyAtChunk(overworld, cx, cz)
+          )
           logger.info(
             s"Starting fresh mandate lattice (${fresh.cells.size} cells); " +
               s"parameters from config `${VoyConfig.FileName}` " +

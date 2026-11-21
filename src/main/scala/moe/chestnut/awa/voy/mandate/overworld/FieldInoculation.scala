@@ -34,7 +34,8 @@ object FieldInoculation:
       chunkX: Int,
       chunkZ: Int
   ): Option[ActionResult] =
-    if !player.isSneaking && OverworldVocabulary.isWildInoculum(held) &&
+    val ecology = OverworldVocabulary.ecologyAt(world, pos)
+    if !player.isSneaking && OverworldVocabulary.isWildInoculum(held, ecology) &&
       OverworldVocabulary.isStrippedTimber(state) &&
       MandateRuntime.isLiveChunk(chunkX, chunkZ)
     then
@@ -103,7 +104,8 @@ object FieldInoculation:
       chunkX: Int,
       chunkZ: Int
   ): Option[ActionResult] =
-    if OverworldVocabulary.isInoculum(held) && OverworldVocabulary.isInoculableSoil(state) &&
+    val ecology = OverworldVocabulary.ecologyAt(world, pos)
+    if OverworldVocabulary.isInoculum(held, ecology) && OverworldVocabulary.isInoculableSoil(state, ecology) &&
       MandateRuntime.isLiveChunk(chunkX, chunkZ) &&
       (if held.isOf(VoyBlocks.InoculatedTimberItem) then player.isSneaking
        else !player.isSneaking)

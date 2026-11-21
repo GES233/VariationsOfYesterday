@@ -10,7 +10,7 @@
 2. **内核步进（`inner/veins/`）**：
    - **四维 RK4 核**（`MandateState.scala`）：快变量 FHN（`excitation` $v$、`recovery` $w$）+ 慢变量（`stress` $s \in [0, 1]$、`activity` $q$）+ step 间闭式衰减的 $\alpha$ 突触脉冲核（`Bell` $\tau=5$ / `CrystalLink` $\tau=2$）。
    - **第五状态 `sustenance`（$M \in [0, 1]$）**：每步 RK4 之后显式推进（logistic 再生 − 高应力酸蚀 + 格间扩散），$M=0$ 为 Allee 吸收态。
-   - **空间耦合**（`MandateGrid.scala` + `MandateField.scala`）：当前通过 `MandateField` 接口（默认实现 `PrototypeValleyField`）注入固定 `32×32` 区块初始场与坐标映射，后续动态生态/一般模式可直接替换该策略。
+   - **空间耦合与生态 Adapter**（`MandateGrid.scala` + `MandateField.scala` + `EcologyKind`）：当前通过 `MandateField` 接口（默认实现 `PrototypeValleyField`）注入固定 `32×32` 区块初始场与坐标映射，并按区块群系映射四种慢变量生态 Adapter（`Mountain` 山地酸水、`Swamp` 天然湿地+泥炭暗火、`Permafrost` 永久冻土+热喀斯特、`Desert` 生物土壤结皮 BSC），各自挂载独立的 `StressParam` 预设与世界侧输入/再接种/渗流物候词表（`OverworldVocabulary.scala`）。
 3. **输出（引擎 → 世界）**：
    - 每 tick 发布 `@volatile readoutSnapshot: Map[(Int, Int), CellReadout]`（游戏线程只读，不含 `lastBellStrikeAt` / `simTime` 等引擎私有状态）；
    - 离散动作队列 `MandateActionProtocol`（`CellSpikeTriggered`、`RegimeTransitioned`、`BellStruck`）在下一服务端 tick 由 `ActionFeedback` 消费。
@@ -29,9 +29,9 @@
 
 ## 3. 工程避坑指南（边界、双默认与刻意保留的旧 Key）
 
-1. **预设与双默认参数**：
+1. **预设与多生态默认参数（`StressParam`）**：
    - `StressParam.BareCore`（`StressParam()` 默认，`sustenanceGrowth = 0.0, sustenanceBurn = 0.0`，菌网休眠）：专供裸核测试与数值回归快照；
-   - `StressParam.OverworldDefault`（`1e-3` / `4e-3`）：`VoyConfig` 主世界运行时默认预设；接线代码切勿直接传 `BareCore` 当生产默认。
+   - `StressParam.OverworldDefault`（`1e-3` / `4e-3`）：`VoyConfig` 主世界山地默认预设；此外提供 `SwampPeatDefault`（沼泽）、`PermafrostDefault`（冰原）、`DesertBscDefault`（沙漠结皮），由 `StressParam.forEcology` 按群系注入；接线代码切勿直接传 `BareCore` 当生产默认。
 2. **冻结的序列化与协议边界（代码变量已改名，wire/save key 刻意保留）**：
    - **存档（`MandatePersistence.scala`）**：`SchemaVersion = 3`（版本或几何尺寸不匹配即整体丢弃重来）；NBT key 仍沿用 `"dissonance"` / `"entrench"` / `"beatPeriods"` / `"beatDuty"`。
    - **配置（`VoyConfig.scala`）**：`config/variations-of-yesterday.json` 中的键名仍用 `"heartbeatParam"`。

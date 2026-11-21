@@ -17,7 +17,8 @@ final case class CellReadout(
     pulseDrive: Double = 0.0,
     rhythm: RhythmVerdict = RhythmVerdict.Warming,
     sustenanceFloor: Double = StressParam.BareCore.sustenanceFloor,
-    toxicityThreshold: Double = StressParam.BareCore.sustenanceBurnThreshold
+    toxicityThreshold: Double = StressParam.BareCore.sustenanceBurnThreshold,
+    sustenanceDepth: Double = StressParam.BareCore.sustenanceDepth
 ):
   /** Canonical 3-tier mycelial health of this cell. */
   def mycelium: SustenanceTier = Readout.sustenanceTier(sustenance, sustenanceFloor)
@@ -28,7 +29,7 @@ final case class CellReadout(
   /** Whether the cell's slow recovery offset sits at or below the burnout knee. */
   def isSlowOffsetBelowKnee: Boolean =
     phase == PhaseReading.Undefined(UndefinedReason.SlowOffsetBelowKnee) ||
-      Readout.isSlowOffsetBelowKnee(current.stress, sustenance)
+      Readout.isSlowOffsetBelowKnee(current.stress, sustenance, depth = sustenanceDepth)
 
   /** Whether soil stress is at or above the acid burn threshold that kills inoculum. */
   def isToxicSoil: Boolean = current.stress >= toxicityThreshold
