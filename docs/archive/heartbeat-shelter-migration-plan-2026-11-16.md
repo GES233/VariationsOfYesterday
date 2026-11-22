@@ -59,13 +59,17 @@ enum BeatSource:
 |---|---|
 | 周期数 < `minCycles`，且仍有生命迹象（`t − max(lastCross, bornAt) ≤ staleCycles × nominalPeriod`） | `Warming` |
 | 从未起跳或太久没跳（`t − max(lastCross, bornAt) > staleCycles × nominalPeriod`） | `Slow` |
-
-> **v2 修正**：v1 第一行的宽限期是 `t − bornAt < staleCycles × nominalPeriod ≈ 99 s`，但在 40 s 健康周期下凑够 `minCycles = 3` 个间隔需要 4 次穿越 ≈ 120 s —— 健康新格会在 99–120 s 之间掉出 `Warming` 又不够周期判定，形成空窗。修正为「仍有生命迹象」判据：以最近一次穿越（无穿越时为出生时刻）为锚，只要锚点距今不超过 `staleCycles × nominalPeriod` 就仍在 `Warming`；判死条件对称改为同一锚点。语义不变（能判定即结束、99 s 无任何穿越即判死），但消除了空窗。
-| `period < periodMin` | `Fast` |
-| `period > periodMax` | `Slow` |
+|           `period < periodMin`            |    `Fast`    |
+|           `period > periodMax`            |    `Slow`    |
 | 最近 `minCycles` 个周期的变异系数 > `regularityTol` | `Arrhythmic` |
-| 上一周期 `duty > dutyMax` | `Arrhythmic` |
-| 否则 | `Beating` |
+|           上一周期 `duty > dutyMax`           | `Arrhythmic` |
+|                    否则                     |  `Beating`   |
+
+> **v2 修正**：
+> v1 第一行的宽限期是 `t − bornAt < staleCycles × nominalPeriod ≈ 99 s`，但在 40 s 健康周期下凑够 `minCycles = 3` 个间隔需要 4 次穿越 ≈ 120 s ——
+> 健康新格会在 99–120 s 之间掉出 `Warming` 又不够周期判定，形成空窗。
+> 修正为「仍有生命迹象」判据：以最近一次穿越（无穿越时为出生时刻）为锚，只要锚点距今不超过 `staleCycles × nominalPeriod` 就仍在 `Warming`；
+> 判死条件对称改为同一锚点。语义不变（能判定即结束、99 s 无任何穿越即判死），但消除了空窗。
 
 **关键点：不能再用瞬时 `v ≥ 1.8` 排除庇护。** 实测健康节拍中 `v ≥ 1.8` 的占空比是 6%–13%，旧规则会让健康心跳每十秒里约一秒被判“尖峰受罚”。新判定必须用周期统计量。
 

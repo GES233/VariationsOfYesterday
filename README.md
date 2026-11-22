@@ -25,16 +25,9 @@ Design notes live in [`docs/`](docs/) (in Chinese). Build & test: `./gradlew tes
 
 ## Series Context
 
-This is the first act of the thematic *Three Dreams* trilogy. The three works share a meta-theme, recurring imagery, and the player's memory, but they do not promise loader, save, or runtime compatibility and are not intended to form a single modpack. What crosses their incompatible worlds is the player, not the inventory. See [Creative Bible](docs/CREATIVE_BIBLE.md) and [Design Note 10 (archive)](docs/archive/design-note-10-meta-trilogy-and-drift.md) (in Chinese).
+First act of the thematic *Three Dreams* trilogy. The three works share a meta-theme, recurring imagery, and the player's memory, without promising loader, save, or modpack compatibility—what crosses their worlds is the player, not the inventory. See [Creative Bible](docs/CREATIVE_BIBLE.md) and [Design Note 10 (archive)](docs/archive/design-note-10-meta-trilogy-and-drift.md) (in Chinese).
 
 ## License
 
-Code is licensed under the [Mozilla Public License 2.0](LICENSE).
-
-Narrative content and visual assets — design notes, prose in the language files,
-textures, the icon — are licensed
-[CC BY-NC-SA 4.0](LICENSE-CONTENT): quote, translate, remix and ship them in
-modpacks or videos with credit, but not commercially, and derivatives stay
-under the same terms.
-
-Minecraft itself is not covered by either license.
+- **Code**: [Mozilla Public License 2.0](LICENSE)
+- **Narrative & Visual Assets** (design docs, language prose, textures, icon): [CC BY-NC-SA 4.0](LICENSE-CONTENT) (non-commercial attribution share-alike; Minecraft itself is not covered).
